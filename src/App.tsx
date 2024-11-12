@@ -12,6 +12,9 @@ import {
   gruvboxLight,
   gruvboxLightInit,
 } from "@uiw/codemirror-theme-gruvbox-dark";
+import { consoleDark } from "@uiw/codemirror-theme-console";
+import { duotoneDark } from "@uiw/codemirror-theme-duotone";
+import { abcdef } from "@uiw/codemirror-theme-abcdef";
 
 const load_tsx_parser = async () =>
   Parser.init({
@@ -163,12 +166,11 @@ function Editor({ code, onChange }: EditorProps) {
   return (
     <CodeMirror
       value={code}
-      //height="100%"
       style={{ height: "100%" }}
       extensions={[javascript({ jsx: true, typescript: true })]}
       onChange={onChange}
       readOnly={!onChange}
-      theme={gruvboxDark}
+      theme={abcdef}
     />
   );
 }
@@ -200,7 +202,7 @@ function Example({ parser, code, onChange }: ExampleProps) {
         <div style={{ flexBasis: "50%", height: "auto" }}>
           <Editor code={code} onChange={onChange} />
         </div>
-        <div className="code">
+        <div className="code" style={{ marginLeft: "1em" }}>
           <ASTExpr ast={root} />
         </div>
       </div>

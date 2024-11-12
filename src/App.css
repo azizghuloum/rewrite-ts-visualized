@@ -79,4 +79,9 @@ sup {
 
 .cm-editor {
   height: inherit;
+  background-color: inherit;
+}
+
+.cm-gutters {
+  background-color: #3338 !important;
 }
