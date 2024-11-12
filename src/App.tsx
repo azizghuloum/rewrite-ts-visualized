@@ -1,11 +1,17 @@
 import "./App.css";
 import Parser from "web-tree-sitter";
-//@ts-ignore
 import treesitter_wasm_url from "web-tree-sitter/tree-sitter.wasm?url";
-//@ts-ignore
 import tsx_url from "./assets/tree-sitter-tsx.wasm?url";
-import React, { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { createBrowserRouter, RouterProvider } from "react-router-dom";
+import CodeMirror from "@uiw/react-codemirror";
+import { javascript } from "@codemirror/lang-javascript";
+import {
+  gruvboxDark,
+  gruvboxDarkInit,
+  gruvboxLight,
+  gruvboxLightInit,
+} from "@uiw/codemirror-theme-gruvbox-dark";
 
 const load_tsx_parser = async () =>
   Parser.init({
@@ -131,8 +137,9 @@ function ASTExpr({ ast }: { ast: AST }) {
 }
 
 const examples = [
-  "const identifier: type_identifier = {\n  member_identifier: 'str'\n}",
-  "type _ = example;",
+  "function(){[,,,]}",
+  "const identifier: type_identifier = {\n  member_identifier: 'str',\n}",
+  "type type = example;",
   "_.example;",
   "function* foo<T>() {}",
   "example;",
@@ -150,7 +157,29 @@ const examples = [
   //});
 ];
 
-function Example({ parser, code }: { parser: Parser; code: string }) {
+type EditorProps = { code: string; onChange?: (code: string) => void };
+
+function Editor({ code, onChange }: EditorProps) {
+  return (
+    <CodeMirror
+      value={code}
+      //height="100%"
+      style={{ height: "100%" }}
+      extensions={[javascript({ jsx: true, typescript: true })]}
+      onChange={onChange}
+      readOnly={!onChange}
+      theme={gruvboxDark}
+    />
+  );
+}
+
+type ExampleProps = {
+  parser: Parser;
+  code: string;
+  onChange?: (code: string) => void;
+};
+
+function Example({ parser, code, onChange }: ExampleProps) {
   const node = parser.parse(code);
   const root = absurdly(node.rootNode);
   return (
@@ -160,11 +189,16 @@ function Example({ parser, code }: { parser: Parser; code: string }) {
           display: "flex",
           flexDirection: "row",
           width: "100%",
-          alignItems: "center",
+          //alignItems: "center",
         }}
       >
-        <div className="code" style={{ flexBasis: "50%", fontSize: "2em" }}>
-          {code}
+        {false && (
+          <div className="code" style={{ flexBasis: "50%", fontSize: "1.5em" }}>
+            {code}
+          </div>
+        )}
+        <div style={{ flexBasis: "50%", height: "auto" }}>
+          <Editor code={code} onChange={onChange} />
         </div>
         <div className="code">
           <ASTExpr ast={root} />
@@ -177,13 +211,25 @@ function Example({ parser, code }: { parser: Parser; code: string }) {
 
 function Expander() {
   const [parser, set_parser] = useState<Parser | null>(null);
+  const [sample, setSample] = useState(
+    localStorage.getItem("sample_program") ?? "console.log('hello world!');"
+  );
   useEffect(() => {
     load_tsx_parser().then(set_parser);
     return undefined;
   }, []);
   if (!parser) return <div>loading ...</div>;
+
   return (
     <>
+      <Example
+        code={sample}
+        onChange={(code) => {
+          setSample(code);
+          localStorage.setItem("sample_program", code);
+        }}
+        parser={parser}
+      />
       {examples.map((code, i) => (
         <Example key={i} code={code} parser={parser} />
       ))}

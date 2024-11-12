@@ -76,3 +76,7 @@ sup {
 .tooltip:hover .tooltiptext {
   visibility: visible;
 }
+
+.cm-editor {
+  height: inherit;
+}

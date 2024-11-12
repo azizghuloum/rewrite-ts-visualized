@@ -10,6 +10,10 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@codemirror/lang-javascript": "^6.2.2",
+    "@uiw/codemirror-theme-gruvbox-dark": "^4.23.6",
+    "@uiw/codemirror-themes": "^4.23.6",
+    "@uiw/react-codemirror": "^4.23.6",
     "grid-parser": "*",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
