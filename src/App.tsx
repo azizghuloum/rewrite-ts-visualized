@@ -6,14 +6,6 @@ import { useEffect, useState } from "react";
 import { createBrowserRouter, RouterProvider } from "react-router-dom";
 import CodeMirror from "@uiw/react-codemirror";
 import { javascript } from "@codemirror/lang-javascript";
-import {
-  gruvboxDark,
-  gruvboxDarkInit,
-  gruvboxLight,
-  gruvboxLightInit,
-} from "@uiw/codemirror-theme-gruvbox-dark";
-import { consoleDark } from "@uiw/codemirror-theme-console";
-import { duotoneDark } from "@uiw/codemirror-theme-duotone";
 import { abcdef } from "@uiw/codemirror-theme-abcdef";
 
 const load_tsx_parser = async () =>
@@ -22,7 +14,6 @@ const load_tsx_parser = async () =>
       const m: { [k: string]: string } = {
         "tree-sitter.wasm": treesitter_wasm_url,
       };
-      //console.log({ scriptName, scriptDirectory });
       return m[scriptName] ?? scriptName;
     },
   })
@@ -46,8 +37,6 @@ function absurdly(node: Parser.SyntaxNode): AST {
       node.type,
       children.filter((x) => x.type !== "comment").map(absurdly),
     ];
-    //return [node.type, children.map(absurdly)];
-    //return [node.type, children.filter((x) => !x.isExtra).map(absurdly)];
   }
 }
 
@@ -139,34 +128,12 @@ function ASTExpr({ ast }: { ast: AST }) {
   }
 }
 
-const examples = [
-  "function(){[,,,]}",
-  "const identifier: type_identifier = {\n  member_identifier: 'str',\n}",
-  "type type = example;",
-  "_.example;",
-  "function* foo<T>() {}",
-  "example;",
-  //type T = {type: Q | typeof Z};
-  //const j = <div>im jsx text</div>;
-  //rewrite(name, (x: X, y: Y, z) => {
-  //  /* comment */
-  //  "im a string".foo
-  //  pattern;
-  //  template;
-  //});
-  //rewrite(foo, () => {
-  //  foo(x);
-  //  1 + x;
-  //});
-];
-
 type EditorProps = { code: string; onChange?: (code: string) => void };
 
 function Editor({ code, onChange }: EditorProps) {
   return (
     <CodeMirror
       value={code}
-      style={{ height: "100%" }}
       extensions={[javascript({ jsx: true, typescript: true })]}
       onChange={onChange}
       readOnly={!onChange}
@@ -185,29 +152,20 @@ function Example({ parser, code, onChange }: ExampleProps) {
   const node = parser.parse(code);
   const root = absurdly(node.rootNode);
   return (
-    <>
-      <div
-        style={{
-          display: "flex",
-          flexDirection: "row",
-          width: "100%",
-          //alignItems: "center",
-        }}
-      >
-        {false && (
-          <div className="code" style={{ flexBasis: "50%", fontSize: "1.5em" }}>
-            {code}
-          </div>
-        )}
-        <div style={{ flexBasis: "50%", height: "auto" }}>
-          <Editor code={code} onChange={onChange} />
-        </div>
-        <div className="code" style={{ marginLeft: "1em" }}>
-          <ASTExpr ast={root} />
-        </div>
+    <div
+      style={{
+        display: "flex",
+        flexDirection: "row",
+        width: "100%",
+      }}
+    >
+      <div style={{ flexBasis: "50%", height: "auto" }}>
+        <Editor code={code} onChange={onChange} />
       </div>
-      <hr />
-    </>
+      <div className="code" style={{ marginLeft: "1em" }}>
+        <ASTExpr ast={root} />
+      </div>
+    </div>
   );
 }
 
@@ -232,9 +190,6 @@ function Expander() {
         }}
         parser={parser}
       />
-      {examples.map((code, i) => (
-        <Example key={i} code={code} parser={parser} />
-      ))}
     </>
   );
 }
