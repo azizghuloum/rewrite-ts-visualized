@@ -4,10 +4,10 @@ import treesitter_wasm_url from "web-tree-sitter/tree-sitter.wasm?url";
 import tsx_url from "./assets/tree-sitter-tsx.wasm?url";
 import { useEffect, useState } from "react";
 import { createBrowserRouter, RouterProvider } from "react-router-dom";
-import CodeMirror from "@uiw/react-codemirror";
-import { javascript } from "@codemirror/lang-javascript";
-import { abcdef } from "@uiw/codemirror-theme-abcdef";
+import { AST } from "./AST";
+import { ASTExpr } from "./ASTVis";
 import * as Zipper from "zipper/src/tagged-zipper";
+import { Editor } from "./Editor";
 
 const load_tsx_parser = async () =>
   Parser.init({
@@ -27,11 +27,6 @@ const load_tsx_parser = async () =>
       return parser;
     });
 
-//type AST = [string, string | AST[]];
-type AST =
-  | { type: "atom"; tag: string; content: string }
-  | { type: "list"; tag: string; content: AST[] };
-
 function absurdly(node: Parser.SyntaxNode): AST {
   const children = node.children;
   if (children.length === 0) {
@@ -43,112 +38,6 @@ function absurdly(node: Parser.SyntaxNode): AST {
       content: children.filter((x) => x.type !== "comment").map(absurdly),
     };
   }
-}
-
-function token_color(
-  token_type: string,
-  token_content: string
-): string | undefined {
-  switch (token_type) {
-    case "identifier":
-      return "yellow";
-    case "property_identifier":
-      return "lime";
-    case "type_identifier":
-      return "orange";
-    case "number":
-      return "magenta";
-    case "jsx_text":
-      return "teal";
-    case "string_fragment":
-      return "cyan";
-    case token_content:
-      return "grey";
-    default:
-      return undefined;
-  }
-}
-
-function ASTToken({
-  token_type,
-  token_content,
-}: {
-  token_type: string;
-  token_content: string;
-}) {
-  const color = token_color(token_type, token_content);
-  return (
-    <div
-      style={{
-        display: "inline-block",
-        border: "1px solid",
-        borderColor: color || "#404040",
-        borderRadius: "3px",
-        margin: "3px",
-        paddingLeft: "5px",
-        paddingRight: "5px",
-        color,
-      }}
-      className="tooltip"
-    >
-      {token_content}
-      {color === undefined && <span className="tooltiptext">{token_type}</span>}
-    </div>
-  );
-}
-
-function ASTList({
-  list_type,
-  list_content,
-}: {
-  list_type: string;
-  list_content: AST[];
-}) {
-  return (
-    <div style={{ display: "block" }}>
-      <div style={{ fontStyle: "italic" }}>{list_type}:</div>
-      <div
-        style={{
-          paddingLeft: "1.4em",
-          borderLeft: "3px solid #303030",
-          borderBottom: "3px solid #303030",
-          borderRadius: "9px",
-          marginLeft: "3px",
-          marginBottom: "3px",
-        }}
-      >
-        {list_content.map((x, i) => (
-          <ASTExpr key={i} ast={x} />
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function ASTExpr({ ast }: { ast: AST }) {
-  switch (ast.type) {
-    case "atom":
-      return <ASTToken token_type={ast.tag} token_content={ast.content} />;
-    case "list":
-      return <ASTList list_type={ast.tag} list_content={ast.content} />;
-    default:
-      const invalid: never = ast;
-      throw invalid;
-  }
-}
-
-type EditorProps = { code: string; onChange?: (code: string) => void };
-
-function Editor({ code, onChange }: EditorProps) {
-  return (
-    <CodeMirror
-      value={code}
-      extensions={[javascript({ jsx: true, typescript: true })]}
-      onChange={onChange}
-      readOnly={!onChange}
-      theme={abcdef}
-    />
-  );
 }
 
 type ExampleProps = {
