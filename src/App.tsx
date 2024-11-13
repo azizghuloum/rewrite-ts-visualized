@@ -7,6 +7,7 @@ import { createBrowserRouter, RouterProvider } from "react-router-dom";
 import CodeMirror from "@uiw/react-codemirror";
 import { javascript } from "@codemirror/lang-javascript";
 import { abcdef } from "@uiw/codemirror-theme-abcdef";
+import * as Zipper from "zipper/src/tagged-zipper";
 
 const load_tsx_parser = async () =>
   Parser.init({
@@ -26,17 +27,21 @@ const load_tsx_parser = async () =>
       return parser;
     });
 
-type AST = [string, string | AST[]];
+//type AST = [string, string | AST[]];
+type AST =
+  | { type: "atom"; tag: string; content: string }
+  | { type: "list"; tag: string; content: AST[] };
 
 function absurdly(node: Parser.SyntaxNode): AST {
   const children = node.children;
   if (children.length === 0) {
-    return [node.type, node.text];
+    return { type: "atom", tag: node.type, content: node.text };
   } else {
-    return [
-      node.type,
-      children.filter((x) => x.type !== "comment").map(absurdly),
-    ];
+    return {
+      type: "list",
+      tag: node.type,
+      content: children.filter((x) => x.type !== "comment").map(absurdly),
+    };
   }
 }
 
@@ -121,10 +126,14 @@ function ASTList({
 }
 
 function ASTExpr({ ast }: { ast: AST }) {
-  if (typeof ast[1] === "string") {
-    return <ASTToken token_type={ast[0]} token_content={ast[1]} />;
-  } else {
-    return <ASTList list_type={ast[0]} list_content={ast[1]} />;
+  switch (ast.type) {
+    case "atom":
+      return <ASTToken token_type={ast.tag} token_content={ast.content} />;
+    case "list":
+      return <ASTList list_type={ast.tag} list_content={ast.content} />;
+    default:
+      const invalid: never = ast;
+      throw invalid;
   }
 }
 

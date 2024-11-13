@@ -12,12 +12,8 @@
   "dependencies": {
     "@codemirror/lang-javascript": "^6.2.2",
     "@uiw/codemirror-theme-abcdef": "^4.23.6",
-    "@uiw/codemirror-theme-console": "^4.23.6",
-    "@uiw/codemirror-theme-duotone": "^4.23.6",
-    "@uiw/codemirror-theme-gruvbox-dark": "^4.23.6",
-    "@uiw/codemirror-themes": "^4.23.6",
     "@uiw/react-codemirror": "^4.23.6",
-    "grid-parser": "*",
+    "zipper": "*",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-router-dom": "^6.27.0",
