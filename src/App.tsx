@@ -157,12 +157,16 @@ function Example({ parser, code, onChange }: ExampleProps) {
         display: "flex",
         flexDirection: "row",
         width: "100%",
+        border: "2px solid #444",
       }}
     >
-      <div style={{ flexBasis: "50%", height: "auto" }}>
+      <div style={{ flexBasis: "50%", flexGrow: "100" }}>
         <Editor code={code} onChange={onChange} />
       </div>
-      <div className="code" style={{ marginLeft: "1em" }}>
+      <div
+        className="code"
+        style={{ marginLeft: "1em", maxHeight: "90vh", overflowY: "scroll" }}
+      >
         <ASTExpr ast={root} />
       </div>
     </div>
