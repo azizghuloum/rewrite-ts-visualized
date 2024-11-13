@@ -52,16 +52,16 @@ function ASTToken({
   );
 }
 
-function ASTList({
-  list_type,
-  list_content,
+export function ASTList({
+  tag,
+  children,
 }: {
-  list_type: string;
-  list_content: AST[];
+  tag: string;
+  children: React.ReactElement[];
 }) {
   return (
     <div style={{ display: "block" }}>
-      <div style={{ fontStyle: "italic" }}>{list_type}:</div>
+      <div style={{ fontStyle: "italic" }}>{tag}:</div>
       <div
         style={{
           paddingLeft: "1.4em",
@@ -72,9 +72,7 @@ function ASTList({
           marginBottom: "3px",
         }}
       >
-        {list_content.map((x, i) => (
-          <ASTExpr key={i} ast={x} />
-        ))}
+        {children}
       </div>
     </div>
   );
@@ -85,9 +83,30 @@ export function ASTExpr({ ast }: { ast: AST }) {
     case "atom":
       return <ASTToken token_type={ast.tag} token_content={ast.content} />;
     case "list":
-      return <ASTList list_type={ast.tag} list_content={ast.content} />;
+      return (
+        <ASTList tag={ast.tag}>
+          {ast.content.map((x, i) => (
+            <ASTExpr key={i} ast={x} />
+          ))}
+        </ASTList>
+      );
     default:
       const invalid: never = ast;
       throw invalid;
   }
+}
+
+export function ASTHighlight({ children }: { children: React.ReactElement }) {
+  return (
+    <div
+      style={{
+        border: "2px dotted cyan",
+        borderRadius: "5px",
+        paddingLeft: "5px",
+        paddingRight: "5px",
+      }}
+    >
+      {children}
+    </div>
+  );
 }

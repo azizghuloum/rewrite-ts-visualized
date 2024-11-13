@@ -5,9 +5,9 @@ import tsx_url from "./assets/tree-sitter-tsx.wasm?url";
 import { useEffect, useState } from "react";
 import { createBrowserRouter, RouterProvider } from "react-router-dom";
 import { AST } from "./AST";
-import { ASTExpr } from "./ASTVis";
-import * as Zipper from "zipper/src/tagged-zipper";
+import { ASTExpr, ASTHighlight, ASTList } from "./ASTVis";
 import { Editor } from "./Editor";
+import * as Zipper from "zipper/src/tagged-zipper";
 
 const load_tsx_parser = async () =>
   Parser.init({
@@ -46,9 +46,37 @@ type ExampleProps = {
   onChange?: (code: string) => void;
 };
 
+type Loc = Zipper.Loc<string, AST & { type: "atom" }>;
+
+function ast_to_zipper(ast: AST): Loc {
+  return Zipper.convert(ast, (x, atom, list) => {
+    switch (x.type) {
+      case "atom":
+        return atom(x);
+      case "list":
+        return list(x.tag, x.content);
+      default:
+        const invalid: never = x;
+        throw invalid;
+    }
+  });
+}
+
+function zipper_to_view(zipper: Loc): React.ReactElement {
+  return Zipper.unconvert(
+    zipper,
+    (x) => <ASTHighlight>{x}</ASTHighlight>,
+    (x) => <ASTExpr ast={x} />,
+    (tag, children) => <ASTList tag={tag} children={children} />
+  );
+}
+
 function Example({ parser, code, onChange }: ExampleProps) {
   const node = parser.parse(code);
-  const root = absurdly(node.rootNode);
+  const root_ast = absurdly(node.rootNode);
+  const zipper = ast_to_zipper(root_ast);
+  const zipper_view = zipper_to_view(zipper);
+
   return (
     <div
       style={{
@@ -65,7 +93,7 @@ function Example({ parser, code, onChange }: ExampleProps) {
         className="code"
         style={{ marginLeft: "1em", maxHeight: "90vh", overflowY: "scroll" }}
       >
-        <ASTExpr ast={root} />
+        {zipper_view}
       </div>
     </div>
   );
