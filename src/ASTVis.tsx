@@ -1,5 +1,10 @@
-import { AST, LL } from "./AST";
-import { STX, WSTX } from "./STX";
+import React from "react";
+import { LL } from "./AST";
+import { Wrap } from "./STX";
+
+type STX =
+  | { type: "atom"; tag: string; wrap?: Wrap; content: string }
+  | { type: "list"; tag: string; wrap?: Wrap; content: LL<STX> };
 
 function token_color(
   token_type: string,
@@ -74,7 +79,7 @@ export function Indented({
         }}
       >
         {items.map((x, i) => (
-          <div key={i}>{x}</div>
+          <React.Fragment key={i}>{x}</React.Fragment>
         ))}
       </div>
     </div>
@@ -103,7 +108,28 @@ function map_to_array<X, Y>(ll: LL<X>, f: (x: X, i: number) => Y): Y[] {
   return ys;
 }
 
-export function ASTExpr({ ast }: { ast: STX | WSTX }) {
+export function ASTExpr({ ast }: { ast: STX }) {
+  if (ast.wrap) {
+    const tag = (
+      <>
+        <div style={{ fontWeight: "bold" }}>
+          marks: {map_to_array(ast.wrap.marks, (x) => x).join(",")}
+        </div>
+        <div style={{ fontWeight: "bold" }}>
+          subst:{" "}
+          {map_to_array(ast.wrap.subst, (x) =>
+            x === "shift" ? "shift" : x.rib
+          ).join(",")}
+        </div>
+      </>
+    );
+    return (
+      <Indented
+        tag={tag}
+        items={[<ASTExpr ast={{ ...ast, wrap: undefined }} />]}
+      />
+    );
+  }
   switch (ast.type) {
     case "atom":
       return <ASTToken token_type={ast.tag} token_content={ast.content} />;
@@ -116,14 +142,6 @@ export function ASTExpr({ ast }: { ast: STX | WSTX }) {
           ))}
         />
       );
-    case "wrapped": {
-      const tag = (
-        <div style={{ fontWeight: "bold" }}>
-          marked {map_to_array(ast.marks, (x) => x).join(",")}
-        </div>
-      );
-      return <Indented tag={tag} items={[<ASTExpr ast={ast.content} />]} />;
-    }
     default:
       const invalid: never = ast;
       throw invalid;

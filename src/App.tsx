@@ -5,7 +5,17 @@ import tsx_url from "./assets/tree-sitter-tsx.wasm?url";
 import { useEffect, useState } from "react";
 import { createBrowserRouter, RouterProvider } from "react-router-dom";
 import { AST } from "./AST";
-import { LL, Marks, STX, Subst, top_mark, WSTX } from "./STX";
+import {
+  antimark,
+  CompilationUnit,
+  LL,
+  Marks,
+  new_subst_label,
+  Rib,
+  STX,
+  top_mark,
+  Wrap,
+} from "./STX";
 import { ASTExpr, ASTHighlight, ASTList } from "./ASTVis";
 import { Editor } from "./Editor";
 import * as Zipper from "zipper/src/tagged-constructive-zipper";
@@ -66,31 +76,104 @@ function zipper_to_view(zipper: Loc): React.ReactElement {
   );
 }
 
-type Step = { loc: Loc } & {
-  type: "ExpandProgram";
-};
+type Step =
+  | { type: "ExpandProgram"; loc: Loc; counter: number }
+  | {
+      type: "PreExpandBody";
+      loc: Loc;
+      unit: CompilationUnit;
+      counter: number;
+    }
+  | {
+      type: "PreExpandBodyForm";
+      loc: Loc;
+      unit: CompilationUnit;
+      counter: number;
+      k: (props: { t: Loc; unit: CompilationUnit; counter: number }) => Step;
+    }
+  | { type: "DEBUG"; loc: Loc };
 
 function initial_step(code: string, parser: Parser): Step {
   const node = parser.parse(code);
   const root_ast = absurdly(node.rootNode);
-  const root_stx: STX = {
-    type: "wrapped",
-    marks: [top_mark, null],
-    subst: null,
-    content: root_ast,
-  };
+
+  const marks: Marks = [top_mark, null];
+  const subst = null;
+  const wrap = { marks, subst };
+  const root_stx: STX = (() => {
+    switch (root_ast.type) {
+      case "atom":
+        return {
+          type: "atom",
+          wrap,
+          tag: root_ast.tag,
+          content: root_ast.content,
+        };
+      case "list":
+        return {
+          type: "list",
+          wrap,
+          tag: root_ast.tag,
+          content: root_ast.content,
+        };
+      default:
+        const invalid: never = root_ast;
+        throw invalid;
+    }
+  })();
+
   const loc: Loc = Zipper.mkzipper(root_stx);
-  return { type: "ExpandProgram", loc };
+  return { type: "ExpandProgram", loc, counter: 0 };
 }
 
-function push_wrap(marks: Marks, subst: Subst): (stx: STX | WSTX) => STX {
-  return (stx: STX | WSTX) => {
+function is_top_marked(wrap: Wrap): boolean {
+  function loop_marks(marks: Marks): boolean {
+    if (marks === null) return false;
+    if (marks[0] === top_mark && marks[1] === null) return true;
+    return loop_marks(marks[1]);
+  }
+  return loop_marks(wrap.marks);
+}
+
+function llappend<X>(a1: LL<X>, a2: LL<X>): LL<X> {
+  return a1 === null ? a2 : [a1[0], llappend(a1[1], a2)];
+}
+
+function merge_wraps(outerwrap: Wrap, innerwrap?: Wrap): Wrap {
+  if (innerwrap === undefined) return outerwrap;
+  if (is_top_marked(outerwrap)) {
+    throw new Error("merge of top-marked outer");
+  }
+  if (outerwrap.marks && innerwrap.marks && innerwrap.marks[0] === antimark) {
+    throw new Error("found antimark");
+  } else {
+    return {
+      marks: llappend(outerwrap.marks, innerwrap.marks),
+      subst: llappend(outerwrap.subst, innerwrap.subst),
+    };
+  }
+}
+
+function push_wrap(outerwrap: Wrap): (stx: AST | STX) => STX {
+  return (stx: STX | AST) => {
+    const wrap = merge_wraps(outerwrap, stx.wrap);
     switch (stx.type) {
-      case "wrapped":
-        throw new Error("merge wraps not implemented");
-      case "list":
-      case "atom":
-        return { type: "wrapped", marks, subst, content: stx };
+      case "list": {
+        return {
+          type: "list",
+          wrap,
+          tag: stx.tag,
+          content: stx.content,
+        };
+      }
+      case "atom": {
+        return {
+          type: "atom",
+          wrap,
+          tag: stx.tag,
+          content: stx.content,
+        };
+      }
     }
   };
 }
@@ -99,46 +182,21 @@ function llmap<X, Y>(ls: LL<X>, f: (x: X) => Y): LL<Y> {
   return ls === null ? null : [f(ls[0]), llmap(ls[1], f)];
 }
 
-function expose(stx: STX & { type: "wrapped" }): STX {
-  const { marks, subst, content } = stx;
-  switch (content.type) {
-    case "atom":
-      return stx;
-    case "list":
-      return {
-        type: "list",
-        tag: content.tag,
-        content: llmap(content.content, push_wrap(marks, subst)),
-      };
-    default:
-      const invalid: never = content;
-      throw invalid;
-  }
-}
-
-function go_down(loc: Loc): Loc {
-  return Zipper.go_down(loc, (head, cb) => {
-    switch (head.type) {
-      case "wrapped": {
-        const exposed = expose(head);
-        switch (exposed.type) {
-          case "wrapped":
-            throw new Error("cannot go down an atom");
-          case "list":
-            return cb(exposed.tag, exposed.content);
-          default:
-            const invalid: never = exposed;
-            throw invalid;
+function go_down(loc: Loc, f: (loc: Loc) => Step): Step {
+  const x: Loc = Zipper.go_down(loc, (t, cb) => {
+    switch (t.type) {
+      case "list": {
+        if (t.wrap) {
+          return cb(t.tag, llmap(t.content, push_wrap(t.wrap)));
+        } else {
+          return cb(t.tag, t.content);
         }
       }
-      case "list": {
-        return cb(head.tag, head.content);
-      }
       default:
-        const invalid: never = head;
-        throw invalid;
+        throw new Error("HERE");
     }
   });
+  return f(x);
 }
 
 function assert(condition: boolean) {
@@ -147,23 +205,40 @@ function assert(condition: boolean) {
   }
 }
 
+function wrap_loc(loc: Loc, wrap: Wrap): Loc {
+  return Zipper.change(loc, push_wrap(wrap)(loc.t));
+}
+
 function next_step(step: Step): Step {
-  const loc = step.loc;
-  if (loc.t.type === "wrapped" && loc.t.content.type !== "atom") {
-    return { ...step, loc: Zipper.change(loc, expose(loc.t)) };
-  }
-  const tree =
-    loc.t.type === "wrapped" && loc.t.content.type !== "atom"
-      ? expose(loc.t)
-      : loc.t;
-  console.log("tick");
   switch (step.type) {
     case "ExpandProgram": {
-      //return { ...step, loc: go_down(loc) };
-      // const forms = down_and_right("program", loc);
-      // console.log(tree.tag);
-      // const d = go_down(loc);
-      // assert(d.t.type === "list" && d.t.tag === "program");
+      assert(step.loc.t.tag === "program");
+      const rib: Rib = {
+        type: "rib",
+        types_env: {},
+        normal_env: {},
+      };
+      const [label, counter] = new_subst_label(step.counter);
+      const wrap: Wrap = { marks: null, subst: [{ rib: label }, null] };
+      return go_down(wrap_loc(step.loc, wrap), (loc) => {
+        return {
+          type: "PreExpandBody",
+          loc,
+          unit: { store: { [label]: rib } },
+          counter,
+        };
+      });
+    }
+    case "PreExpandBody": {
+      return {
+        type: "PreExpandBodyForm",
+        counter: step.counter,
+        unit: step.unit,
+        loc: { type: "loc", t: step.loc.t, p: { type: "top" } },
+        k: ({}) => {
+          throw new Error("PostPreExpage");
+        },
+      };
     }
   }
   throw new Error(`${step.type} is not implemented`);
@@ -193,12 +268,13 @@ function Stepper({ code, parser }: { code: string; parser: Parser }) {
     [next_step, code]
   );
   useEffect(() => {
-    requestAnimationFrame(() => {
+    const handle = setTimeout(() => {
       setState((state) => {
         if (state.error !== null || state.fuel_left === 0) return state;
         const next_state = (() => {
           try {
             const step = next_step(state.last_step);
+            console.log("one step done");
             const next_state: State = {
               prev_steps: [state.last_step, state.prev_steps],
               last_step: step,
@@ -213,7 +289,10 @@ function Stepper({ code, parser }: { code: string; parser: Parser }) {
         })();
         return next_state;
       });
-    });
+    }, 200);
+    return () => {
+      clearTimeout(handle);
+    };
   }, [state]);
   return (
     <div>
@@ -228,7 +307,12 @@ function Stepper({ code, parser }: { code: string; parser: Parser }) {
       </div>
       <div
         className="code"
-        style={{ marginLeft: "1em", maxHeight: "80vh", overflowY: "scroll" }}
+        style={{
+          marginLeft: "1em",
+          height: "80vh",
+          maxHeight: "80vh",
+          overflowY: "scroll",
+        }}
       >
         {zipper_view}
       </div>
@@ -249,7 +333,9 @@ function Example({ parser, code, onChange }: ExampleProps) {
       <div style={{ flexBasis: "50%", flexGrow: "100" }}>
         <Editor code={code} onChange={onChange} />
       </div>
-      <Stepper code={code} parser={parser} />
+      <div style={{ flexBasis: "40%", flexGrow: "0" }}>
+        <Stepper code={code} parser={parser} />
+      </div>
     </div>
   );
 }

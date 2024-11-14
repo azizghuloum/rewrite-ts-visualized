@@ -1,10 +1,16 @@
+import { AST } from "./AST";
+
 export type LL<X> = null | [X, LL<X>];
 
 export type TopMark = "top";
 
 export const top_mark: TopMark = "top";
 
-export type Mark = TopMark | string;
+export type AntiMark = "antimark";
+
+export const antimark: AntiMark = "antimark";
+
+export type Mark = TopMark | AntiMark | string;
 
 export type Shift = "shift";
 
@@ -27,17 +33,29 @@ test();
 
 export type Env = { [name: string]: [LL<Mark>, string][] };
 
-export type Rib = { types: Env; exprs: Env };
+export type Rib = { type: "rib"; types_env: Env; normal_env: Env };
+
+function label_generator(
+  prefix: string
+): (counter: number) => [string, number] {
+  return (counter: number) => [`${prefix}${counter}`, counter + 1];
+}
+
+export const new_subst_label = label_generator("s.");
+
+export type CompilationUnit = {
+  store: { [label: string]: Rib };
+};
 
 export type Marks = LL<Mark>;
 
-export type Subst = LL<Shift | Rib>;
+export type RibRef = { rib: string };
+
+export type Subst = LL<Shift | RibRef>;
+
+export type Wrap = { marks: Marks; subst: Subst };
 
 export type STX =
-  | { type: "list"; tag: string; content: LL<STX> }
-  //| { type: "wrapped_atom"; tag: string, marks: Marks; subst: Subst; content: string }
-  | { type: "wrapped"; marks: Marks; subst: Subst; content: WSTX };
-
-export type WSTX =
-  | { type: "list"; tag: string; content: LL<WSTX | STX> }
-  | { type: "atom"; tag: string; content: string };
+  | { type: "list"; tag: string; wrap: Wrap; content: LL<STX | AST> }
+  | { type: "list"; tag: string; wrap: undefined; content: LL<STX> }
+  | { type: "atom"; tag: string; wrap: Wrap; content: string };
