@@ -1,3 +1,4 @@
+import { assert } from "./assert";
 import { AST } from "./AST";
 import {
   CompilationUnit,
@@ -50,12 +51,6 @@ export function initial_step(ast: AST): Step {
     unit,
     context,
   };
-}
-
-function assert(condition: boolean) {
-  if (!condition) {
-    throw new Error("condition failed");
-  }
 }
 
 export function next_step(step: Step): Step {
