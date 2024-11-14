@@ -29,9 +29,14 @@ export type Env = { [name: string]: [LL<Mark>, string][] };
 
 export type Rib = { types: Env; exprs: Env };
 
+export type Marks = LL<Mark>;
+
+export type Subst = LL<Shift | Rib>;
+
 export type STX =
   | { type: "list"; tag: string; content: LL<STX> }
-  | { type: "wrapped"; marks: LL<Mark>; subst: LL<Shift | Rib>; content: WSTX };
+  //| { type: "wrapped_atom"; tag: string, marks: Marks; subst: Subst; content: string }
+  | { type: "wrapped"; marks: Marks; subst: Subst; content: WSTX };
 
 export type WSTX =
   | { type: "list"; tag: string; content: LL<WSTX | STX> }

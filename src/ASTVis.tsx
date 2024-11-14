@@ -55,10 +55,10 @@ function ASTToken({
 
 export function Indented({
   tag,
-  children,
+  items,
 }: {
   tag: React.ReactElement;
-  children: React.ReactElement | React.ReactElement[];
+  items: React.ReactElement[];
 }) {
   return (
     <div style={{ display: "block" }}>
@@ -73,7 +73,9 @@ export function Indented({
           marginBottom: "3px",
         }}
       >
-        {children}
+        {items.map((x, i) => (
+          <div key={i}>{x}</div>
+        ))}
       </div>
     </div>
   );
@@ -81,13 +83,13 @@ export function Indented({
 
 export function ASTList({
   tag,
-  children,
+  items,
 }: {
   tag: string;
-  children: React.ReactElement[];
+  items: React.ReactElement[];
 }) {
   const tag_element = <div style={{ fontStyle: "italic" }}>{tag}:</div>;
-  return <Indented tag={tag_element} children={children} />;
+  return <Indented tag={tag_element} items={items} />;
 }
 
 function map_to_array<X, Y>(ll: LL<X>, f: (x: X, i: number) => Y): Y[] {
@@ -107,11 +109,12 @@ export function ASTExpr({ ast }: { ast: STX | WSTX }) {
       return <ASTToken token_type={ast.tag} token_content={ast.content} />;
     case "list":
       return (
-        <ASTList tag={ast.tag}>
-          {map_to_array(ast.content, (x, i) => (
+        <ASTList
+          tag={ast.tag}
+          items={map_to_array(ast.content, (x, i) => (
             <ASTExpr key={i} ast={x} />
           ))}
-        </ASTList>
+        />
       );
     case "wrapped": {
       const tag = (
@@ -119,11 +122,7 @@ export function ASTExpr({ ast }: { ast: STX | WSTX }) {
           marked {map_to_array(ast.marks, (x) => x).join(",")}
         </div>
       );
-      return (
-        <Indented tag={tag}>
-          <ASTExpr ast={ast.content} />
-        </Indented>
-      );
+      return <Indented tag={tag} items={[<ASTExpr ast={ast.content} />]} />;
     }
     default:
       const invalid: never = ast;
