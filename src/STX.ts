@@ -10,7 +10,24 @@ export type Shift = "shift";
 
 export const shift: Shift = "shift";
 
-export type Rib = { [name: string]: [LL<Mark>, string][] };
+/*
+ * Dual environments in typescript
+ */
+
+function test() {
+  const t = 12;
+  type t = string;
+  function bar() {
+    const q = t;
+    type q = t;
+  }
+  bar();
+}
+test();
+
+export type Env = { [name: string]: [LL<Mark>, string][] };
+
+export type Rib = { types: Env; exprs: Env };
 
 export type STX =
   | { type: "list"; tag: string; content: LL<STX> }
