@@ -145,3 +145,13 @@ export function init_top_level(ast: AST): {
     context,
   };
 }
+
+export function extend_unit(
+  unit: CompilationUnit,
+  label: string,
+  rib: Rib
+): CompilationUnit {
+  return {
+    store: { ...unit.store, [label]: rib },
+  };
+}

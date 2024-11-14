@@ -8,6 +8,7 @@ import { AST } from "./AST";
 import {
   CompilationUnit,
   Context,
+  extend_unit,
   init_top_level,
   LL,
   new_subst_label,
@@ -142,16 +143,6 @@ function wrap_loc(loc: Loc, wrap: Wrap): Loc {
   return Zipper.change(loc, push_wrap(wrap)(loc.t));
 }
 
-function extent_unit(
-  unit: CompilationUnit,
-  label: string,
-  rib: Rib
-): CompilationUnit {
-  return {
-    store: { ...unit.store, [label]: rib },
-  };
-}
-
 function next_step(step: Step): Step {
   switch (step.type) {
     case "ExpandProgram": {
@@ -167,7 +158,7 @@ function next_step(step: Step): Step {
         return {
           type: "PreExpandBody",
           loc,
-          unit: extent_unit(step.unit, label, rib),
+          unit: extend_unit(step.unit, label, rib),
           context: step.context,
           counter,
         };
