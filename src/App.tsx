@@ -12,15 +12,13 @@ import {
   init_top_level,
   LL,
   new_subst_label,
-  push_wrap,
   Rib,
-  STX,
   Wrap,
 } from "./STX";
 import { ASTExpr, ASTHighlight, ASTList } from "./ASTVis";
 import { Editor } from "./Editor";
-import * as Zipper from "zipper/src/tagged-constructive-zipper";
-import { array_to_ll, llmap } from "./llhelpers";
+import { array_to_ll } from "./llhelpers";
+import * as Zipper from "./zipper";
 
 const load_tsx_parser = async () =>
   Parser.init({
@@ -61,9 +59,7 @@ type ExampleProps = {
   onChange?: (code: string) => void;
 };
 
-type Loc = Zipper.Loc<string, STX>;
-
-function zipper_to_view(zipper: Loc): React.ReactElement {
+function zipper_to_view(zipper: Zipper.Loc): React.ReactElement {
   return Zipper.reconvert(
     zipper,
     (x) => <ASTHighlight>{x}</ASTHighlight>,
@@ -71,6 +67,8 @@ function zipper_to_view(zipper: Loc): React.ReactElement {
     (tag, children) => <ASTList tag={tag} items={children} />
   );
 }
+
+type Loc = Zipper.Loc;
 
 type Step =
   | {
@@ -116,31 +114,10 @@ function initial_step(code: string, parser: Parser): Step {
   };
 }
 
-function go_down(loc: Loc, f: (loc: Loc) => Step): Step {
-  const x: Loc = Zipper.go_down(loc, (t, cb) => {
-    switch (t.type) {
-      case "list": {
-        if (t.wrap) {
-          return cb(t.tag, llmap(t.content, push_wrap(t.wrap)));
-        } else {
-          return cb(t.tag, t.content);
-        }
-      }
-      default:
-        throw new Error("HERE");
-    }
-  });
-  return f(x);
-}
-
 function assert(condition: boolean) {
   if (!condition) {
     throw new Error("condition failed");
   }
-}
-
-function wrap_loc(loc: Loc, wrap: Wrap): Loc {
-  return Zipper.change(loc, push_wrap(wrap)(loc.t));
 }
 
 function next_step(step: Step): Step {
@@ -154,7 +131,7 @@ function next_step(step: Step): Step {
       };
       const [label, counter] = new_subst_label(step.counter);
       const wrap: Wrap = { marks: null, subst: [{ rib: label }, null] };
-      return go_down(wrap_loc(step.loc, wrap), (loc) => {
+      return Zipper.go_down(Zipper.wrap_loc(step.loc, wrap), (loc) => {
         return {
           type: "PreExpandBody",
           loc,
