@@ -5,20 +5,11 @@ import tsx_url from "./assets/tree-sitter-tsx.wasm?url";
 import { useEffect, useState } from "react";
 import { createBrowserRouter, RouterProvider } from "react-router-dom";
 import { AST } from "./AST";
-import {
-  CompilationUnit,
-  Context,
-  extend_unit,
-  init_top_level,
-  LL,
-  new_subst_label,
-  Rib,
-  Wrap,
-} from "./STX";
 import { ASTExpr, ASTHighlight, ASTList } from "./ASTVis";
 import { Editor } from "./Editor";
-import { array_to_ll } from "./llhelpers";
+import { array_to_ll, LL } from "./llhelpers";
 import * as Zipper from "./zipper";
+import { initial_step, next_step, Step } from "./expander";
 
 const load_tsx_parser = async () =>
   Parser.init({
@@ -68,95 +59,6 @@ function zipper_to_view(zipper: Zipper.Loc): React.ReactElement {
   );
 }
 
-type Loc = Zipper.Loc;
-
-type Step =
-  | {
-      type: "ExpandProgram";
-      loc: Loc;
-      unit: CompilationUnit;
-      context: Context;
-      counter: number;
-    }
-  | {
-      type: "PreExpandBody";
-      loc: Loc;
-      unit: CompilationUnit;
-      context: Context;
-      counter: number;
-    }
-  | {
-      type: "PreExpandBodyForm";
-      loc: Loc;
-      unit: CompilationUnit;
-      context: Context;
-      counter: number;
-      k: (props: {
-        t: Loc;
-        unit: CompilationUnit;
-        context: Context;
-        counter: number;
-      }) => Step;
-    }
-  | { type: "DEBUG"; loc: Loc };
-
-function initial_step(code: string, parser: Parser): Step {
-  const node = parser.parse(code);
-  const root_ast = absurdly(node.rootNode);
-  const { stx, counter, unit, context } = init_top_level(root_ast);
-  const loc: Loc = Zipper.mkzipper(stx);
-  return {
-    type: "ExpandProgram",
-    loc,
-    counter,
-    unit,
-    context,
-  };
-}
-
-function assert(condition: boolean) {
-  if (!condition) {
-    throw new Error("condition failed");
-  }
-}
-
-function next_step(step: Step): Step {
-  switch (step.type) {
-    case "ExpandProgram": {
-      assert(step.loc.t.tag === "program");
-      const rib: Rib = {
-        type: "rib",
-        types_env: {},
-        normal_env: {},
-      };
-      const [label, counter] = new_subst_label(step.counter);
-      const wrap: Wrap = { marks: null, subst: [{ rib: label }, null] };
-      return Zipper.go_down(Zipper.wrap_loc(step.loc, wrap), (loc) => {
-        return {
-          type: "PreExpandBody",
-          loc,
-          unit: extend_unit(step.unit, label, rib),
-          context: step.context,
-          counter,
-        };
-      });
-    }
-    case "PreExpandBody": {
-      return {
-        type: "PreExpandBodyForm",
-        counter: step.counter,
-        unit: step.unit,
-        context: step.context,
-        loc: { type: "loc", t: step.loc.t, p: { type: "top" } },
-        k: ({}) => {
-          throw new Error("PostPreExpage");
-        },
-      };
-    }
-  }
-  throw new Error(`${step.type} is not implemented`);
-}
-
 type State = {
   prev_steps: LL<Step>;
   last_step: Step;
@@ -173,11 +75,19 @@ function initial_state(step: Step): State {
   };
 }
 
+function parse_with(parser: Parser, code: string): AST {
+  const node = parser.parse(code);
+  const ast = absurdly(node.rootNode);
+  return ast;
+}
+
 function Stepper({ code, parser }: { code: string; parser: Parser }) {
-  const [state, setState] = useState(initial_state(initial_step(code, parser)));
+  const [state, setState] = useState(
+    initial_state(initial_step(parse_with(parser, code)))
+  );
   const zipper_view = zipper_to_view(state.last_step.loc);
   useEffect(
-    () => setState(initial_state(initial_step(code, parser))),
+    () => setState(initial_state(initial_step(parse_with(parser, code)))),
     [next_step, code]
   );
   useEffect(() => {

@@ -1,7 +1,5 @@
 import { AST } from "./AST";
-import { llappend } from "./llhelpers";
-
-export type LL<X> = null | [X, LL<X>];
+import { LL, llappend } from "./llhelpers";
 
 export type TopMark = "top";
 
