@@ -5,9 +5,10 @@ import tsx_url from "./assets/tree-sitter-tsx.wasm?url";
 import { useEffect, useState } from "react";
 import { createBrowserRouter, RouterProvider } from "react-router-dom";
 import { AST } from "./AST";
+import { LL, STX, top_mark } from "./STX";
 import { ASTExpr, ASTHighlight, ASTList } from "./ASTVis";
 import { Editor } from "./Editor";
-import * as Zipper from "zipper/src/tagged-zipper";
+import * as Zipper from "zipper/src/tagged-constructive-zipper";
 
 const load_tsx_parser = async () =>
   Parser.init({
@@ -27,6 +28,12 @@ const load_tsx_parser = async () =>
       return parser;
     });
 
+function array_to_ll<X>(a: X[]): LL<X> {
+  let ll: LL<X> = null;
+  for (let i = a.length - 1; i >= 0; i--) ll = [a[i], ll];
+  return ll;
+}
+
 function absurdly(node: Parser.SyntaxNode): AST {
   const children = node.children;
   if (children.length === 0) {
@@ -35,7 +42,9 @@ function absurdly(node: Parser.SyntaxNode): AST {
     return {
       type: "list",
       tag: node.type,
-      content: children.filter((x) => x.type !== "comment").map(absurdly),
+      content: array_to_ll(
+        children.filter((x) => x.type !== "comment").map(absurdly)
+      ),
     };
   }
 }
@@ -46,24 +55,10 @@ type ExampleProps = {
   onChange?: (code: string) => void;
 };
 
-type Loc = Zipper.Loc<string, AST & { type: "atom" }>;
-
-function ast_to_zipper(ast: AST): Loc {
-  return Zipper.convert(ast, (x, atom, list) => {
-    switch (x.type) {
-      case "atom":
-        return atom(x);
-      case "list":
-        return list(x.tag, x.content);
-      default:
-        const invalid: never = x;
-        throw invalid;
-    }
-  });
-}
+type Loc = Zipper.Loc<string, STX>;
 
 function zipper_to_view(zipper: Loc): React.ReactElement {
-  return Zipper.unconvert(
+  return Zipper.reconvert(
     zipper,
     (x) => <ASTHighlight>{x}</ASTHighlight>,
     (x) => <ASTExpr ast={x} />,
@@ -74,7 +69,13 @@ function zipper_to_view(zipper: Loc): React.ReactElement {
 function Example({ parser, code, onChange }: ExampleProps) {
   const node = parser.parse(code);
   const root_ast = absurdly(node.rootNode);
-  const zipper = ast_to_zipper(root_ast);
+  const root_stx: STX = {
+    type: "wrapped",
+    marks: [top_mark, null],
+    subst: null,
+    content: root_ast,
+  };
+  const zipper: Loc = Zipper.mkzipper(root_stx);
   const zipper_view = zipper_to_view(zipper);
 
   return (

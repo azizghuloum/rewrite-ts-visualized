@@ -1,4 +1,5 @@
-import { AST } from "./AST";
+import { AST, LL } from "./AST";
+import { STX, WSTX } from "./STX";
 
 function token_color(
   token_type: string,
@@ -78,18 +79,41 @@ export function ASTList({
   );
 }
 
-export function ASTExpr({ ast }: { ast: AST }) {
+function map_to_array<X, Y>(ll: LL<X>, f: (x: X, i: number) => Y): Y[] {
+  const ys: Y[] = [];
+  let i = 0;
+  while (ll !== null) {
+    ys.push(f(ll[0], i));
+    i += 1;
+    ll = ll[1];
+  }
+  return ys;
+}
+
+export function ASTExpr({ ast }: { ast: STX | WSTX }) {
   switch (ast.type) {
     case "atom":
       return <ASTToken token_type={ast.tag} token_content={ast.content} />;
     case "list":
       return (
         <ASTList tag={ast.tag}>
-          {ast.content.map((x, i) => (
+          {map_to_array(ast.content, (x, i) => (
             <ASTExpr key={i} ast={x} />
           ))}
         </ASTList>
       );
+    case "wrapped": {
+      return (
+        <div>
+          <div style={{ fontWeight: "bold" }}>
+            marked {map_to_array(ast.marks, (x) => x).join(",")}
+          </div>
+          <div style={{ paddingLeft: "1em" }}>
+            <ASTExpr ast={ast.content} />;
+          </div>
+        </div>
+      );
+    }
     default:
       const invalid: never = ast;
       throw invalid;
