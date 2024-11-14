@@ -1,4 +1,4 @@
-export type LL<X> = null | [X, LL<X>];
+import { LL } from "./llhelpers";
 
 export type AST =
   | {

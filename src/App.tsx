@@ -6,19 +6,20 @@ import { useEffect, useState } from "react";
 import { createBrowserRouter, RouterProvider } from "react-router-dom";
 import { AST } from "./AST";
 import {
-  antimark,
   CompilationUnit,
+  Context,
+  init_top_level,
   LL,
-  Marks,
   new_subst_label,
+  push_wrap,
   Rib,
   STX,
-  top_mark,
   Wrap,
 } from "./STX";
 import { ASTExpr, ASTHighlight, ASTList } from "./ASTVis";
 import { Editor } from "./Editor";
 import * as Zipper from "zipper/src/tagged-constructive-zipper";
+import { array_to_ll, llmap } from "./llhelpers";
 
 const load_tsx_parser = async () =>
   Parser.init({
@@ -37,12 +38,6 @@ const load_tsx_parser = async () =>
       parser.setLanguage(tsx);
       return parser;
     });
-
-function array_to_ll<X>(a: X[]): LL<X> {
-  let ll: LL<X> = null;
-  for (let i = a.length - 1; i >= 0; i--) ll = [a[i], ll];
-  return ll;
-}
 
 function absurdly(node: Parser.SyntaxNode): AST {
   const children = node.children;
@@ -77,109 +72,47 @@ function zipper_to_view(zipper: Loc): React.ReactElement {
 }
 
 type Step =
-  | { type: "ExpandProgram"; loc: Loc; counter: number }
+  | {
+      type: "ExpandProgram";
+      loc: Loc;
+      unit: CompilationUnit;
+      context: Context;
+      counter: number;
+    }
   | {
       type: "PreExpandBody";
       loc: Loc;
       unit: CompilationUnit;
+      context: Context;
       counter: number;
     }
   | {
       type: "PreExpandBodyForm";
       loc: Loc;
       unit: CompilationUnit;
+      context: Context;
       counter: number;
-      k: (props: { t: Loc; unit: CompilationUnit; counter: number }) => Step;
+      k: (props: {
+        t: Loc;
+        unit: CompilationUnit;
+        context: Context;
+        counter: number;
+      }) => Step;
     }
   | { type: "DEBUG"; loc: Loc };
 
 function initial_step(code: string, parser: Parser): Step {
   const node = parser.parse(code);
   const root_ast = absurdly(node.rootNode);
-
-  const marks: Marks = [top_mark, null];
-  const subst = null;
-  const wrap = { marks, subst };
-  const root_stx: STX = (() => {
-    switch (root_ast.type) {
-      case "atom":
-        return {
-          type: "atom",
-          wrap,
-          tag: root_ast.tag,
-          content: root_ast.content,
-        };
-      case "list":
-        return {
-          type: "list",
-          wrap,
-          tag: root_ast.tag,
-          content: root_ast.content,
-        };
-      default:
-        const invalid: never = root_ast;
-        throw invalid;
-    }
-  })();
-
-  const loc: Loc = Zipper.mkzipper(root_stx);
-  return { type: "ExpandProgram", loc, counter: 0 };
-}
-
-function is_top_marked(wrap: Wrap): boolean {
-  function loop_marks(marks: Marks): boolean {
-    if (marks === null) return false;
-    if (marks[0] === top_mark && marks[1] === null) return true;
-    return loop_marks(marks[1]);
-  }
-  return loop_marks(wrap.marks);
-}
-
-function llappend<X>(a1: LL<X>, a2: LL<X>): LL<X> {
-  return a1 === null ? a2 : [a1[0], llappend(a1[1], a2)];
-}
-
-function merge_wraps(outerwrap: Wrap, innerwrap?: Wrap): Wrap {
-  if (innerwrap === undefined) return outerwrap;
-  if (is_top_marked(outerwrap)) {
-    throw new Error("merge of top-marked outer");
-  }
-  if (outerwrap.marks && innerwrap.marks && innerwrap.marks[0] === antimark) {
-    throw new Error("found antimark");
-  } else {
-    return {
-      marks: llappend(outerwrap.marks, innerwrap.marks),
-      subst: llappend(outerwrap.subst, innerwrap.subst),
-    };
-  }
-}
-
-function push_wrap(outerwrap: Wrap): (stx: AST | STX) => STX {
-  return (stx: STX | AST) => {
-    const wrap = merge_wraps(outerwrap, stx.wrap);
-    switch (stx.type) {
-      case "list": {
-        return {
-          type: "list",
-          wrap,
-          tag: stx.tag,
-          content: stx.content,
-        };
-      }
-      case "atom": {
-        return {
-          type: "atom",
-          wrap,
-          tag: stx.tag,
-          content: stx.content,
-        };
-      }
-    }
+  const { stx, counter, unit, context } = init_top_level(root_ast);
+  const loc: Loc = Zipper.mkzipper(stx);
+  return {
+    type: "ExpandProgram",
+    loc,
+    counter,
+    unit,
+    context,
   };
-}
-
-function llmap<X, Y>(ls: LL<X>, f: (x: X) => Y): LL<Y> {
-  return ls === null ? null : [f(ls[0]), llmap(ls[1], f)];
 }
 
 function go_down(loc: Loc, f: (loc: Loc) => Step): Step {
@@ -209,6 +142,16 @@ function wrap_loc(loc: Loc, wrap: Wrap): Loc {
   return Zipper.change(loc, push_wrap(wrap)(loc.t));
 }
 
+function extent_unit(
+  unit: CompilationUnit,
+  label: string,
+  rib: Rib
+): CompilationUnit {
+  return {
+    store: { ...unit.store, [label]: rib },
+  };
+}
+
 function next_step(step: Step): Step {
   switch (step.type) {
     case "ExpandProgram": {
@@ -224,7 +167,8 @@ function next_step(step: Step): Step {
         return {
           type: "PreExpandBody",
           loc,
-          unit: { store: { [label]: rib } },
+          unit: extent_unit(step.unit, label, rib),
+          context: step.context,
           counter,
         };
       });
@@ -234,6 +178,7 @@ function next_step(step: Step): Step {
         type: "PreExpandBodyForm",
         counter: step.counter,
         unit: step.unit,
+        context: step.context,
         loc: { type: "loc", t: step.loc.t, p: { type: "top" } },
         k: ({}) => {
           throw new Error("PostPreExpage");
