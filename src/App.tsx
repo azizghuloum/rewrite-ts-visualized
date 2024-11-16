@@ -71,18 +71,22 @@ function zipper_to_view(zipper: Zipper.Loc): React.ReactElement {
 }
 
 type State = {
-  prev_steps: LL<Step>;
+  prev_steps: Step[];
   last_step: Step;
-  fuel_left: number;
+  step_number: number;
   error: string | null;
+  pointer: number | null;
 };
+
+const max_fuel = 100;
 
 function initial_state(step: Step): State {
   return {
-    prev_steps: null,
+    prev_steps: [],
     last_step: step,
-    fuel_left: 100,
+    step_number: 0,
     error: null,
+    pointer: null,
   };
 }
 
@@ -92,52 +96,19 @@ function parse_with(parser: Parser, code: string): AST {
   return ast;
 }
 
-function Stepper({ code, parser }: { code: string; parser: Parser }) {
-  const [state, setState] = useState(
-    initial_state(initial_step(parse_with(parser, code)))
-  );
-  const zipper_view = zipper_to_view(state.last_step.loc);
-  useEffect(
-    () => setState(initial_state(initial_step(parse_with(parser, code)))),
-    [next_step, code]
-  );
-  useEffect(() => {
-    const handle = setTimeout(() => {
-      setState((state) => {
-        if (state.error !== null || state.fuel_left === 0) return state;
-        const next_state = (() => {
-          try {
-            const step = next_step(state.last_step);
-            console.log("one step done");
-            const next_state: State = {
-              prev_steps: [state.last_step, state.prev_steps],
-              last_step: step,
-              fuel_left: state.fuel_left - 1,
-              error: null,
-            };
-            return next_state;
-          } catch (err) {
-            const next_state: State = { ...state, error: String(err) };
-            return next_state;
-          }
-        })();
-        return next_state;
-      });
-    }, 200);
-    return () => {
-      clearTimeout(handle);
-    };
-  }, [state]);
+function StepperView({
+  step,
+  step_number,
+}: {
+  step: Step;
+  step_number: number;
+}) {
+  const zipper_view = zipper_to_view(step.loc);
   return (
     <div>
       <div>
-        <div>{state.fuel_left} fuel left</div>
-        {state.error === null ? (
-          <div>no error</div>
-        ) : (
-          <div style={{ color: "red" }}>{state.error}</div>
-        )}
-        {state.last_step.type}
+        <div>step: {step_number}</div>
+        {step.type}
       </div>
       <div
         className="code"
@@ -155,20 +126,89 @@ function Stepper({ code, parser }: { code: string; parser: Parser }) {
 }
 
 function Example({ parser, code, onChange }: ExampleProps) {
+  const [state, setState] = useState(
+    initial_state(initial_step(parse_with(parser, code)))
+  );
+  useEffect(
+    () => setState(initial_state(initial_step(parse_with(parser, code)))),
+    [next_step, code]
+  );
+  useEffect(() => {
+    const handle = setTimeout(() => {
+      setState((state) => {
+        if (state.error !== null || state.step_number === max_fuel)
+          return state;
+        const next_state = (() => {
+          try {
+            const step = next_step(state.last_step);
+            state.prev_steps.push(state.last_step); // yes, destructive
+            console.log("one step done");
+            const next_state: State = {
+              prev_steps: state.prev_steps,
+              last_step: step,
+              step_number: state.step_number + 1,
+              error: null,
+              pointer: state.pointer,
+            };
+            return next_state;
+          } catch (err) {
+            const next_state: State = { ...state, error: String(err) };
+            return next_state;
+          }
+        })();
+        return next_state;
+      });
+    }, 200);
+    return () => {
+      clearTimeout(handle);
+    };
+  }, [state]);
+  const max = state.step_number;
   return (
-    <div
-      style={{
-        display: "flex",
-        flexDirection: "row",
-        width: "100%",
-        border: "2px solid #444",
-      }}
-    >
-      <div style={{ flexBasis: "50%", flexGrow: "100" }}>
-        <Editor code={code} onChange={onChange} />
-      </div>
-      <div style={{ flexBasis: "40%", flexGrow: "0" }}>
-        <Stepper code={code} parser={parser} />
+    <div>
+      <input
+        style={{ display: "block", width: "100%" }}
+        type="range"
+        min={0}
+        max={max}
+        value={state.pointer === null ? max : state.pointer}
+        onChange={(e) => {
+          const value: number = (e.target as any).value;
+          if (value === max) {
+            setState((s) => ({ ...s, pointer: null }));
+          } else {
+            setState((s) => ({ ...s, pointer: value }));
+          }
+        }}
+      />
+      {state.error === null ? (
+        <div>no error</div>
+      ) : (
+        <div style={{ color: "red" }}>{state.error}</div>
+      )}
+      <div
+        style={{
+          display: "flex",
+          flexDirection: "row",
+          width: "100%",
+          border: "2px solid #444",
+        }}
+      >
+        <div style={{ flexBasis: "50%", flexGrow: "100" }}>
+          <Editor code={code} onChange={onChange} />
+        </div>
+        <div style={{ flexBasis: "40%", flexGrow: "0" }}>
+          <StepperView
+            step={
+              state.pointer === null
+                ? state.last_step
+                : state.prev_steps[state.pointer]
+            }
+            step_number={
+              state.pointer === null ? state.step_number : state.pointer
+            }
+          />
+        </div>
       </div>
     </div>
   );
