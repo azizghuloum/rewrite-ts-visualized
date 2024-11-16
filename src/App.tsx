@@ -156,8 +156,8 @@ function Example({ parser, code, onChange }: ExampleProps) {
               last_step: step,
               step_number: state.step_number + 1,
               error:
-                step.type === "Error"
-                  ? `Error: ${step.reason}`
+                step.type === "SyntaxError"
+                  ? `Syntax Error: ${step.reason}`
                   : step.type === "DEBUG"
                     ? `DEBUG: ${JSON.stringify(step.info)}`
                     : null,

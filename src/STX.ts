@@ -44,10 +44,10 @@ function label_generator(
   return (counter: number) => [`${prefix}${counter}`, counter + 1];
 }
 
-export const new_subst_label = label_generator("s.");
+export const new_rib_id = label_generator("r");
 
 export type CompilationUnit = {
-  store: { [label: string]: Rib };
+  store: { [rib_id: string]: Rib };
 };
 
 export type Marks = LL<Mark>;
@@ -131,6 +131,29 @@ export function resolve(
   }
 }
 
+export function extend_rib<S>(
+  rib: Rib,
+  name: string,
+  marks: Marks,
+  counter: number,
+  env_type: "normal_env" | "types_env",
+  sk: (args: { rib: Rib; counter: number; label: string }) => S,
+  fk: (reason: string) => S
+): S {
+  const env = rib[env_type];
+  const entry = env[name] ?? [];
+  if (entry.find((x) => same_marks(x[0], marks))) {
+    return fk(`${name} is already defined in ${env_type}`);
+  }
+  const label = `l${counter}`;
+  const new_counter = counter + 1;
+  const new_rib: Rib = {
+    ...rib,
+    [env_type]: { ...env, [name]: [...entry, [marks, label]] },
+  };
+  return sk({ rib: new_rib, counter: new_counter, label });
+}
+
 function merge_wraps(outerwrap: Wrap, innerwrap?: Wrap): Wrap {
   if (innerwrap === undefined) return outerwrap;
   if (is_top_marked(outerwrap)) {
@@ -176,7 +199,7 @@ export function init_top_level(ast: AST): {
   unit: CompilationUnit;
   context: Context;
 } {
-  const [rib_id, counter] = new_subst_label(0);
+  const [rib_id, counter] = new_rib_id(0);
   const wrap: Wrap = { marks: top_marks, subst: [{ rib_id }, null] };
   const unit: CompilationUnit = {
     store: {
@@ -203,10 +226,10 @@ export function init_top_level(ast: AST): {
 
 export function extend_unit(
   unit: CompilationUnit,
-  label: string,
+  rib_id: string,
   rib: Rib
 ): CompilationUnit {
   return {
-    store: { ...unit.store, [label]: rib },
+    store: { ...unit.store, [rib_id]: rib },
   };
 }
