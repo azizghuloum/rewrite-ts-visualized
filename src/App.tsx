@@ -125,6 +125,16 @@ function StepperView({
   );
 }
 
+function timeout(delay: number, f: () => void): () => void {
+  if (delay <= 0) {
+    const handle = requestAnimationFrame(f);
+    return () => cancelAnimationFrame(handle);
+  } else {
+    const handle = setTimeout(f, delay);
+    return () => clearTimeout(handle);
+  }
+}
+
 function Example({ parser, code, onChange }: ExampleProps) {
   const [state, setState] = useState(
     initial_state(initial_step(parse_with(parser, code)))
@@ -134,7 +144,7 @@ function Example({ parser, code, onChange }: ExampleProps) {
     [next_step, code]
   );
   useEffect(() => {
-    const handle = setTimeout(() => {
+    const cancel = timeout(0, () => {
       setState((state) => {
         if (state.error !== null || state.step_number === max_fuel)
           return state;
@@ -161,10 +171,8 @@ function Example({ parser, code, onChange }: ExampleProps) {
         })();
         return next_state;
       });
-    }, 100);
-    return () => {
-      clearTimeout(handle);
-    };
+    });
+    return cancel;
   }, [state]);
   const max = state.step_number;
   const [display_step, display_number] =

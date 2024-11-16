@@ -166,10 +166,28 @@ type Lexical = {
 
 function extract_lexical_declaration_bindings<T>(
   loc: Loc,
-  sk: (bindings: Lexical[]) => T,
+  sk: (loc: Loc, bindings: Lexical[]) => T,
   fk: (loc: Loc, reason: string) => T
 ): T {
   const bindings: Lexical[] = [];
+
+  function after_vars(ls: Loc): T {
+    if (ls.t.type === "atom" && ls.t.tag === "other") {
+      switch (ls.t.content) {
+        case ";":
+          return go_next(
+            ls,
+            (loc) => fk(loc, "expected nothing after semicolon"),
+            (loc) => sk(loc, bindings)
+          );
+        case ",":
+          return go_right(ls, get_vars, (loc) =>
+            fk(loc, "expected variable after ','")
+          );
+      }
+    }
+    return fk(ls, "expected a ',' or a ';'");
+  }
 
   function get_vars(ls: Loc): T {
     if (ls.t.type === "list" && ls.t.tag === "variable_declarator") {
@@ -177,23 +195,13 @@ function extract_lexical_declaration_bindings<T>(
         const stx = loc.t;
         if (stx.type === "atom" && stx.tag === "identifier") {
           bindings.push({ stx });
-          return go_right(ls, get_vars, () => sk(bindings));
+          return go_next(ls, after_vars, (loc) => sk(loc, bindings));
         } else {
           throw new Error(`HERE2 ${stx.type}:${stx.tag}`);
         }
       });
-    } else if (
-      ls.t.type === "atom" &&
-      ls.t.tag === "other" &&
-      ls.t.content === ";"
-    ) {
-      return go_right(
-        ls,
-        (loc) => fk(loc, "unexpected token after semicolon"),
-        () => sk(bindings)
-      );
     } else {
-      throw new Error(`HERE3 ${ls.t.type}:${ls.t.tag}`);
+      return fk(ls, `expected a variable declaration; found ${ls.t.tag}`);
     }
   }
   return go_down(loc, (loc) => {
@@ -233,7 +241,6 @@ export function next_step(step: Step): Step {
           context: step.context,
           counter,
           k: ({ loc, bindings }) => {
-            console.log(bindings);
             return debug({
               loc,
               info: { msg: "finished preexpand", bindings },
@@ -278,7 +285,7 @@ export function next_step(step: Step): Step {
                 case "lexical_declaration": {
                   return extract_lexical_declaration_bindings(
                     loc,
-                    (bindings) => step.k({ loc, bindings }),
+                    (loc, bindings) => step.k({ loc, bindings }),
                     (loc, reason) => {
                       return { type: "Error", loc, reason };
                     }
