@@ -130,10 +130,8 @@ function Example({ parser, code, onChange }: ExampleProps) {
         const next_state = (() => {
           try {
             const step = next_step(state.last_step);
-            state.prev_steps.push(state.last_step); // yes, destructive
-            console.log("one step done");
             const next_state: State = {
-              prev_steps: state.prev_steps,
+              prev_steps: [...state.prev_steps, state.last_step],
               last_step: step,
               step_number: state.step_number + 1,
               error: null,
@@ -147,12 +145,16 @@ function Example({ parser, code, onChange }: ExampleProps) {
         })();
         return next_state;
       });
-    }, 200);
+    }, 100);
     return () => {
       clearTimeout(handle);
     };
   }, [state]);
   const max = state.step_number;
+  const [display_step, display_number] =
+    state.pointer === null || state.pointer >= state.prev_steps.length
+      ? [state.last_step, state.step_number]
+      : [state.prev_steps[state.pointer], state.pointer];
   return (
     <div>
       <input
@@ -187,16 +189,7 @@ function Example({ parser, code, onChange }: ExampleProps) {
           <Editor code={code} onChange={onChange} />
         </div>
         <div style={{ flexBasis: "40%", flexGrow: "0" }}>
-          <StepperView
-            step={
-              state.pointer === null
-                ? state.last_step
-                : state.prev_steps[state.pointer]
-            }
-            step_number={
-              state.pointer === null ? state.step_number : state.pointer
-            }
-          />
+          <StepperView step={display_step} step_number={display_number} />
         </div>
       </div>
     </div>
