@@ -1,5 +1,6 @@
 import * as Zipper from "zipper/src/tagged-constructive-zipper";
-import { llmap } from "./llhelpers";
+import { assert } from "./assert";
+import { LL, llmap } from "./llhelpers";
 import { push_wrap, STX, Wrap } from "./STX";
 
 export type Loc = Zipper.Loc<string, STX>;
@@ -36,4 +37,36 @@ export function go_down<S>(loc: Loc, f: (loc: Loc) => S): S {
     }
   });
   return f(x);
+}
+
+export function isolate(loc: Loc): Loc {
+  return { type: "loc", t: loc.t, p: { type: "top" } };
+}
+
+export function change(loc: Loc, new_loc: Loc): Loc {
+  assert(new_loc.p.type === "top");
+  return { type: "loc", t: new_loc.t, p: loc.p };
+}
+
+function mkstx(tag: string, content: LL<STX>): STX {
+  return { type: "list", tag, wrap: undefined, content };
+}
+
+export function go_next<S>(
+  loc: Loc,
+  sk: (loc: Loc) => S,
+  fk: (loc: Loc) => S
+): S {
+  switch (loc.p.type) {
+    case "node": {
+      if (loc.p.r === null) {
+        return go_next(Zipper.go_up(loc, mkstx), sk, fk);
+      } else {
+        return sk(Zipper.go_right(loc));
+      }
+    }
+    case "top": {
+      return fk(loc);
+    }
+  }
 }

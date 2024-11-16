@@ -1,33 +1,24 @@
 import React from "react";
-import { LL } from "./AST";
+import { LL } from "./llhelpers";
 import { Wrap } from "./STX";
+import * as AST from "./AST";
 
 type STX =
   | { type: "atom"; tag: string; wrap?: Wrap; content: string }
   | { type: "list"; tag: string; wrap?: Wrap; content: LL<STX> };
 
-function token_color(
-  token_type: string,
-  token_content: string
-): string | undefined {
-  switch (token_type) {
-    case "identifier":
-      return "yellow";
-    case "property_identifier":
-      return "lime";
-    case "type_identifier":
-      return "orange";
-    case "number":
-      return "magenta";
-    case "jsx_text":
-      return "teal";
-    case "string_fragment":
-      return "cyan";
-    case token_content:
-      return "grey";
-    default:
-      return undefined;
-  }
+const colormap: { [k in AST.atom_tag]: string } = {
+  identifier: "yellow",
+  property_identifier: "lime",
+  number: "magenta",
+  type_identifier: "orange",
+  jsx_text: "teal",
+  string_fragment: "cyan",
+  other: "grey",
+};
+
+function token_color(token_type: string): string | undefined {
+  return (colormap as { [k: string]: string })[token_type];
 }
 
 function ASTToken({
@@ -37,7 +28,7 @@ function ASTToken({
   token_type: string;
   token_content: string;
 }) {
-  const color = token_color(token_type, token_content);
+  const color = token_color(token_type);
   return (
     <div
       style={{
@@ -118,7 +109,7 @@ export function ASTExpr({ ast }: { ast: STX }) {
         <div style={{ fontWeight: "bold" }}>
           subst:{" "}
           {map_to_array(ast.wrap.subst, (x) =>
-            x === "shift" ? "shift" : x.rib
+            x === "shift" ? "shift" : x.rib_id
           ).join(",")}
         </div>
       </>

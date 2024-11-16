@@ -1,10 +1,19 @@
 import { LL } from "./llhelpers";
 
+export type atom_tag =
+  | "identifier"
+  | "property_identifier"
+  | "number"
+  | "type_identifier"
+  | "jsx_text"
+  | "string_fragment"
+  | "other";
+
 export type AST =
   | {
       type: "atom";
       wrap?: undefined;
-      tag: string;
+      tag: atom_tag;
       content: string;
     }
   | {

@@ -32,7 +32,18 @@ const load_tsx_parser = async () =>
 function absurdly(node: Parser.SyntaxNode): AST {
   const children = node.children;
   if (children.length === 0) {
-    return { type: "atom", tag: node.type, content: node.text };
+    switch (node.type) {
+      case "number":
+      case "identifier":
+      case "property_identifier": {
+        return { type: "atom", tag: node.type, content: node.text };
+      }
+      case node.text: {
+        return { type: "atom", tag: "other", content: node.text };
+      }
+      default:
+        throw new Error(`unknown atom ${node.type}:${node.text}`);
+    }
   } else {
     return {
       type: "list",

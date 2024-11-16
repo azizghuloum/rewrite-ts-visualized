@@ -1,4 +1,4 @@
-import { AST } from "./AST";
+import { AST, atom_tag } from "./AST";
 import { LL, llappend } from "./llhelpers";
 
 export type TopMark = "top";
@@ -21,6 +21,7 @@ export const shift: Shift = "shift";
  * Dual environments in typescript
  */
 
+/*
 function test() {
   const t = 12;
   type t = string;
@@ -31,6 +32,7 @@ function test() {
   bar();
 }
 test();
+*/
 
 export type Env = { [name: string]: [LL<Mark>, string][] };
 
@@ -50,7 +52,7 @@ export type CompilationUnit = {
 
 export type Marks = LL<Mark>;
 
-export type RibRef = { rib: string };
+export type RibRef = { rib_id: string };
 
 export type Subst = LL<Shift | RibRef>;
 
@@ -59,7 +61,7 @@ export type Wrap = { marks: Marks; subst: Subst };
 export type STX =
   | { type: "list"; tag: string; wrap: Wrap; content: LL<STX | AST> }
   | { type: "list"; tag: string; wrap: undefined; content: LL<STX> }
-  | { type: "atom"; tag: string; wrap: Wrap; content: string };
+  | { type: "atom"; tag: atom_tag; wrap: Wrap; content: string };
 
 export type Binding = { type: "core_syntax"; name: "splice" };
 
@@ -72,6 +74,61 @@ function is_top_marked(wrap: Wrap): boolean {
     return loop_marks(marks[1]);
   }
   return loop_marks(wrap.marks);
+}
+
+function same_marks(m1: Marks, m2: Marks): boolean {
+  return m1 === null
+    ? m2 === null
+    : m2 !== null && m1[0] === m2[0] && same_marks(m1[1], m2[1]);
+}
+
+function id_to_label(
+  name: string,
+  marks: Marks,
+  subst: Subst,
+  unit: CompilationUnit,
+  resolution_type: "normal_env" | "types_env"
+): string | undefined {
+  function loop(marks: Marks | null, subst: Subst): string | undefined {
+    if (marks === null) throw new Error("missing marks");
+    if (subst === null) return undefined; // unbound
+    if (subst[0] === shift) return loop(marks[1], subst[1]);
+    const env = (({ rib_id }) => {
+      const rib = unit.store[rib_id];
+      if (rib === undefined) throw new Error("missing rib");
+      return rib[resolution_type];
+    })(subst[0]);
+    const ls = env[name];
+    if (ls === undefined) return loop(marks, subst[1]);
+    const entry = ls.find(([ms, _]) => same_marks(ms, marks));
+    if (entry === undefined) return loop(marks, subst[1]);
+    return entry[1];
+  }
+  return loop(marks, subst);
+}
+
+export type Resolution =
+  | { type: "unbound" }
+  | { type: "bound"; binding: Binding }
+  | { type: "error"; reason: string };
+
+export function resolve(
+  name: string,
+  { marks, subst }: Wrap,
+  context: Context,
+  unit: CompilationUnit,
+  resolution_type: "normal_env" | "types_env"
+): Resolution {
+  const label = id_to_label(name, marks, subst, unit, resolution_type);
+  if (label === undefined) {
+    return { type: "unbound" };
+  }
+  const binding = context[label];
+  if (binding) {
+    return { type: "bound", binding };
+  } else {
+    return { type: "error", reason: "out of context" };
+  }
 }
 
 function merge_wraps(outerwrap: Wrap, innerwrap?: Wrap): Wrap {
@@ -120,7 +177,7 @@ export function init_top_level(ast: AST): {
   context: Context;
 } {
   const [rib_id, counter] = new_subst_label(0);
-  const wrap: Wrap = { marks: top_marks, subst: [{ rib: rib_id }, null] };
+  const wrap: Wrap = { marks: top_marks, subst: [{ rib_id }, null] };
   const unit: CompilationUnit = {
     store: {
       [rib_id]: {
