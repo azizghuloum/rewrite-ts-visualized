@@ -72,6 +72,7 @@ export type Step =
       loc: Loc;
       unit: CompilationUnit;
       counter: number;
+      context: Context;
       k: (args: { loc: Loc }) => Step;
     }
   | { type: "SyntaxError"; loc: Loc; reason: string }
@@ -292,6 +293,7 @@ export function next_step(step: Step): Step {
               type: "PostExpandBody",
               loc,
               counter,
+              context,
               unit,
               k: ({ loc }) =>
                 debug({
