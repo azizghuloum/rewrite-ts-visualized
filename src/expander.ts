@@ -11,6 +11,7 @@ import {
   resolve,
   Resolution,
   extend_rib,
+  extend_context,
 } from "./STX";
 import {
   change,
@@ -38,7 +39,12 @@ export type Step =
       unit: CompilationUnit;
       context: Context;
       counter: number;
-      k: (props: { loc: Loc; rib: Rib; counter: number }) => Step;
+      k: (props: {
+        loc: Loc;
+        rib: Rib;
+        context: Context;
+        counter: number;
+      }) => Step;
     }
   | {
       type: "PreExpandForms";
@@ -47,7 +53,12 @@ export type Step =
       counter: number;
       unit: CompilationUnit;
       context: Context;
-      k: (props: { loc: Loc; rib: Rib; counter: number }) => Step;
+      k: (props: {
+        loc: Loc;
+        rib: Rib;
+        context: Context;
+        counter: number;
+      }) => Step;
     }
   | {
       type: "FindForm";
@@ -55,6 +66,13 @@ export type Step =
       unit: CompilationUnit;
       context: Context;
       k: (args: { loc: Loc; resolution: Resolution | undefined }) => Step;
+    }
+  | {
+      type: "PostExpandBody";
+      loc: Loc;
+      unit: CompilationUnit;
+      counter: number;
+      k: (args: { loc: Loc }) => Step;
     }
   | { type: "SyntaxError"; loc: Loc; reason: string }
   | { type: "DEBUG"; loc: Loc; info: any };
@@ -166,23 +184,24 @@ function debug({ loc, info }: { loc: Loc; info?: any }): Step {
 function extract_lexical_declaration_bindings<T>(
   loc: Loc,
   rib: Rib,
+  context: Context,
   counter: number,
-  sk: (args: { loc: Loc; rib: Rib; counter: number }) => T,
+  sk: (args: { loc: Loc; rib: Rib; context: Context; counter: number }) => T,
   fk: (loc: Loc, reason: string) => T
 ): T {
-  function after_vars(ls: Loc, rib: Rib, counter: number): T {
+  function after_vars(ls: Loc, rib: Rib, context: Context, counter: number): T {
     if (ls.t.type === "atom" && ls.t.tag === "other") {
       switch (ls.t.content) {
         case ";":
           return go_next(
             ls,
             (loc) => fk(loc, "expected nothing after semicolon"),
-            (loc) => sk({ loc, rib, counter })
+            (loc) => sk({ loc, rib, context, counter })
           );
         case ",":
           return go_right(
             ls,
-            (loc) => get_vars(loc, rib, counter),
+            (loc) => get_vars(loc, rib, context, counter),
             (loc) => fk(loc, "expected variable after ','")
           );
       }
@@ -190,7 +209,7 @@ function extract_lexical_declaration_bindings<T>(
     return fk(ls, "expected a ',' or a ';'");
   }
 
-  function get_vars(ls: Loc, rib: Rib, counter: number): T {
+  function get_vars(ls: Loc, rib: Rib, context: Context, counter: number): T {
     if (ls.t.type === "list" && ls.t.tag === "variable_declarator") {
       return go_down(ls, (loc) => {
         const stx = loc.t;
@@ -202,10 +221,18 @@ function extract_lexical_declaration_bindings<T>(
             counter,
             "normal_env",
             ({ rib, counter, label }) =>
-              go_next(
-                ls,
-                (loc) => after_vars(loc, rib, counter),
-                (loc) => sk({ loc, rib, counter })
+              extend_context(
+                context,
+                counter,
+                label,
+                "lexical",
+                stx.content,
+                ({ context, counter }) =>
+                  go_next(
+                    ls,
+                    (loc) => after_vars(loc, rib, context, counter),
+                    (loc) => sk({ loc, rib, context, counter })
+                  )
               ),
             (reason) => fk(loc, reason)
           );
@@ -225,7 +252,7 @@ function extract_lexical_declaration_bindings<T>(
       ) {
         return go_right(
           loc,
-          (loc) => get_vars(loc, rib, counter),
+          (loc) => get_vars(loc, rib, context, counter),
           (loc) => fk(loc, "no bindings after keyword")
         );
       } else {
@@ -256,12 +283,22 @@ export function next_step(step: Step): Step {
           unit: extend_unit(step.unit, rib_id, rib), // rib is empty
           context: step.context,
           counter,
-          k: ({ loc, rib }) => {
+          k: ({ loc, rib, counter, context }) => {
             // rib is filled
-            return debug({
+            // context is filled also
+            const unit = extend_unit(step.unit, rib_id, rib);
+            // unit is now filled
+            return {
+              type: "PostExpandBody",
               loc,
-              info: { msg: "finished preexpand", rib },
-            });
+              counter,
+              unit,
+              k: ({ loc }) =>
+                debug({
+                  loc,
+                  info: { msg: "finished postexpand" },
+                }),
+            };
           },
         };
       });
@@ -274,7 +311,7 @@ export function next_step(step: Step): Step {
         counter: step.counter,
         unit: step.unit,
         context: step.context,
-        k: ({ loc, rib, counter }) =>
+        k: ({ loc, rib, context, counter }) =>
           go_next<Step>(
             change(step.loc, loc), // unisolate
             (loc) => ({
@@ -282,11 +319,11 @@ export function next_step(step: Step): Step {
               loc,
               rib,
               counter,
-              context: step.context,
+              context,
               unit: step.unit,
               k: step.k,
             }),
-            (loc) => step.k({ loc, rib, counter })
+            (loc) => step.k({ loc, rib, context, counter })
           ),
       };
     }
@@ -305,6 +342,7 @@ export function next_step(step: Step): Step {
                   return extract_lexical_declaration_bindings(
                     loc,
                     step.rib,
+                    step.context,
                     step.counter,
                     step.k,
                     (loc, reason) => {
@@ -314,11 +352,21 @@ export function next_step(step: Step): Step {
                 }
                 default: {
                   assert(list_handlers[loc.t.tag] === "descend");
-                  return step.k({ loc, rib: step.rib, counter: step.counter });
+                  return step.k({
+                    loc,
+                    rib: step.rib,
+                    counter: step.counter,
+                    context: step.context,
+                  });
                 }
               }
             } else {
-              return step.k({ loc, rib: step.rib, counter: step.counter });
+              return step.k({
+                loc,
+                rib: step.rib,
+                counter: step.counter,
+                context: step.context,
+              });
             }
           } else {
             throw new Error("macro form");

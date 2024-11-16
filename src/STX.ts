@@ -63,7 +63,9 @@ export type STX =
   | { type: "list"; tag: string; wrap: undefined; content: LL<STX> }
   | { type: "atom"; tag: atom_tag; wrap: Wrap; content: string };
 
-export type Binding = { type: "core_syntax"; name: "splice" };
+export type Binding =
+  | { type: "lexical"; name: string }
+  | { type: "core_syntax"; name: "splice" };
 
 export type Context = { [label: string]: Binding };
 
@@ -152,6 +154,23 @@ export function extend_rib<S>(
     [env_type]: { ...env, [name]: [...entry, [marks, label]] },
   };
   return sk({ rib: new_rib, counter: new_counter, label });
+}
+
+export function extend_context<S>(
+  context: Context,
+  counter: number,
+  label: string,
+  binding_type: "lexical",
+  original_name: string,
+  k: (args: { context: Context; counter: number }) => S
+): S {
+  const new_name = `${original_name}_${counter}`;
+  const new_counter = counter + 1;
+  const new_context: Context = {
+    ...context,
+    [label]: { type: binding_type, name: new_name },
+  };
+  return k({ context: new_context, counter: new_counter });
 }
 
 function merge_wraps(outerwrap: Wrap, innerwrap?: Wrap): Wrap {
