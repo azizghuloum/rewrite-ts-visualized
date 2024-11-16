@@ -70,3 +70,16 @@ export function go_next<S>(
     }
   }
 }
+
+export function go_right<S>(
+  loc: Loc,
+  sk: (loc: Loc) => S,
+  fk: (loc: Loc) => S
+): S {
+  if (loc.p.type === "node" && loc.p.r === null) {
+    // no right of me
+    return fk(loc);
+  } else {
+    return sk(Zipper.go_right(loc));
+  }
+}

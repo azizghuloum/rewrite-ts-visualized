@@ -7,7 +7,7 @@ import { createBrowserRouter, RouterProvider } from "react-router-dom";
 import { AST } from "./AST";
 import { ASTExpr, ASTHighlight, ASTList } from "./ASTVis";
 import { Editor } from "./Editor";
-import { array_to_ll, LL } from "./llhelpers";
+import { array_to_ll } from "./llhelpers";
 import * as Zipper from "./zipper";
 import { initial_step, next_step, Step } from "./expander";
 
@@ -145,7 +145,12 @@ function Example({ parser, code, onChange }: ExampleProps) {
               prev_steps: [...state.prev_steps, state.last_step],
               last_step: step,
               step_number: state.step_number + 1,
-              error: null,
+              error:
+                step.type === "Error"
+                  ? `Error: ${step.reason}`
+                  : step.type === "DEBUG"
+                    ? `DEBUG: ${JSON.stringify(step.info)}`
+                    : null,
               pointer: state.pointer,
             };
             return next_state;
