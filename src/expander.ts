@@ -35,21 +35,21 @@ export type Step =
       unit: CompilationUnit;
       context: Context;
       counter: number;
-      k: (props: { new_loc: Loc }) => Step;
+      k: (props: { loc: Loc }) => Step;
     }
   | {
       type: "PreExpandForms";
       loc: Loc;
       unit: CompilationUnit;
       context: Context;
-      k: (props: { new_loc: Loc }) => Step;
+      k: (props: { loc: Loc }) => Step;
     }
   | {
       type: "FindForm";
       loc: Loc;
       unit: CompilationUnit;
       context: Context;
-      k: (args: { new_loc: Loc; resolution: Resolution | undefined }) => Step;
+      k: (args: { loc: Loc; resolution: Resolution | undefined }) => Step;
     }
   | { type: "DEBUG"; loc: Loc };
 
@@ -146,6 +146,10 @@ function find_form(
   return find_form(loc);
 }
 
+function debug({ loc }: { loc: Loc }): Step {
+  return { type: "DEBUG", loc };
+}
+
 export function next_step(step: Step): Step {
   switch (step.type) {
     case "ExpandProgram": {
@@ -164,9 +168,7 @@ export function next_step(step: Step): Step {
           unit: extend_unit(step.unit, rib_id, rib),
           context: step.context,
           counter,
-          k: () => {
-            throw new Error("HERE?");
-          },
+          k: debug,
         };
       });
     }
@@ -176,10 +178,9 @@ export function next_step(step: Step): Step {
         loc: isolate(step.loc),
         unit: step.unit,
         context: step.context,
-        k: ({ new_loc }) => {
-          const loc = change(step.loc, new_loc);
-          return go_next<Step>(
-            loc,
+        k: ({ loc }) =>
+          go_next<Step>(
+            change(step.loc, loc),
             (loc) => ({
               type: "PreExpandBody",
               loc,
@@ -188,9 +189,8 @@ export function next_step(step: Step): Step {
               counter: step.counter,
               k: step.k,
             }),
-            (loc) => step.k({ new_loc: loc })
-          );
-        },
+            (loc) => step.k({ loc })
+          ),
       };
     }
     case "PreExpandForms": {
@@ -199,10 +199,10 @@ export function next_step(step: Step): Step {
         loc: step.loc,
         unit: step.unit,
         context: step.context,
-        k: ({ new_loc, resolution }) => {
+        k: ({ loc, resolution }) => {
           if (resolution === undefined) {
-            assert(new_loc.p.type === "top");
-            return step.k({ new_loc });
+            assert(loc.p.type === "top");
+            return step.k({ loc });
           } else {
             throw new Error("special form");
           }
@@ -210,9 +210,8 @@ export function next_step(step: Step): Step {
       };
     }
     case "FindForm": {
-      const { loc, unit, context, k } = step;
-      const [new_loc, resolution] = find_form(loc, unit, context);
-      return k({ new_loc, resolution });
+      const [loc, resolution] = find_form(step.loc, step.unit, step.context);
+      return step.k({ loc, resolution });
     }
   }
   throw new Error(`${step.type} is not implemented`);
