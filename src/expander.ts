@@ -68,6 +68,14 @@ export type Step =
       k: (args: { loc: Loc; resolution: Resolution | undefined }) => Step;
     }
   | {
+      type: "PostExpandProgram";
+      loc: Loc;
+      unit: CompilationUnit;
+      counter: number;
+      context: Context;
+      k: (args: { loc: Loc }) => Step;
+    }
+  | {
       type: "PostExpandBody";
       loc: Loc;
       unit: CompilationUnit;
@@ -205,7 +213,7 @@ function expand_program(step: {
         const unit = extend_unit(step.unit, rib_id, rib);
         // unit is now filled
         return {
-          type: "PostExpandBody",
+          type: "PostExpandProgram",
           loc,
           counter,
           context,
@@ -285,7 +293,7 @@ function preexpand_forms(step: {
               );
             }
             default: {
-              assert(list_handlers[loc.t.tag] === "descend");
+              assert(preexpand_list_handlers[loc.t.tag] === "descend");
               return step.k({
                 loc,
                 rib: step.rib,
@@ -309,8 +317,8 @@ function preexpand_forms(step: {
   };
 }
 
-const list_handlers: { [tag: string]: "descend" | "done" } = {
-  lexical_declaration: "done",
+const preexpand_list_handlers: { [tag: string]: "descend" | "stop" } = {
+  lexical_declaration: "stop",
   expression_statement: "descend",
   call_expression: "descend",
   arguments: "descend",
@@ -319,7 +327,7 @@ const list_handlers: { [tag: string]: "descend" | "done" } = {
   member_expression: "descend",
 };
 
-const atom_handlers: { [tag in atom_tag]: "next" | "stop" } = {
+const preexpand_atom_handlers: { [tag in atom_tag]: "next" | "stop" } = {
   identifier: "stop",
   type_identifier: "stop",
   property_identifier: "stop",
@@ -347,7 +355,7 @@ function find_form<T>({
     switch (loc.t.type) {
       case "atom": {
         const { tag, content, wrap } = loc.t;
-        const action = atom_handlers[tag];
+        const action = preexpand_atom_handlers[tag];
         switch (action) {
           case "stop": {
             const resolution = resolve(
@@ -375,14 +383,14 @@ function find_form<T>({
       }
       case "list": {
         const { tag } = loc.t;
-        const action = list_handlers[tag];
+        const action = preexpand_list_handlers[tag];
         if (action === undefined) {
           throw new Error(`no stop_table entry for ${tag}`);
         }
         switch (action) {
           case "descend":
             return go_down(loc, find_form);
-          case "done":
+          case "stop":
             return done(loc);
           default:
             const invalid: never = action;
@@ -397,6 +405,34 @@ function find_form<T>({
   return find_form(loc);
 }
 
+function postexpand_program(step: {
+  loc: Loc;
+  unit: CompilationUnit;
+  counter: number;
+  context: Context;
+  k: (args: { loc: Loc }) => Step;
+}): Step {
+  assert(step.loc.t.tag === "program");
+  return go_down(step.loc, (loc) => ({
+    type: "PostExpandBody",
+    loc,
+    unit: step.unit,
+    counter: step.counter,
+    context: step.context,
+    k: step.k,
+  }));
+}
+
+function postexpand_body(step: {
+  loc: Loc;
+  unit: CompilationUnit;
+  counter: number;
+  context: Context;
+  k: (args: { loc: Loc }) => Step;
+}): Step {
+  throw new Error("postexpand_body");
+}
+
 export function next_step(step: Step): Step {
   switch (step.type) {
     case "ExpandProgram":
@@ -407,6 +443,10 @@ export function next_step(step: Step): Step {
       return preexpand_forms(step);
     case "FindForm":
       return find_form(step);
+    case "PostExpandProgram":
+      return postexpand_program(step);
+    case "PostExpandBody":
+      return postexpand_body(step);
   }
   throw new Error(`${step.type} is not implemented`);
 }
