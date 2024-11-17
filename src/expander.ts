@@ -9,7 +9,6 @@ import {
   Rib,
   Wrap,
   resolve,
-  Resolution,
   extend_rib,
   extend_context,
 } from "./STX";
@@ -218,51 +217,65 @@ function preexpand_forms(step: {
 }): Step {
   return find_form({
     loc: step.loc,
-    unit: step.unit,
-    context: step.context,
-    k: ({ loc, resolution }) => {
-      if (resolution === undefined) {
-        assert(loc.p.type === "top");
-        if (loc.t.type === "list") {
-          switch (loc.t.tag) {
-            case "lexical_declaration": {
-              return extract_lexical_declaration_bindings(
-                loc,
-                step.rib,
-                step.context,
-                step.counter,
-                step.k,
-                (loc, reason) => {
-                  return { type: "SyntaxError", loc, reason };
-                }
-              );
-            }
-            default: {
-              assert(preexpand_list_handlers[loc.t.tag] === "descend");
-              return step.k({
-                loc,
-                rib: step.rib,
-                counter: step.counter,
-                context: step.context,
-              });
-            }
+    done: (loc) =>
+      step.k({
+        loc,
+        rib: step.rib,
+        context: step.context,
+        counter: step.counter,
+      }),
+    kid: ({ loc, cont }) => {
+      if (loc.t.type !== "atom") throw new Error("expected atom");
+      const { tag, content, wrap } = loc.t;
+      switch (tag) {
+        case "identifier": {
+          const resolution = resolve(
+            content,
+            wrap,
+            step.context,
+            step.unit,
+            "normal_env"
+          );
+          switch (resolution.type) {
+            case "unbound":
+              return cont(loc);
           }
-        } else {
-          return step.k({
-            loc,
-            rib: step.rib,
-            counter: step.counter,
-            context: step.context,
-          });
+          return debug("resolved")({ loc, resolution });
         }
-      } else {
-        throw new Error("macro form");
+        default:
+          return debug("unhandled atom tag")({ loc, tag });
+      }
+    },
+    klist: ({ loc, cont }) => {
+      if (loc.t.type !== "list") throw new Error("expected list");
+      switch (loc.t.tag) {
+        case "lexical_declaration": {
+          return extract_lexical_declaration_bindings(
+            loc,
+            step.rib,
+            step.context,
+            step.counter,
+            ({ loc, rib, context, counter }) =>
+              go_next(
+                loc,
+                (loc) => debug("next of lexical")({ loc }),
+                (loc) => step.k({ loc, rib, context, counter })
+              ),
+            (loc, reason) => {
+              return { type: "SyntaxError", loc, reason };
+            }
+          );
+        }
+        default: {
+          assert(list_handlers[loc.t.tag] === "descend");
+          return cont(loc);
+        }
       }
     },
   });
 }
 
-const preexpand_list_handlers: { [tag: string]: "descend" | "stop" } = {
+const list_handlers: { [tag: string]: "descend" | "stop" } = {
   lexical_declaration: "stop",
   expression_statement: "descend",
   call_expression: "descend",
@@ -272,7 +285,7 @@ const preexpand_list_handlers: { [tag: string]: "descend" | "stop" } = {
   member_expression: "descend",
 };
 
-const preexpand_atom_handlers: { [tag in atom_tag]: "next" | "stop" } = {
+const atom_handlers: { [tag in atom_tag]: "next" | "stop" } = {
   identifier: "stop",
   type_identifier: "stop",
   property_identifier: "stop",
@@ -284,37 +297,23 @@ const preexpand_atom_handlers: { [tag in atom_tag]: "next" | "stop" } = {
 
 function find_form<T>({
   loc,
-  unit,
-  context,
-  k,
+  done,
+  kid,
+  klist,
 }: {
   loc: Loc;
-  unit: CompilationUnit;
-  context: Context;
-  k: (args: { loc: Loc; resolution: Resolution | undefined }) => T;
+  done: (loc: Loc) => T;
+  kid: (args: { loc: Loc; cont: (loc: Loc) => T }) => T;
+  klist: (args: { loc: Loc; cont: (loc: Loc) => T }) => T;
 }): T {
-  function done(loc: Loc): T {
-    return k({ loc, resolution: undefined });
-  }
   function find_form(loc: Loc): T {
     switch (loc.t.type) {
       case "atom": {
-        const { tag, content, wrap } = loc.t;
-        const action = preexpand_atom_handlers[tag];
+        const { tag, content } = loc.t;
+        const action = atom_handlers[tag];
         switch (action) {
           case "stop": {
-            const resolution = resolve(
-              content,
-              wrap,
-              context,
-              unit,
-              "normal_env"
-            );
-            switch (resolution.type) {
-              case "unbound":
-                return go_next(loc, find_form, done);
-            }
-            throw new Error(`${tag} ${content} resolved as ${resolution.type}`);
+            return kid({ loc, cont: (loc) => go_next(loc, find_form, done) });
           }
           case "next": {
             return go_next(loc, find_form, done);
@@ -328,7 +327,7 @@ function find_form<T>({
       }
       case "list": {
         const { tag } = loc.t;
-        const action = preexpand_list_handlers[tag];
+        const action = list_handlers[tag];
         if (action === undefined) {
           throw new Error(`no stop_table entry for ${tag}`);
         }
@@ -336,7 +335,7 @@ function find_form<T>({
           case "descend":
             return go_down(loc, find_form);
           case "stop":
-            return done(loc);
+            return klist({ loc, cont: (loc) => go_next(loc, find_form, done) });
           default:
             const invalid: never = action;
             throw invalid;
