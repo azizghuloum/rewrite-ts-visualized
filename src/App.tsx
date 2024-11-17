@@ -35,6 +35,7 @@ function absurdly(node: Parser.SyntaxNode): AST {
     switch (node.type) {
       case "number":
       case "identifier":
+      case "type_identifier":
       case "property_identifier": {
         return { type: "atom", tag: node.type, content: node.text };
       }
