@@ -42,8 +42,11 @@ function absurdly(node: Parser.SyntaxNode): AST {
       case node.text: {
         return { type: "atom", tag: "other", content: node.text };
       }
+      case ";": {
+        return { type: "atom", tag: "other", content: ";" };
+      }
       default:
-        throw new Error(`unknown atom ${node.type}:${node.text}`);
+        throw new Error(`unknown atom '${node.type}':'${node.text}'`);
     }
   } else {
     return {
