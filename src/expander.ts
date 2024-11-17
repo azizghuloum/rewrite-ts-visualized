@@ -32,57 +32,6 @@ export type Step =
       context: Context;
       counter: number;
     }
-  | {
-      type: "PreExpandBody";
-      loc: Loc;
-      rib: Rib;
-      unit: CompilationUnit;
-      context: Context;
-      counter: number;
-      k: (props: {
-        loc: Loc;
-        rib: Rib;
-        context: Context;
-        counter: number;
-      }) => Step;
-    }
-  | {
-      type: "PreExpandForms";
-      loc: Loc;
-      rib: Rib;
-      counter: number;
-      unit: CompilationUnit;
-      context: Context;
-      k: (props: {
-        loc: Loc;
-        rib: Rib;
-        context: Context;
-        counter: number;
-      }) => Step;
-    }
-  | {
-      type: "FindForm";
-      loc: Loc;
-      unit: CompilationUnit;
-      context: Context;
-      k: (args: { loc: Loc; resolution: Resolution | undefined }) => Step;
-    }
-  | {
-      type: "PostExpandProgram";
-      loc: Loc;
-      unit: CompilationUnit;
-      counter: number;
-      context: Context;
-      k: (args: { loc: Loc }) => Step;
-    }
-  | {
-      type: "PostExpandBody";
-      loc: Loc;
-      unit: CompilationUnit;
-      counter: number;
-      context: Context;
-      k: (args: { loc: Loc }) => Step;
-    }
   | { type: "SyntaxError"; loc: Loc; reason: string }
   | { type: "DEBUG"; loc: Loc; info: any };
 
@@ -98,7 +47,7 @@ export function initial_step(ast: AST): Step {
   };
 }
 
-function debug({ loc, info }: { loc: Loc; info?: any }): Step {
+function debug({ loc, ...info }: { loc: Loc; [k: string]: any }): Step {
   return { type: "DEBUG", loc, info };
 }
 
@@ -199,9 +148,8 @@ function expand_program(step: {
   };
   const [rib_id, counter] = new_rib_id(step.counter);
   const wrap: Wrap = { marks: null, subst: [{ rib_id }, null] };
-  return go_down(wrap_loc(step.loc, wrap), (loc) => {
-    return {
-      type: "PreExpandBody",
+  return go_down(wrap_loc(step.loc, wrap), (loc) =>
+    preexpand_body({
       loc,
       rib,
       unit: extend_unit(step.unit, rib_id, rib), // rib is empty
@@ -212,8 +160,7 @@ function expand_program(step: {
         // context is filled also
         const unit = extend_unit(step.unit, rib_id, rib);
         // unit is now filled
-        return {
-          type: "PostExpandProgram",
+        return postexpand_program({
           loc,
           counter,
           context,
@@ -223,10 +170,10 @@ function expand_program(step: {
               loc,
               info: { msg: "finished postexpand" },
             }),
-        };
+        });
       },
-    };
-  });
+    })
+  );
 }
 
 function preexpand_body(step: {
@@ -237,8 +184,7 @@ function preexpand_body(step: {
   counter: number;
   k: (props: { loc: Loc; rib: Rib; context: Context; counter: number }) => Step;
 }): Step {
-  return {
-    type: "PreExpandForms",
+  return preexpand_forms({
     loc: isolate(step.loc),
     rib: step.rib,
     counter: step.counter,
@@ -247,22 +193,21 @@ function preexpand_body(step: {
     k: ({ loc, rib, context, counter }) =>
       go_next<Step>(
         change(step.loc, loc), // unisolate
-        (loc) => ({
-          type: "PreExpandBody",
-          loc,
-          rib,
-          counter,
-          context,
-          unit: step.unit,
-          k: step.k,
-        }),
+        (loc) =>
+          preexpand_body({
+            loc,
+            rib,
+            counter,
+            context,
+            unit: step.unit,
+            k: step.k,
+          }),
         (loc) => step.k({ loc, rib, context, counter })
       ),
-  };
+  });
 }
 
 function preexpand_forms(step: {
-  type: "PreExpandForms";
   loc: Loc;
   rib: Rib;
   counter: number;
@@ -270,8 +215,7 @@ function preexpand_forms(step: {
   context: Context;
   k: (props: { loc: Loc; rib: Rib; context: Context; counter: number }) => Step;
 }): Step {
-  return {
-    type: "FindForm",
+  return find_form({
     loc: step.loc,
     unit: step.unit,
     context: step.context,
@@ -314,7 +258,7 @@ function preexpand_forms(step: {
         throw new Error("macro form");
       }
     },
-  };
+  });
 }
 
 const preexpand_list_handlers: { [tag: string]: "descend" | "stop" } = {
@@ -413,14 +357,15 @@ function postexpand_program(step: {
   k: (args: { loc: Loc }) => Step;
 }): Step {
   assert(step.loc.t.tag === "program");
-  return go_down(step.loc, (loc) => ({
-    type: "PostExpandBody",
-    loc,
-    unit: step.unit,
-    counter: step.counter,
-    context: step.context,
-    k: step.k,
-  }));
+  return go_down(step.loc, (loc) =>
+    postexpand_body({
+      loc,
+      unit: step.unit,
+      counter: step.counter,
+      context: step.context,
+      k: step.k,
+    })
+  );
 }
 
 function postexpand_body(step: {
@@ -430,23 +375,13 @@ function postexpand_body(step: {
   context: Context;
   k: (args: { loc: Loc }) => Step;
 }): Step {
-  throw new Error("postexpand_body");
+  return debug(step);
 }
 
 export function next_step(step: Step): Step {
   switch (step.type) {
     case "ExpandProgram":
       return expand_program(step);
-    case "PreExpandBody":
-      return preexpand_body(step);
-    case "PreExpandForms":
-      return preexpand_forms(step);
-    case "FindForm":
-      return find_form(step);
-    case "PostExpandProgram":
-      return postexpand_program(step);
-    case "PostExpandBody":
-      return postexpand_body(step);
   }
   throw new Error(`${step.type} is not implemented`);
 }
