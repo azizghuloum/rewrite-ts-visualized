@@ -5,7 +5,13 @@ import tsx_url from "./assets/tree-sitter-tsx.wasm?url";
 import { useEffect, useState } from "react";
 import { createBrowserRouter, RouterProvider } from "react-router-dom";
 import { AST } from "./AST";
-import { ASTExpr, ASTHighlight, ASTList } from "./ASTVis";
+import {
+  ASTExpr,
+  ASTExprSpan,
+  ASTHighlight,
+  ASTList,
+  ASTListSpan,
+} from "./ASTVis";
 import { Editor } from "./Editor";
 import { array_to_ll } from "./llhelpers";
 import * as Zipper from "./zipper";
@@ -34,6 +40,7 @@ function absurdly(node: Parser.SyntaxNode): AST {
   if (children.length === 0) {
     switch (node.type) {
       case "number":
+      case "regex_pattern":
       case "identifier":
       case "type_identifier":
       case "property_identifier": {
@@ -71,6 +78,15 @@ function zipper_to_view(zipper: Zipper.Loc): React.ReactElement {
     (x) => <ASTHighlight>{x}</ASTHighlight>,
     (x) => <ASTExpr ast={x} />,
     (tag, children) => <ASTList tag={tag} items={children} />
+  );
+}
+
+function zipper_to_span(zipper: Zipper.Loc): React.ReactElement {
+  return Zipper.reconvert(
+    zipper,
+    (x) => <ASTHighlight>{x}</ASTHighlight>,
+    (x) => <ASTExprSpan ast={x} />,
+    (tag, children) => <ASTListSpan tag={tag} items={children} />
   );
 }
 
@@ -118,8 +134,8 @@ function StepperView({
         className="code"
         style={{
           marginLeft: "1em",
-          height: "80vh",
-          maxHeight: "80vh",
+          height: "75vh",
+          maxHeight: "75vh",
           overflowY: "scroll",
         }}
       >
@@ -218,11 +234,14 @@ function Example({ parser, code, onChange }: ExampleProps) {
           border: "2px solid #444",
         }}
       >
-        <div style={{ flexBasis: "50%", flexGrow: "100" }}>
+        <div style={{ flexBasis: "40%", flexGrow: "100" }}>
           <Editor code={code} onChange={onChange} />
         </div>
-        <div style={{ flexBasis: "40%", flexGrow: "0" }}>
+        <div style={{ flexBasis: "30%", flexGrow: "0" }}>
           <StepperView step={display_step} step_number={display_number} />
+        </div>
+        <div className="code" style={{ flexBasis: "20%", flexGrow: "100" }}>
+          {zipper_to_span(display_step.loc)}
         </div>
       </div>
     </div>

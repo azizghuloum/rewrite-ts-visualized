@@ -14,6 +14,7 @@ const colormap: { [k in AST.atom_tag]: string } = {
   type_identifier: "orange",
   jsx_text: "teal",
   string_fragment: "cyan",
+  regex_pattern: "magenta",
   other: "grey",
 };
 
@@ -24,11 +25,15 @@ function token_color(token_type: string): string | undefined {
 function ASTToken({
   token_type,
   token_content,
+  renamed,
 }: {
   token_type: string;
   token_content: string;
+  renamed?: boolean;
 }) {
   const color = token_color(token_type);
+  const parts = renamed ? token_content.match(/^(.*)_(\d+)$/) : null;
+
   return (
     <div
       style={{
@@ -43,7 +48,14 @@ function ASTToken({
       }}
       className="tooltip"
     >
-      {token_content}
+      {parts ? (
+        <span>
+          {parts[1]}
+          <sub>{parts[2]}</sub>
+        </span>
+      ) : (
+        token_content
+      )}
       {color === undefined && <span className="tooltiptext">{token_type}</span>}
     </div>
   );
@@ -151,5 +163,51 @@ export function ASTHighlight({ children }: { children: React.ReactElement }) {
     >
       {children}
     </div>
+  );
+}
+
+export function ASTExprSpan({ ast }: { ast: STX }) {
+  switch (ast.type) {
+    case "atom": {
+      //return <span>{ast.content + (ast.content === ";" ? "\n" : " ")}</span>;
+      const x = (
+        <ASTToken token_type={ast.tag} token_content={ast.content} renamed />
+      );
+      return [";", "}"].includes(ast.content) ? (
+        <span>
+          {x}
+          {"\n"}
+        </span>
+      ) : (
+        x
+      );
+    }
+    case "list":
+      return (
+        <span>
+          {map_to_array(ast.content, (x, i) => (
+            <ASTExprSpan key={i} ast={x} />
+          ))}
+        </span>
+      );
+    default:
+      const invalid: never = ast;
+      throw invalid;
+  }
+}
+
+export function ASTListSpan({
+  tag,
+  items,
+}: {
+  tag: string;
+  items: React.ReactElement[];
+}) {
+  return (
+    <span>
+      {items.map((x, i) => (
+        <span key={i}>{x} </span>
+      ))}
+    </span>
   );
 }

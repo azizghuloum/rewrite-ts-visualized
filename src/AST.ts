@@ -4,6 +4,7 @@ export type atom_tag =
   | "identifier"
   | "property_identifier"
   | "number"
+  | "regex_pattern"
   | "type_identifier"
   | "jsx_text"
   | "string_fragment"
