@@ -159,7 +159,7 @@ function Example({ parser, code, onChange }: ExampleProps) {
                 step.type === "SyntaxError"
                   ? `Syntax Error: ${step.reason}`
                   : step.type === "DEBUG"
-                    ? `DEBUG: ${JSON.stringify(step.info)}`
+                    ? `DEBUG (${step.msg}): ${JSON.stringify(step.info)}`
                     : null,
               pointer: state.pointer,
             };

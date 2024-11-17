@@ -33,7 +33,7 @@ export type Step =
       counter: number;
     }
   | { type: "SyntaxError"; loc: Loc; reason: string }
-  | { type: "DEBUG"; loc: Loc; info: any };
+  | { type: "DEBUG"; loc: Loc; msg: string; info: any };
 
 export function initial_step(ast: AST): Step {
   const { stx, counter, unit, context } = init_top_level(ast);
@@ -47,9 +47,14 @@ export function initial_step(ast: AST): Step {
   };
 }
 
-function debug({ loc, ...info }: { loc: Loc; [k: string]: any }): Step {
-  return { type: "DEBUG", loc, info };
-}
+const debug =
+  (msg: string) =>
+  ({ loc, ...info }: { loc: Loc; [k: string]: any }) => ({
+    type: "DEBUG" as const,
+    loc,
+    msg,
+    info,
+  });
 
 function extract_lexical_declaration_bindings<T>(
   loc: Loc,
@@ -165,11 +170,7 @@ function expand_program(step: {
           counter,
           context,
           unit,
-          k: ({ loc }) =>
-            debug({
-              loc,
-              info: { msg: "finished postexpand" },
-            }),
+          k: debug("finished postexpand"),
         });
       },
     })
@@ -375,7 +376,7 @@ function postexpand_body(step: {
   context: Context;
   k: (args: { loc: Loc }) => Step;
 }): Step {
-  return debug(step);
+  return debug("in postexpand_body")(step);
 }
 
 export function next_step(step: Step): Step {
