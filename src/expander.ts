@@ -11,6 +11,7 @@ import {
   resolve,
   extend_rib,
   extend_context,
+  STX,
 } from "./STX";
 import {
   change,
@@ -32,6 +33,7 @@ export type Step =
       counter: number;
     }
   | { type: "SyntaxError"; loc: Loc; reason: string }
+  | { type: "DONE"; loc: Loc }
   | { type: "DEBUG"; loc: Loc; msg: string; info: any };
 
 export function initial_step(ast: AST): Step {
@@ -46,10 +48,12 @@ export function initial_step(ast: AST): Step {
   };
 }
 
-const debug =
-  (msg: string) =>
-  ({ loc, ...info }: { loc: Loc; [k: string]: any }) => ({
-    type: "DEBUG" as const,
+const debug: (
+  msg: string
+) => ({ loc, ...info }: { loc: Loc; [k: string]: any }) => Step =
+  (msg) =>
+  ({ loc, ...info }) => ({
+    type: "DEBUG",
     loc,
     msg,
     info,
@@ -275,16 +279,6 @@ function preexpand_forms(step: {
   });
 }
 
-const list_handlers: { [tag: string]: "descend" | "stop" } = {
-  lexical_declaration: "stop",
-  expression_statement: "descend",
-  call_expression: "descend",
-  arguments: "descend",
-  binary_expression: "descend",
-  array: "descend",
-  member_expression: "descend",
-};
-
 const atom_handlers: { [tag in atom_tag]: "next" | "stop" } = {
   identifier: "stop",
   type_identifier: "stop",
@@ -293,6 +287,17 @@ const atom_handlers: { [tag in atom_tag]: "next" | "stop" } = {
   jsx_text: "next",
   string_fragment: "next",
   other: "next",
+};
+
+const list_handlers: { [tag: string]: "descend" | "stop" } = {
+  lexical_declaration: "stop",
+  variable_declarator: "stop",
+  expression_statement: "descend",
+  call_expression: "descend",
+  arguments: "descend",
+  binary_expression: "descend",
+  array: "descend",
+  member_expression: "descend",
 };
 
 function find_form<T>({
@@ -304,7 +309,11 @@ function find_form<T>({
   loc: Loc;
   done: (loc: Loc) => T;
   kid: (args: { loc: Loc; cont: (loc: Loc) => T }) => T;
-  klist: (args: { loc: Loc; cont: (loc: Loc) => T }) => T;
+  klist: (args: {
+    loc: Loc;
+    cont: (loc: Loc) => T;
+    descend: (loc: Loc) => T;
+  }) => T;
 }): T {
   function find_form(loc: Loc): T {
     switch (loc.t.type) {
@@ -335,7 +344,11 @@ function find_form<T>({
           case "descend":
             return go_down(loc, find_form);
           case "stop":
-            return klist({ loc, cont: (loc) => go_next(loc, find_form, done) });
+            return klist({
+              loc,
+              cont: (loc) => go_next(loc, find_form, done),
+              descend: (loc) => go_down(loc, find_form),
+            });
           default:
             const invalid: never = action;
             throw invalid;
@@ -368,6 +381,10 @@ function postexpand_program(step: {
   );
 }
 
+function postexpand_done(loc: Loc): Step {
+  return { type: "DONE", loc };
+}
+
 function postexpand_body(step: {
   loc: Loc;
   unit: CompilationUnit;
@@ -375,7 +392,61 @@ function postexpand_body(step: {
   context: Context;
   k: (args: { loc: Loc }) => Step;
 }): Step {
-  return debug("in postexpand_body")(step);
+  return find_form({
+    loc: step.loc,
+    done: postexpand_done,
+    kid: ({ loc, cont }) => {
+      if (loc.t.type !== "atom") throw new Error("expected atom");
+      const { tag, content, wrap } = loc.t;
+      switch (tag) {
+        case "identifier": {
+          const resolution = resolve(
+            content,
+            wrap,
+            step.context,
+            step.unit,
+            "normal_env"
+          );
+          switch (resolution.type) {
+            case "bound": {
+              const { binding } = resolution;
+              switch (binding.type) {
+                case "lexical": {
+                  const new_id: STX = {
+                    type: "atom",
+                    tag: "identifier",
+                    wrap: { marks: null, subst: null },
+                    content: binding.name,
+                  };
+                  return cont(
+                    change(loc, { type: "loc", t: new_id, p: { type: "top" } })
+                  );
+                }
+              }
+            }
+            case "unbound":
+              return { type: "SyntaxError", loc, reason: "unbound identifier" };
+          }
+          return debug("resolved")({ loc, resolution });
+        }
+        default:
+          return debug("unhandled atom tag")({ loc, tag });
+      }
+    },
+    klist: ({ loc, cont, descend }) => {
+      if (loc.t.type !== "list") throw new Error("expected list");
+      switch (loc.t.tag) {
+        case "lexical_declaration":
+          return descend(loc);
+        case "variable_declarator":
+          return descend(loc);
+        default: {
+          assert(list_handlers[loc.t.tag] === "descend");
+          return cont(loc);
+        }
+      }
+    },
+  });
 }
 
 export function next_step(step: Step): Step {

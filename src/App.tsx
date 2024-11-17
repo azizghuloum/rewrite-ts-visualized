@@ -146,7 +146,11 @@ function Example({ parser, code, onChange }: ExampleProps) {
   useEffect(() => {
     const cancel = timeout(0, () => {
       setState((state) => {
-        if (state.error !== null || state.step_number === max_fuel)
+        if (
+          state.error !== null ||
+          state.step_number === max_fuel ||
+          state.last_step.type === "DONE"
+        )
           return state;
         const next_state = (() => {
           try {
@@ -165,6 +169,7 @@ function Example({ parser, code, onChange }: ExampleProps) {
             };
             return next_state;
           } catch (err) {
+            console.error(err);
             const next_state: State = { ...state, error: String(err) };
             return next_state;
           }
