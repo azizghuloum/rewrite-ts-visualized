@@ -26,6 +26,7 @@ import {
   mkzipper,
   wrap_loc,
 } from "./zipper";
+import { core_handlers } from "./syntax-core-patterns";
 
 export type Step =
   | {
@@ -221,6 +222,20 @@ function preexpand_body(step: {
   });
 }
 
+function handle_core_syntax<T>(
+  loc: Loc,
+  name: string,
+  pattern: STX,
+  k: (loc: Loc) => T
+): T {
+  const handler = core_handlers[name];
+  if (handler) {
+    return handler(loc, pattern, k);
+  } else {
+    throw new Error(`missing handler for ${name}`);
+  }
+}
+
 function preexpand_forms(step: {
   loc: Loc;
   rib: Rib;
@@ -260,8 +275,10 @@ function preexpand_forms(step: {
                   return cont(loc);
                 case "core_syntax": {
                   const { name, pattern } = binding;
-                  return inspect(loc, `Found core '${name}'`, () =>
-                    debug("after inspect")({ loc })
+                  return inspect(loc, `Handling core '${name}' syntax.`, () =>
+                    handle_core_syntax(loc, name, pattern, (loc) =>
+                      debug("after inspect")({ loc })
+                    )
                   );
                 }
                 default:

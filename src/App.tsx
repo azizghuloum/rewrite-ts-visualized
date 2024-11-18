@@ -244,6 +244,11 @@ function Example({ parser, code, onChange }: ExampleProps) {
           }
         }}
       />
+      {state.error !== null && (
+        <div style={{ color: "red" }}>
+          {state.error} at step {state.step_number}
+        </div>
+      )}
       <div
         style={{
           display: "flex",
