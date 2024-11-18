@@ -30,17 +30,22 @@ export function stx_list_content(t: STX): LL<STX> {
   }
 }
 
-export function go_down<S>(loc: Loc, f: (loc: Loc) => S): S {
-  const x: Loc = Zipper.go_down(loc, (t, cb) => {
-    switch (t.type) {
-      case "list": {
-        return cb(t.tag, stx_list_content(t));
-      }
-      default:
-        throw new Error("HERE");
+export function go_down<S>(
+  loc: Loc,
+  k: (loc: Loc) => S,
+  fk: (loc: Loc) => S
+): S {
+  if (loc.t.type === "list") {
+    if (loc.t.content === null) {
+      return fk(loc);
     }
-  });
-  return f(x);
+  }
+  return k(
+    Zipper.go_down(loc, (t, cb) => {
+      assert(t.type === "list");
+      return cb(t.tag, stx_list_content(t));
+    })
+  );
 }
 
 export function isolate(loc: Loc): Loc {

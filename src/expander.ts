@@ -102,57 +102,69 @@ function extract_lexical_declaration_bindings<T>(
 
   function get_vars(ls: Loc, rib: Rib, context: Context, counter: number): T {
     if (ls.t.type === "list" && ls.t.tag === "variable_declarator") {
-      return go_down(ls, (loc) => {
-        const stx = loc.t;
-        if (stx.type === "atom" && stx.tag === "identifier") {
-          return extend_rib(
-            rib,
-            stx.content,
-            stx.wrap.marks,
-            counter,
-            "normal_env",
-            ({ rib, counter, label }) =>
-              extend_context(
-                context,
-                counter,
-                label,
-                "lexical",
-                stx.content,
-                ({ context, counter }) =>
-                  go_next(
-                    ls,
-                    (loc) => after_vars(loc, rib, context, counter),
-                    (loc) => sk({ loc, rib, context, counter })
-                  )
-              ),
-            (reason) => fk(loc, reason)
-          );
-        } else {
-          throw new Error(`HERE2 ${stx.type}:${stx.tag}`);
+      return go_down(
+        ls,
+        (loc) => {
+          const stx = loc.t;
+          if (stx.type === "atom" && stx.tag === "identifier") {
+            return extend_rib(
+              rib,
+              stx.content,
+              stx.wrap.marks,
+              counter,
+              "normal_env",
+              ({ rib, counter, label }) =>
+                extend_context(
+                  context,
+                  counter,
+                  label,
+                  "lexical",
+                  stx.content,
+                  ({ context, counter }) =>
+                    go_next(
+                      ls,
+                      (loc) => after_vars(loc, rib, context, counter),
+                      (loc) => sk({ loc, rib, context, counter })
+                    )
+                ),
+              (reason) => fk(loc, reason)
+            );
+          } else {
+            throw new Error(`HERE2 ${stx.type}:${stx.tag}`);
+          }
+        },
+        (_loc) => {
+          throw new Error("empty variable_declarator?");
         }
-      });
+      );
     } else {
       return fk(ls, `expected a variable declaration; found ${ls.t.tag}`);
     }
   }
-  return go_down(loc, (loc) => {
-    if (loc.t.type === "atom") {
-      if (
-        loc.t.tag === "other" &&
-        (loc.t.content === "const" || loc.t.content === "let")
-      ) {
-        return go_right(
-          loc,
-          (loc) => get_vars(loc, rib, context, counter),
-          (loc) => fk(loc, "no bindings after keyword")
-        );
+  return go_down(
+    loc,
+    (loc) => {
+      if (loc.t.type === "atom") {
+        if (
+          loc.t.tag === "other" &&
+          (loc.t.content === "const" || loc.t.content === "let")
+        ) {
+          return go_right(
+            loc,
+            (loc) => get_vars(loc, rib, context, counter),
+            (loc) => fk(loc, "no bindings after keyword")
+          );
+        } else {
+          throw new Error(`HERE? ${loc.t.type}:${loc.t.tag}`);
+        }
       } else {
-        throw new Error(`HERE? ${loc.t.type}:${loc.t.tag}`);
+        return fk(loc, "expected keyword const or let");
       }
-    } else {
-      return fk(loc, "expected keyword const or let");
+    },
+    (_loc) => {
+      throw new Error("empty?");
     }
-  });
+  );
 }
 
 function expand_program(step: {
@@ -169,27 +181,32 @@ function expand_program(step: {
   };
   const [rib_id, counter] = new_rib_id(step.counter);
   const wrap: Wrap = { marks: null, subst: [{ rib_id }, null] };
-  return go_down(wrap_loc(step.loc, wrap), (loc) =>
-    preexpand_body({
-      loc,
-      rib,
-      unit: extend_unit(step.unit, rib_id, rib), // rib is empty
-      context: step.context,
-      counter,
-      k: ({ loc, rib, counter, context }) => {
-        // rib is filled
-        // context is filled also
-        const unit = extend_unit(step.unit, rib_id, rib);
-        // unit is now filled
-        return postexpand_program({
-          loc,
-          counter,
-          context,
-          unit,
-          k: debug("finished postexpand"),
-        });
-      },
-    })
+  return go_down(
+    wrap_loc(step.loc, wrap),
+    (loc) =>
+      preexpand_body({
+        loc,
+        rib,
+        unit: extend_unit(step.unit, rib_id, rib), // rib is empty
+        context: step.context,
+        counter,
+        k: ({ loc, rib, counter, context }) => {
+          // rib is filled
+          // context is filled also
+          const unit = extend_unit(step.unit, rib_id, rib);
+          // unit is now filled
+          return postexpand_program({
+            loc,
+            counter,
+            context,
+            unit,
+            k: debug("finished postexpand"),
+          });
+        },
+      }),
+    (_loc) => {
+      throw new Error("empty program?");
+    }
   );
 }
 
@@ -428,12 +445,15 @@ function find_form<T>({
         }
         switch (action) {
           case "descend":
-            return go_down(loc, find_form);
+            return go_down(loc, find_form, (loc) =>
+              go_next(loc, find_form, done)
+            );
           case "stop":
             return klist({
               loc,
               cont: (loc) => go_next(loc, find_form, done),
-              descend: (loc) => go_down(loc, find_form),
+              descend: (loc) =>
+                go_down(loc, find_form, (loc) => go_next(loc, find_form, done)),
             });
           default:
             const invalid: never = action;
@@ -456,14 +476,17 @@ function postexpand_program(step: {
   k: (args: { loc: Loc }) => Step;
 }): Step {
   assert(step.loc.t.tag === "program");
-  return go_down(step.loc, (loc) =>
-    postexpand_body({
-      loc,
-      unit: step.unit,
-      counter: step.counter,
-      context: step.context,
-      k: step.k,
-    })
+  return go_down(
+    step.loc,
+    (loc) =>
+      postexpand_body({
+        loc,
+        unit: step.unit,
+        counter: step.counter,
+        context: step.context,
+        k: step.k,
+      }),
+    (loc) => step.k({ loc })
   );
 }
 
