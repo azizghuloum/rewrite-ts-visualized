@@ -159,16 +159,11 @@ export function push_wrap(outerwrap: Wrap): (stx: AST | STX) => STX {
   };
 }
 
-export type CorePattern = {
-  name: "splice";
-  pattern: AST;
-};
-
 function init_global_context(
-  patterns: CorePattern[],
+  patterns: CorePatterns,
   wrap: (ast: AST) => STX
 ): Context {
-  const binding_entries = patterns.map(({ name, pattern }) => [
+  const binding_entries = Object.entries(patterns).map(([name, pattern]) => [
     `global.${name}`,
     { type: "core_syntax", name, pattern: wrap(pattern) },
   ]);
@@ -176,9 +171,11 @@ function init_global_context(
   return context;
 }
 
+export type CorePatterns = { [k: string]: AST };
+
 export function init_top_level(
   ast: AST,
-  patterns: CorePattern[]
+  patterns: CorePatterns
 ): {
   stx: STX;
   counter: number;

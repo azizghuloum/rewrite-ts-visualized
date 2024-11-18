@@ -15,7 +15,7 @@ import {
   resolve,
   extend_rib,
   extend_context,
-  CorePattern,
+  CorePatterns,
 } from "./STX";
 import {
   change,
@@ -39,7 +39,7 @@ export type Step =
   | { type: "DONE"; loc: Loc }
   | { type: "DEBUG"; loc: Loc; msg: string; info: any };
 
-export function initial_step(ast: AST, patterns: CorePattern[]): Step {
+export function initial_step(ast: AST, patterns: CorePatterns): Step {
   const { stx, counter, unit, context } = init_top_level(ast, patterns);
   const loc: Loc = mkzipper(stx);
   return {
@@ -246,8 +246,27 @@ function preexpand_forms(step: {
           switch (resolution.type) {
             case "unbound":
               return cont(loc);
+            case "bound": {
+              const binding = resolution.binding;
+              switch (binding.type) {
+                case "lexical":
+                  return cont(loc);
+                case "core_syntax": {
+                  const { name, pattern } = binding;
+                  return debug("core_syntax")({ loc, name, pattern });
+                }
+                default:
+                  const invalid: never = binding;
+                  throw invalid;
+              }
+            }
+            case "error": {
+              return { type: "SyntaxError", loc, reason: resolution.reason };
+            }
+            default:
+              const invalid: never = resolution;
+              throw invalid;
           }
-          return debug("resolved")({ loc, resolution });
         }
         default:
           return debug("unhandled atom tag")({ loc, tag });
