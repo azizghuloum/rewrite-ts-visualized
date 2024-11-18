@@ -1,9 +1,8 @@
 import * as Zipper from "zipper/src/tagged-constructive-zipper";
 import { assert } from "./assert";
 import { LL, llmap } from "./llhelpers";
-import { push_wrap, STX, Wrap } from "./STX";
-
-export type Loc = Zipper.Loc<string, STX>;
+import { STX, Loc, Wrap } from "./syntax-structures";
+import { push_wrap } from "./STX";
 
 export function wrap_loc(loc: Loc, wrap: Wrap): Loc {
   return Zipper.change(loc, push_wrap(wrap)(loc.t));

@@ -3,15 +3,18 @@ import { AST, atom_tag } from "./AST";
 import {
   CompilationUnit,
   Context,
-  extend_unit,
-  init_top_level,
   new_rib_id,
   Rib,
+  Loc,
   Wrap,
+  STX,
+} from "./syntax-structures";
+import {
+  extend_unit,
+  init_top_level,
   resolve,
   extend_rib,
   extend_context,
-  STX,
 } from "./STX";
 import {
   change,
@@ -19,7 +22,6 @@ import {
   go_next,
   go_right,
   isolate,
-  Loc,
   mkzipper,
   wrap_loc,
 } from "./zipper";
@@ -283,9 +285,11 @@ const atom_handlers: { [tag in atom_tag]: "next" | "stop" } = {
   identifier: "stop",
   type_identifier: "stop",
   property_identifier: "stop",
+  shorthand_property_identifier: "stop",
   number: "next",
   jsx_text: "next",
   string_fragment: "next",
+  regex_pattern: "next",
   other: "next",
 };
 

@@ -43,25 +43,35 @@ function absurdly(node: Parser.SyntaxNode): AST {
       case "regex_pattern":
       case "identifier":
       case "type_identifier":
+      case "shorthand_property_identifier":
       case "property_identifier": {
         return { type: "atom", tag: node.type, content: node.text };
       }
       case node.text: {
         return { type: "atom", tag: "other", content: node.text };
       }
-      case ";": {
-        return { type: "atom", tag: "other", content: ";" };
-      }
-      default:
+      default: {
+        if (node.text === "") {
+          return { type: "atom", tag: "other", content: node.type };
+        }
         throw new Error(`unknown atom '${node.type}':'${node.text}'`);
+      }
     }
   } else {
+    const ls = children.filter((x) => x.type !== "comment").map(absurdly);
+    switch (node.type) {
+      case "expression_statement": {
+        if (ls.length === 1 || (ls.length === 2 && ls[1].content === ";")) {
+          return ls[0];
+        } else {
+          throw new Error("invalid expression_statement");
+        }
+      }
+    }
     return {
       type: "list",
       tag: node.type,
-      content: array_to_ll(
-        children.filter((x) => x.type !== "comment").map(absurdly)
-      ),
+      content: array_to_ll(ls),
     };
   }
 }

@@ -3,6 +3,7 @@ import { LL } from "./llhelpers";
 export type atom_tag =
   | "identifier"
   | "property_identifier"
+  | "shorthand_property_identifier"
   | "number"
   | "regex_pattern"
   | "type_identifier"
