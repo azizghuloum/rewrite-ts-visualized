@@ -36,6 +36,7 @@ export type Step =
       counter: number;
     }
   | { type: "SyntaxError"; loc: Loc; reason: string }
+  | { type: "Inspect"; loc: Loc; reason: string; k: () => Step }
   | { type: "DONE"; loc: Loc }
   | { type: "DEBUG"; loc: Loc; msg: string; info: any };
 
@@ -61,6 +62,12 @@ const debug: (
     msg,
     info,
   });
+
+const inspect: (loc: Loc, reason: string, k: () => Step) => Step = (
+  loc,
+  reason,
+  k
+) => ({ type: "Inspect", loc, reason, k });
 
 function extract_lexical_declaration_bindings<T>(
   loc: Loc,
@@ -253,7 +260,9 @@ function preexpand_forms(step: {
                   return cont(loc);
                 case "core_syntax": {
                   const { name, pattern } = binding;
-                  return debug("core_syntax")({ loc, name, pattern });
+                  return inspect(loc, `Found core '${name}'`, () =>
+                    debug("after inspect")({ loc })
+                  );
                 }
                 default:
                   const invalid: never = binding;
@@ -477,6 +486,8 @@ export function next_step(step: Step): Step {
   switch (step.type) {
     case "ExpandProgram":
       return expand_program(step);
+    case "Inspect":
+      return step.k();
   }
   throw new Error(`${step.type} is not implemented`);
 }

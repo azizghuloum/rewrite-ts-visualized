@@ -140,7 +140,15 @@ function StepperView({
     <div>
       <div>
         <div>step: {step_number}</div>
-        {step.type}
+        {step.type === "Inspect" ? (
+          <span style={{ fontWeight: "bold" }}>{step.reason}</span>
+        ) : step.type === "DEBUG" ? (
+          <span style={{ fontWeight: "bold", color: "red" }}>
+            {step.type}: {step.msg} {JSON.stringify(step.info)}
+          </span>
+        ) : (
+          <span style={{ fontWeight: "bold" }}>{step.type}</span>
+        )}
       </div>
       <div
         className="code"
@@ -219,7 +227,10 @@ function Example({ parser, code, onChange }: ExampleProps) {
   return (
     <div>
       <input
-        style={{ display: "block", width: "100%" }}
+        style={{
+          display: "block",
+          width: "100%",
+        }}
         type="range"
         min={0}
         max={max}
@@ -233,11 +244,6 @@ function Example({ parser, code, onChange }: ExampleProps) {
           }
         }}
       />
-      {state.error === null ? (
-        <div>no error</div>
-      ) : (
-        <div style={{ color: "red" }}>{state.error}</div>
-      )}
       <div
         style={{
           display: "flex",
