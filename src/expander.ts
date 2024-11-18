@@ -15,6 +15,7 @@ import {
   resolve,
   extend_rib,
   extend_context,
+  CorePattern,
 } from "./STX";
 import {
   change,
@@ -38,8 +39,8 @@ export type Step =
   | { type: "DONE"; loc: Loc }
   | { type: "DEBUG"; loc: Loc; msg: string; info: any };
 
-export function initial_step(ast: AST): Step {
-  const { stx, counter, unit, context } = init_top_level(ast);
+export function initial_step(ast: AST, patterns: CorePattern[]): Step {
+  const { stx, counter, unit, context } = init_top_level(ast, patterns);
   const loc: Loc = mkzipper(stx);
   return {
     type: "ExpandProgram",

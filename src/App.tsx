@@ -16,6 +16,8 @@ import { Editor } from "./Editor";
 import { array_to_ll } from "./llhelpers";
 import * as Zipper from "./zipper";
 import { initial_step, next_step, Step } from "./expander";
+import { Loc } from "./syntax-structures";
+import { core_patterns } from "./syntax-core-patterns";
 
 const load_tsx_parser = async () =>
   Parser.init({
@@ -82,7 +84,7 @@ type ExampleProps = {
   onChange?: (code: string) => void;
 };
 
-function zipper_to_view(zipper: Zipper.Loc): React.ReactElement {
+function zipper_to_view(zipper: Loc): React.ReactElement {
   return Zipper.reconvert(
     zipper,
     (x) => <ASTHighlight>{x}</ASTHighlight>,
@@ -91,7 +93,7 @@ function zipper_to_view(zipper: Zipper.Loc): React.ReactElement {
   );
 }
 
-function zipper_to_span(zipper: Zipper.Loc): React.ReactElement {
+function zipper_to_span(zipper: Loc): React.ReactElement {
   return Zipper.reconvert(
     zipper,
     (x) => <ASTHighlight>{x}</ASTHighlight>,
@@ -166,13 +168,13 @@ function timeout(delay: number, f: () => void): () => void {
 }
 
 function Example({ parser, code, onChange }: ExampleProps) {
-  const [state, setState] = useState(
-    initial_state(initial_step(parse_with(parser, code)))
-  );
-  useEffect(
-    () => setState(initial_state(initial_step(parse_with(parser, code)))),
-    [next_step, code]
-  );
+  function init_state() {
+    const parse = (code: string) => parse_with(parser, code);
+    const patterns = core_patterns(parse);
+    return initial_state(initial_step(parse(code), patterns));
+  }
+  const [state, setState] = useState(init_state());
+  useEffect(() => setState(init_state()), [next_step, code]);
   useEffect(() => {
     const cancel = timeout(0, () => {
       setState((state) => {

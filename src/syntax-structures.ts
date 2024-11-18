@@ -68,6 +68,6 @@ export type Loc = TaggedReconstructiveZipper.Loc<string, STX>;
 
 export type Binding =
   | { type: "lexical"; name: string }
-  | { type: "core_syntax"; name: "splice" };
+  | { type: "core_syntax"; name: "splice"; pattern: STX };
 
 export type Context = { [label: string]: Binding };

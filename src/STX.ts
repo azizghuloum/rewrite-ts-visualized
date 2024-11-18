@@ -159,14 +159,37 @@ export function push_wrap(outerwrap: Wrap): (stx: AST | STX) => STX {
   };
 }
 
-export function init_top_level(ast: AST): {
+export type CorePattern = {
+  name: "splice";
+  pattern: AST;
+};
+
+function init_global_context(
+  patterns: CorePattern[],
+  wrap: (ast: AST) => STX
+): Context {
+  const binding_entries = patterns.map(({ name, pattern }) => [
+    `global.${name}`,
+    { type: "core_syntax", name, pattern: wrap(pattern) },
+  ]);
+  const context: Context = Object.fromEntries(binding_entries);
+  return context;
+}
+
+export function init_top_level(
+  ast: AST,
+  patterns: CorePattern[]
+): {
   stx: STX;
   counter: number;
   unit: CompilationUnit;
   context: Context;
 } {
   const [rib_id, counter] = new_rib_id(0);
-  const wrap: Wrap = { marks: top_marks, subst: [{ rib_id }, null] };
+  const top_wrap: Wrap = { marks: top_marks, subst: [{ rib_id }, null] };
+  function wrap(ast: AST): STX {
+    return { ...ast, wrap: top_wrap };
+  }
   const unit: CompilationUnit = {
     store: {
       [rib_id]: {
@@ -178,15 +201,11 @@ export function init_top_level(ast: AST): {
       },
     },
   };
-  const context: Context = {
-    "global.splice": { type: "core_syntax", name: "splice" },
-  };
-  const stx: STX = { ...ast, wrap };
   return {
-    stx,
+    stx: wrap(ast),
     counter,
     unit,
-    context,
+    context: init_global_context(patterns, wrap),
   };
 }
 
