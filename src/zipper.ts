@@ -1,6 +1,6 @@
 import * as Zipper from "zipper/src/tagged-constructive-zipper";
 import { assert } from "./assert";
-import { LL, llmap } from "./llhelpers";
+import { LL, llappend, llmap } from "./llhelpers";
 import { STX, Loc, Wrap } from "./syntax-structures";
 import { push_wrap } from "./STX";
 
@@ -21,15 +21,20 @@ export function reconvert<Y>(
   return Zipper.reconvert(zipper, mark, conv, wrap);
 }
 
+export function stx_list_content(t: STX): LL<STX> {
+  assert(t.type === "list");
+  if (t.wrap) {
+    return llmap(t.content, push_wrap(t.wrap));
+  } else {
+    return t.content;
+  }
+}
+
 export function go_down<S>(loc: Loc, f: (loc: Loc) => S): S {
   const x: Loc = Zipper.go_down(loc, (t, cb) => {
     switch (t.type) {
       case "list": {
-        if (t.wrap) {
-          return cb(t.tag, llmap(t.content, push_wrap(t.wrap)));
-        } else {
-          return cb(t.tag, t.content);
-        }
+        return cb(t.tag, stx_list_content(t));
       }
       default:
         throw new Error("HERE");
@@ -45,6 +50,16 @@ export function isolate(loc: Loc): Loc {
 export function change(loc: Loc, new_loc: Loc): Loc {
   assert(new_loc.p.type === "top");
   return { type: "loc", t: new_loc.t, p: loc.p };
+}
+
+export function change_splicing(loc: Loc, list: [STX, LL<STX>]): Loc {
+  const p = loc.p;
+  assert(p.type === "node");
+  return {
+    type: "loc",
+    t: list[0],
+    p: { ...p, r: llappend(list[1], p.r) },
+  };
 }
 
 function mkstx(tag: string, content: LL<STX>): STX {

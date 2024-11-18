@@ -19,11 +19,13 @@ import {
 } from "./STX";
 import {
   change,
+  change_splicing,
   go_down,
   go_next,
   go_right,
   isolate,
   mkzipper,
+  stx_list_content,
   wrap_loc,
 } from "./zipper";
 import { core_handlers } from "./syntax-core-patterns";
@@ -82,7 +84,7 @@ function extract_lexical_declaration_bindings<T>(
     if (ls.t.type === "atom" && ls.t.tag === "other") {
       switch (ls.t.content) {
         case ";":
-          return go_next(
+          return go_right(
             ls,
             (loc) => fk(loc, "expected nothing after semicolon"),
             (loc) => sk({ loc, rib, context, counter })
@@ -205,8 +207,27 @@ function preexpand_body(step: {
     counter: step.counter,
     unit: step.unit,
     context: step.context,
-    k: ({ loc, rib, context, counter }) =>
-      go_next<Step>(
+    k: ({ loc, rib, context, counter }) => {
+      if (loc.t.tag === "slice") {
+        assert(loc.p.type === "top");
+        const subforms = stx_list_content(loc.t);
+        if (subforms === null) {
+          throw new Error("TODO: handle empty slice");
+        }
+        const new_loc = change_splicing(step.loc, subforms);
+        return inspect(new_loc, "After splicing the body.", () =>
+          preexpand_body({
+            loc: new_loc,
+            rib,
+            unit: step.unit,
+            context,
+            counter,
+            k: step.k,
+          })
+        );
+        throw new Error("SLICE");
+      }
+      return go_next<Step>(
         change(step.loc, loc), // unisolate
         (loc) =>
           preexpand_body({
@@ -218,7 +239,8 @@ function preexpand_body(step: {
             k: step.k,
           }),
         (loc) => step.k({ loc, rib, context, counter })
-      ),
+      );
+    },
   });
 }
 
@@ -253,7 +275,7 @@ function preexpand_forms(step: {
         context: step.context,
         counter: step.counter,
       }),
-    kid: ({ loc, cont }) => {
+    kid: ({ loc, cont, redo }) => {
       if (loc.t.type !== "atom") throw new Error("expected atom");
       const { tag, content, wrap } = loc.t;
       switch (tag) {
@@ -277,7 +299,9 @@ function preexpand_forms(step: {
                   const { name, pattern } = binding;
                   return inspect(loc, `Handling core '${name}' syntax.`, () =>
                     handle_core_syntax(loc, name, pattern, (loc) =>
-                      debug("after inspect")({ loc })
+                      inspect(loc, `After expanding '${name}'.`, () =>
+                        cont(loc)
+                      )
                     )
                   );
                 }
@@ -348,6 +372,7 @@ const list_handlers: { [tag: string]: "descend" | "stop" } = {
   binary_expression: "descend",
   array: "descend",
   member_expression: "descend",
+  slice: "stop",
 };
 
 function find_form<T>({
@@ -358,7 +383,7 @@ function find_form<T>({
 }: {
   loc: Loc;
   done: (loc: Loc) => T;
-  kid: (args: { loc: Loc; cont: (loc: Loc) => T }) => T;
+  kid: (args: { loc: Loc; cont: (loc: Loc) => T; redo: (loc: Loc) => T }) => T;
   klist: (args: {
     loc: Loc;
     cont: (loc: Loc) => T;
@@ -372,7 +397,11 @@ function find_form<T>({
         const action = atom_handlers[tag];
         switch (action) {
           case "stop": {
-            return kid({ loc, cont: (loc) => go_next(loc, find_form, done) });
+            return kid({
+              loc,
+              cont: (loc) => go_next(loc, find_form, done),
+              redo: find_form,
+            });
           }
           case "next": {
             return go_next(loc, find_form, done);
