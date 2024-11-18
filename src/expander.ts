@@ -193,6 +193,13 @@ function expand_program(step: {
   );
 }
 
+const empty_statement: STX = {
+  type: "list",
+  tag: "empty_statement",
+  wrap: undefined,
+  content: null,
+};
+
 function preexpand_body(step: {
   loc: Loc;
   rib: Rib;
@@ -211,10 +218,10 @@ function preexpand_body(step: {
       if (loc.t.tag === "slice") {
         assert(loc.p.type === "top");
         const subforms = stx_list_content(loc.t);
-        if (subforms === null) {
-          throw new Error("TODO: handle empty slice");
-        }
-        const new_loc = change_splicing(step.loc, subforms);
+        const new_loc = change_splicing(
+          step.loc,
+          subforms === null ? [empty_statement, null] : subforms
+        );
         return inspect(new_loc, "After splicing the body.", () =>
           preexpand_body({
             loc: new_loc,
@@ -225,7 +232,6 @@ function preexpand_body(step: {
             k: step.k,
           })
         );
-        throw new Error("SLICE");
       }
       return go_next<Step>(
         change(step.loc, loc), // unisolate
@@ -275,7 +281,7 @@ function preexpand_forms(step: {
         context: step.context,
         counter: step.counter,
       }),
-    kid: ({ loc, cont, redo }) => {
+    kid: ({ loc, cont }) => {
       if (loc.t.type !== "atom") throw new Error("expected atom");
       const { tag, content, wrap } = loc.t;
       switch (tag) {
@@ -373,6 +379,7 @@ const list_handlers: { [tag: string]: "descend" | "stop" } = {
   array: "descend",
   member_expression: "descend",
   slice: "stop",
+  empty_statement: "descend",
 };
 
 function find_form<T>({

@@ -1,7 +1,6 @@
 import { assert } from "./assert";
 import { AST, atom_tag } from "./AST";
 import { LL } from "./llhelpers";
-import { push_wrap } from "./STX";
 import { Loc, STX } from "./syntax-structures";
 import { go_next, go_down, mkzipper, stx_list_content } from "./zipper";
 
@@ -53,9 +52,13 @@ const merge_subst: (s1: subst | null, s2: subst | null) => subst | null = (
   return merge_subst(b, extend_subst(a, s2));
 };
 
-const same_lhs: (x: STX, y: STX) => boolean = (x, y) => todo;
+const same_lhs: (x: STX, y: STX) => boolean = (_x, _y) => {
+  throw new Error("TODO");
+};
 
-const same_rhs: (x: LL<STX>, y: LL<STX>) => boolean = (x, y) => todo;
+const same_rhs: (x: LL<STX>, y: LL<STX>) => boolean = (_x, _y) => {
+  throw new Error("TODO");
+};
 
 const extend_subst: (
   [lhs, rhs]: [STX, LL<STX>],
@@ -129,13 +132,11 @@ const unify_right: (kwdls: LL<STX>, codels: LL<STX>) => subst | null = (
       if (count === 1) {
         const count = lllength(codels) - lllength(rest_patterns);
         if (count < 0) return null;
-        console.log({ count });
         const fsts = lltake(count, codels);
         const rests = lldrop(count, codels);
         assert(lllength(rest_patterns) === lllength(rests));
         const s1 = f(0, rest_patterns, rests);
         if (s1 === null) return null;
-        console.log(fsts);
         return extend_subst([fst_pattern, fsts], s1);
       } else {
         throw new Error("not last one");
