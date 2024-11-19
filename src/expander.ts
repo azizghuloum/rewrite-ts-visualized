@@ -281,6 +281,31 @@ function handle_core_syntax<T>(
   }
 }
 
+const atom_handlers_table: { [tag in atom_tag]: "next" | "stop" } = {
+  identifier: "stop",
+  type_identifier: "stop",
+  property_identifier: "stop",
+  shorthand_property_identifier: "stop",
+  number: "next",
+  jsx_text: "next",
+  string_fragment: "next",
+  regex_pattern: "next",
+  other: "next",
+};
+
+const list_handlers_table: { [tag: string]: "descend" | "stop" } = {
+  lexical_declaration: "stop",
+  variable_declarator: "stop",
+  expression_statement: "descend",
+  call_expression: "descend",
+  arguments: "descend",
+  binary_expression: "descend",
+  array: "descend",
+  member_expression: "descend",
+  slice: "stop",
+  empty_statement: "descend",
+};
+
 function preexpand_forms(step: {
   loc: Loc;
   rib: Rib;
@@ -366,38 +391,13 @@ function preexpand_forms(step: {
           );
         }
         default: {
-          assert(list_handlers[loc.t.tag] === "descend");
+          assert(list_handlers_table[loc.t.tag] === "descend");
           return cont(loc);
         }
       }
     },
   });
 }
-
-const atom_handlers: { [tag in atom_tag]: "next" | "stop" } = {
-  identifier: "stop",
-  type_identifier: "stop",
-  property_identifier: "stop",
-  shorthand_property_identifier: "stop",
-  number: "next",
-  jsx_text: "next",
-  string_fragment: "next",
-  regex_pattern: "next",
-  other: "next",
-};
-
-const list_handlers: { [tag: string]: "descend" | "stop" } = {
-  lexical_declaration: "stop",
-  variable_declarator: "stop",
-  expression_statement: "descend",
-  call_expression: "descend",
-  arguments: "descend",
-  binary_expression: "descend",
-  array: "descend",
-  member_expression: "descend",
-  slice: "stop",
-  empty_statement: "descend",
-};
 
 function find_form<T>({
   loc,
@@ -418,7 +418,7 @@ function find_form<T>({
     switch (loc.t.type) {
       case "atom": {
         const { tag, content } = loc.t;
-        const action = atom_handlers[tag];
+        const action = atom_handlers_table[tag];
         switch (action) {
           case "stop": {
             return kid({
@@ -439,7 +439,7 @@ function find_form<T>({
       }
       case "list": {
         const { tag } = loc.t;
-        const action = list_handlers[tag];
+        const action = list_handlers_table[tag];
         if (action === undefined) {
           throw new Error(`no stop_table entry for ${tag}`);
         }
@@ -550,7 +550,7 @@ function postexpand_body(step: {
         case "variable_declarator":
           return descend(loc);
         default: {
-          assert(list_handlers[loc.t.tag] === "descend");
+          assert(list_handlers_table[loc.t.tag] === "descend");
           return cont(loc);
         }
       }
