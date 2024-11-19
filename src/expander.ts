@@ -296,13 +296,14 @@ const atom_handlers_table: { [tag in atom_tag]: "next" | "stop" } = {
 const list_handlers_table: { [tag: string]: "descend" | "stop" } = {
   lexical_declaration: "stop",
   variable_declarator: "stop",
+  slice: "stop",
+  arrow_function: "stop",
   expression_statement: "descend",
   call_expression: "descend",
   arguments: "descend",
   binary_expression: "descend",
   array: "descend",
   member_expression: "descend",
-  slice: "stop",
   empty_statement: "descend",
 };
 
@@ -550,7 +551,11 @@ function postexpand_body(step: {
         case "variable_declarator":
           return descend(loc);
         default: {
-          assert(list_handlers_table[loc.t.tag] === "descend");
+          if (list_handlers_table[loc.t.tag] !== "descend") {
+            return debug(`unhandled '${loc.t.tag}' form in postexpand_body`)({
+              loc,
+            });
+          }
           return cont(loc);
         }
       }
