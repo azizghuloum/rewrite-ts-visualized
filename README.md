@@ -27,3 +27,8 @@
 
 - [ ] add source locations to ast/stx forms (most likely to tags).
 - [ ] make a proper pretty printer
+
+
+# Some references
+
+- https://github.com/dsherret/ts-nameof/issues/121
