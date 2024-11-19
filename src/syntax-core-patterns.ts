@@ -1,7 +1,7 @@
 import { assert } from "./assert";
 import { AST, atom_tag } from "./AST";
 import { LL } from "./llhelpers";
-import { Loc, STX } from "./syntax-structures";
+import { Context, Loc, STX } from "./syntax-structures";
 import { go_next, go_down, mkzipper, stx_list_content } from "./zipper";
 
 type handler = <T>(loc: Loc, pattern: STX, k: (loc: Loc) => T) => T;
@@ -20,7 +20,16 @@ const zipper_find: (loc: Loc, pred: (x: STX) => boolean) => Loc | null = (
         () => null
       );
     case "list":
-      return go_down(loc, (loc) => zipper_find(loc, pred));
+      return go_down(
+        loc,
+        (loc) => zipper_find(loc, pred),
+        (loc) =>
+          go_next(
+            loc,
+            (loc) => zipper_find(loc, pred),
+            () => null
+          )
+      );
     default:
       const invalid: never = t;
       throw invalid;
@@ -64,6 +73,7 @@ const extend_subst: (
   [lhs, rhs]: [STX, LL<STX>],
   subst: subst
 ) => subst | null = ([lhs, rhs], s) => {
+  if (lhs.content === "_") return s; // drop underscore vars from matching
   const x = s.find((x) => same_lhs(x[0], lhs));
   if (!x) return [[lhs, rhs], ...s];
   if (same_rhs(x[1], rhs)) {
@@ -122,6 +132,7 @@ const unify_right: (kwdls: LL<STX>, codels: LL<STX>) => subst | null = (
   codels
 ) => {
   function f(count: number, kwdls: LL<STX>, codels: LL<STX>): subst | null {
+    //console.log({ count, kwdls, codels });
     if (kwdls === null) {
       assert(count === 0);
       return codels === null ? [] : null;
@@ -213,6 +224,29 @@ const splice: handler = (loc, pattern, k) => {
   return k(result_loc);
 };
 
+export const pattern_match: <S>(
+  loc: Loc,
+  context: Context,
+  name: keyof ReturnType<typeof core_patterns>,
+  k: (match: LL<STX>) => S,
+  fk: () => S
+) => S = (loc, context, name, k, fk) => {
+  const binding = context[`global.${name}`];
+  assert(
+    binding && binding.type === "core_syntax",
+    `core pattern for ${name} is undefined`
+  );
+  const pattern = binding.pattern;
+  const subst = unify_right([pattern, null], [loc.t, null]);
+  if (subst === null) return fk();
+  const b = subst.find((x) => x[0].type === "atom" && x[0].content === name);
+  if (b) {
+    return k(b[1]);
+  } else {
+    return fk();
+  }
+};
+
 export const core_handlers: { [k: string]: handler } = {
   splice,
 };
@@ -228,5 +262,9 @@ export const core_patterns = (parse: (code: string) => AST) => {
   };
   return {
     splice: pattern("splice(() => {body});"),
+    //arrow_function_single_param: pattern("arrow_function_single_param => _;"),
+    //arrow_function_paren_params: pattern("(arrow_function_paren_params) => _;"),
+    //arrow_function_block_body: pattern("_ => {arrow_function_block_body};"),
+    //arrow_function_other_body: pattern("_ => arrow_function_other_body;"),
   };
 };

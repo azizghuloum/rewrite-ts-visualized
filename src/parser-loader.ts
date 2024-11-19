@@ -1,4 +1,5 @@
 import Parser from "web-tree-sitter";
+import { assert } from "./assert";
 import { AST } from "./AST";
 import { array_to_ll } from "./llhelpers";
 
@@ -54,6 +55,26 @@ function absurdly(node: Parser.SyntaxNode): AST {
         } else {
           throw new Error("invalid expression_statement");
         }
+      }
+      case "required_parameter": {
+        assert(ls.length === 1);
+        const x = ls[0];
+        return x;
+      }
+      case "arrow_function": {
+        assert(ls.length === 3);
+        const fmls = ls[0];
+        if (fmls.type === "atom" && fmls.tag === "identifier") {
+          // const lparen: AST = { type: "atom", tag: "other", content: "(" };
+          // const rparen: AST = { type: "atom", tag: "other", content: ")" };
+          const rfmls: AST = {
+            type: "list",
+            tag: "formal_parameters",
+            content: array_to_ll([fmls]),
+          };
+          ls[0] = rfmls;
+        }
+        assert(ls[0].type === "list");
       }
     }
     return {

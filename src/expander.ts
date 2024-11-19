@@ -28,7 +28,7 @@ import {
   stx_list_content,
   wrap_loc,
 } from "./zipper";
-import { core_handlers } from "./syntax-core-patterns";
+import { core_handlers, pattern_match } from "./syntax-core-patterns";
 
 export type Step =
   | {
@@ -391,6 +391,8 @@ function preexpand_forms(step: {
             }
           );
         }
+        case "arrow_function":
+          return cont(loc);
         default: {
           assert(list_handlers_table[loc.t.tag] === "descend");
           return cont(loc);
@@ -495,6 +497,14 @@ function postexpand_done(loc: Loc): Step {
   return { type: "DONE", loc };
 }
 
+function expand_arrow_function<S>(
+  loc: Loc,
+  sk: (loc: Loc) => S,
+  fk: (loc: Loc, reason: string) => S
+): S {
+  return fk(loc, "TODO");
+}
+
 function postexpand_body(step: {
   loc: Loc;
   unit: CompilationUnit;
@@ -550,6 +560,14 @@ function postexpand_body(step: {
           return descend(loc);
         case "variable_declarator":
           return descend(loc);
+        case "arrow_function":
+          return expand_arrow_function(
+            isolate(loc),
+            (new_loc) => cont(change(loc, new_loc)),
+            (err_loc, reason) => {
+              return { type: "SyntaxError", loc: err_loc, reason };
+            }
+          );
         default: {
           if (list_handlers_table[loc.t.tag] !== "descend") {
             return debug(`unhandled '${loc.t.tag}' form in postexpand_body`)({
