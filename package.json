@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "test": "vitest",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview"
@@ -13,12 +14,12 @@
     "@codemirror/lang-javascript": "^6.2.2",
     "@uiw/codemirror-theme-abcdef": "^4.23.6",
     "@uiw/react-codemirror": "^4.23.6",
-    "zipper": "*",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-router-dom": "^6.27.0",
     "tree-sitter-typescript": "*",
-    "web-tree-sitter": "^0.24.3"
+    "web-tree-sitter": "^0.24.3",
+    "zipper": "*"
   },
   "devDependencies": {
     "@eslint/js": "^9.11.1",
@@ -31,6 +32,7 @@
     "globals": "^15.9.0",
     "typescript": "^5.5.3",
     "typescript-eslint": "^8.7.0",
-    "vite": "^5.4.8"
+    "vite": "^5.4.8",
+    "vitest": "^2.1.5"
   }
 }

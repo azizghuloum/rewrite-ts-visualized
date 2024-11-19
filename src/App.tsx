@@ -4,7 +4,6 @@ import treesitter_wasm_url from "web-tree-sitter/tree-sitter.wasm?url";
 import tsx_url from "./assets/tree-sitter-tsx.wasm?url";
 import { useEffect, useState } from "react";
 import { createBrowserRouter, RouterProvider } from "react-router-dom";
-import { AST } from "./AST";
 import {
   ASTExpr,
   ASTExprSpan,
@@ -13,70 +12,11 @@ import {
   ASTListSpan,
 } from "./ASTVis";
 import { Editor } from "./Editor";
-import { array_to_ll } from "./llhelpers";
 import * as Zipper from "./zipper";
 import { initial_step, next_step, Step } from "./expander";
 import { Loc } from "./syntax-structures";
 import { core_patterns } from "./syntax-core-patterns";
-
-const load_tsx_parser = async () =>
-  Parser.init({
-    locateFile(scriptName: string, _scriptDirectory: string) {
-      const m: { [k: string]: string } = {
-        "tree-sitter.wasm": treesitter_wasm_url,
-      };
-      return m[scriptName] ?? scriptName;
-    },
-  })
-    .then(() => {
-      return Parser.Language.load(tsx_url);
-    })
-    .then((tsx) => {
-      const parser = new Parser();
-      parser.setLanguage(tsx);
-      return parser;
-    });
-
-function absurdly(node: Parser.SyntaxNode): AST {
-  const children = node.children;
-  if (children.length === 0) {
-    switch (node.type) {
-      case "number":
-      case "regex_pattern":
-      case "identifier":
-      case "type_identifier":
-      case "shorthand_property_identifier":
-      case "property_identifier": {
-        return { type: "atom", tag: node.type, content: node.text };
-      }
-      case node.text: {
-        return { type: "atom", tag: "other", content: node.text };
-      }
-      default: {
-        if (node.text === "") {
-          return { type: "atom", tag: "other", content: node.type };
-        }
-        throw new Error(`unknown atom '${node.type}':'${node.text}'`);
-      }
-    }
-  } else {
-    const ls = children.filter((x) => x.type !== "comment").map(absurdly);
-    switch (node.type) {
-      case "expression_statement": {
-        if (ls.length === 1 || (ls.length === 2 && ls[1].content === ";")) {
-          return ls[0];
-        } else {
-          throw new Error("invalid expression_statement");
-        }
-      }
-    }
-    return {
-      type: "list",
-      tag: node.type,
-      content: array_to_ll(ls),
-    };
-  }
-}
+import { load_parser, parse_with } from "./parser-loader";
 
 type ExampleProps = {
   parser: Parser;
@@ -120,12 +60,6 @@ function initial_state(step: Step): State {
     error: null,
     pointer: null,
   };
-}
-
-function parse_with(parser: Parser, code: string): AST {
-  const node = parser.parse(code);
-  const ast = absurdly(node.rootNode);
-  return ast;
 }
 
 function StepperView({
@@ -277,7 +211,10 @@ function Expander() {
     localStorage.getItem("sample_program") ?? "console.log('hello world!');"
   );
   useEffect(() => {
-    load_tsx_parser().then(set_parser);
+    load_parser({
+      parser_url: treesitter_wasm_url,
+      lang_url: tsx_url,
+    }).then(set_parser);
     return undefined;
   }, []);
   if (!parser) return <div>loading ...</div>;
