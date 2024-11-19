@@ -57,14 +57,17 @@ export function initial_step(ast: AST, patterns: CorePatterns): Step {
 
 const debug: (
   msg: string
-) => ({ loc, ...info }: { loc: Loc; [k: string]: any }) => Step =
+) => ({ loc, ...info }: { loc: Loc; [k: string]: any }) => never =
   (msg) =>
-  ({ loc, ...info }) => ({
-    type: "DEBUG",
-    loc,
-    msg,
-    info,
-  });
+  ({ loc, ..._info }) => {
+    throw new Error("FIXME DEBUG" + msg);
+    //({
+    //  type: "DEBUG",
+    //  loc,
+    //  msg,
+    //  info,
+    //});
+  };
 
 const inspect: (loc: Loc, reason: string, k: () => Step) => Step = (
   loc,
@@ -208,33 +211,31 @@ function expand_program(step: {
   };
   const [rib_id, counter] = new_rib_id(step.counter);
   const wrap: Wrap = { marks: null, subst: [{ rib_id }, null] };
-  return go_down(
+  const loc = go_down(
     wrap_loc(step.loc, wrap),
-    (loc) =>
-      preexpand_body({
-        loc,
-        rib,
-        unit: extend_unit(step.unit, rib_id, rib), // rib is empty
-        context: step.context,
-        counter,
-        k: ({ loc, rib, counter, context }) => {
-          // rib is filled
-          // context is filled also
-          const unit = extend_unit(step.unit, rib_id, rib);
-          // unit is now filled
-          return postexpand_program({
-            loc,
-            counter,
-            context,
-            unit,
-            k: debug("finished postexpand"),
-          });
-        },
-      }),
-    (_loc) => {
-      throw new Error("empty program?");
-    }
+    (x) => x,
+    (loc) => syntax_error(loc, "empty program?")
   );
+  return preexpand_body({
+    loc,
+    rib,
+    unit: extend_unit(step.unit, rib_id, rib), // rib is empty
+    context: step.context,
+    counter,
+    k: ({ loc, rib, counter, context }) => {
+      // rib is filled
+      // context is filled also
+      const unit = extend_unit(step.unit, rib_id, rib);
+      // unit is now filled
+      return postexpand_program({
+        loc,
+        counter,
+        context,
+        unit,
+        k: debug("finished postexpand"),
+      });
+    },
+  });
 }
 
 const empty_statement: STX = {
@@ -252,46 +253,39 @@ function preexpand_body(step: {
   counter: number;
   k: (props: { loc: Loc; rib: Rib; context: Context; counter: number }) => Step;
 }): Step {
-  return preexpand_forms({
-    loc: isolate(step.loc),
-    rib: step.rib,
-    counter: step.counter,
-    unit: step.unit,
-    context: step.context,
-    k: ({ loc, rib, context, counter }) => {
-      if (loc.t.tag === "slice") {
-        assert(loc.p.type === "top");
-        const subforms = stx_list_content(loc.t);
-        const new_loc = change_splicing(
-          step.loc,
-          subforms === null ? [empty_statement, null] : subforms
-        );
-        return inspect(new_loc, "After splicing the body.", () =>
-          preexpand_body({
-            loc: new_loc,
-            rib,
-            unit: step.unit,
-            context,
-            counter,
-            k: step.k,
-          })
-        );
-      }
-      return go_next<Step>(
-        change(step.loc, loc), // unisolate
-        (loc) =>
-          preexpand_body({
-            loc,
-            rib,
-            counter,
-            context,
-            unit: step.unit,
-            k: step.k,
-          }),
-        (loc) => step.k({ loc, rib, context, counter })
-      );
-    },
-  });
+  const { loc, rib, context, counter } = in_isolation(step.loc, (loc) =>
+    preexpand_forms({ ...step, loc })
+  );
+  if (loc.t.tag === "slice") {
+    const subforms = stx_list_content(loc.t);
+    const new_loc = change_splicing(
+      loc,
+      subforms === null ? [empty_statement, null] : subforms
+    );
+    return inspect(new_loc, "After splicing the body.", () =>
+      preexpand_body({
+        loc: new_loc,
+        rib,
+        unit: step.unit,
+        context,
+        counter,
+        k: step.k,
+      })
+    );
+  }
+  return go_next<Step>(
+    loc,
+    (loc) =>
+      preexpand_body({
+        loc,
+        rib,
+        counter,
+        context,
+        unit: step.unit,
+        k: step.k,
+      }),
+    (loc) => step.k({ loc, rib, context, counter })
+  );
 }
 
 function handle_core_syntax<T>(
@@ -317,6 +311,7 @@ const atom_handlers_table: { [tag in atom_tag]: "next" | "stop" } = {
   jsx_text: "next",
   string_fragment: "next",
   regex_pattern: "next",
+  ERROR: "stop",
   other: "next",
 };
 
@@ -340,19 +335,17 @@ function preexpand_forms(step: {
   counter: number;
   unit: CompilationUnit;
   context: Context;
-  k: (props: { loc: Loc; rib: Rib; context: Context; counter: number }) => Step;
-}): Step {
+}): { loc: Loc; rib: Rib; context: Context; counter: number } {
   return find_form({
     loc: step.loc,
-    done: (loc) =>
-      step.k({
-        loc,
-        rib: step.rib,
-        context: step.context,
-        counter: step.counter,
-      }),
+    done: (loc) => ({
+      loc,
+      rib: step.rib,
+      context: step.context,
+      counter: step.counter,
+    }),
     kid: ({ loc, cont }) => {
-      if (loc.t.type !== "atom") throw new Error("expected atom");
+      assert(loc.t.type === "atom");
       const { tag, content, wrap } = loc.t;
       switch (tag) {
         case "identifier": {
@@ -373,13 +366,14 @@ function preexpand_forms(step: {
                   return cont(loc);
                 case "core_syntax": {
                   const { name, pattern } = binding;
-                  return inspect(loc, `Handling core '${name}' syntax.`, () =>
+                  return (
+                    //inspect(loc, `Handling core '${name}' syntax.`, () =>
                     handle_core_syntax(loc, name, pattern, (loc) =>
-                      inspect(loc, `After expanding '${name}'.`, () =>
-                        cont(loc)
-                      )
+                      //inspect(loc, `After expanding '${name}'.`, () =>
+                      cont(loc)
                     )
                   );
+                  //);
                 }
                 default:
                   const invalid: never = binding;
@@ -410,7 +404,7 @@ function preexpand_forms(step: {
               go_next(
                 loc,
                 (loc) => debug("next of lexical")({ loc }),
-                (loc) => step.k({ loc, rib, context, counter })
+                (loc) => ({ loc, rib, context, counter })
               )
           );
         }

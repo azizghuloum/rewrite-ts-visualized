@@ -9,6 +9,7 @@ export type atom_tag =
   | "type_identifier"
   | "jsx_text"
   | "string_fragment"
+  | "ERROR"
   | "other";
 
 export type AST =
