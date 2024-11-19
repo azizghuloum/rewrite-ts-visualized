@@ -1,0 +1,74 @@
+{
+  "loc": {
+    "p": {
+      "type": "top",
+    },
+    "t": {
+      "content": [
+        {
+          "content": [
+            {
+              "content": "(",
+              "tag": "other",
+              "type": "atom",
+            },
+            [
+              {
+                "content": "x",
+                "tag": "identifier",
+                "type": "atom",
+              },
+              [
+                {
+                  "content": ")",
+                  "tag": "other",
+                  "type": "atom",
+                },
+                null,
+              ],
+            ],
+          ],
+          "tag": "formal_parameters",
+          "type": "list",
+        },
+        [
+          {
+            "content": "=>",
+            "tag": "other",
+            "type": "atom",
+          },
+          [
+            {
+              "content": "x",
+              "tag": "identifier",
+              "type": "atom",
+            },
+            null,
+          ],
+        ],
+      ],
+      "tag": "arrow_function",
+      "type": "list",
+      "wrap": {
+        "marks": [
+          "top",
+          null,
+        ],
+        "subst": [
+          {
+            "rib_id": "r1",
+          },
+          [
+            {
+              "rib_id": "r0",
+            },
+            null,
+          ],
+        ],
+      },
+    },
+    "type": "loc",
+  },
+  "reason": "TODO",
+  "type": "DONE",
+}

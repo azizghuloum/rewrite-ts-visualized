@@ -28,7 +28,7 @@ import {
   stx_list_content,
   wrap_loc,
 } from "./zipper";
-import { core_handlers, pattern_match } from "./syntax-core-patterns";
+import { core_handlers } from "./syntax-core-patterns";
 
 export type Step =
   | {
@@ -72,13 +72,40 @@ const inspect: (loc: Loc, reason: string, k: () => Step) => Step = (
   k
 ) => ({ type: "Inspect", loc, reason, k });
 
+class SyntaxError extends Error {
+  loc: Loc;
+  constructor(message: string, loc: Loc) {
+    super(message);
+    this.loc = loc;
+  }
+}
+
+const syntax_error: (loc: Loc, reason: string) => never = (loc, reason) => {
+  throw new SyntaxError(reason, loc);
+};
+
+const in_isolation: <S extends { loc: Loc }>(
+  loc: Loc,
+  f: (loc: Loc) => S
+) => S = (loc, f) => {
+  try {
+    const res = f(isolate(loc));
+    return { ...res, loc: change(loc, res.loc) };
+  } catch (err) {
+    if (err instanceof SyntaxError) {
+      syntax_error(change(loc, err.loc), err.message);
+    } else {
+      throw err;
+    }
+  }
+};
+
 function extract_lexical_declaration_bindings<T>(
   loc: Loc,
   rib: Rib,
   context: Context,
   counter: number,
-  sk: (args: { loc: Loc; rib: Rib; context: Context; counter: number }) => T,
-  fk: (loc: Loc, reason: string) => T
+  sk: (args: { loc: Loc; rib: Rib; context: Context; counter: number }) => T
 ): T {
   function after_vars(ls: Loc, rib: Rib, context: Context, counter: number): T {
     if (ls.t.type === "atom" && ls.t.tag === "other") {
@@ -86,18 +113,18 @@ function extract_lexical_declaration_bindings<T>(
         case ";":
           return go_right(
             ls,
-            (loc) => fk(loc, "expected nothing after semicolon"),
+            (loc) => syntax_error(loc, "expected nothing after semicolon"),
             (loc) => sk({ loc, rib, context, counter })
           );
         case ",":
           return go_right(
             ls,
             (loc) => get_vars(loc, rib, context, counter),
-            (loc) => fk(loc, "expected variable after ','")
+            (loc) => syntax_error(loc, "expected variable after ','")
           );
       }
     }
-    return fk(ls, "expected a ',' or a ';'");
+    syntax_error(ls, "expected a ',' or a ';'");
   }
 
   function get_vars(ls: Loc, rib: Rib, context: Context, counter: number): T {
@@ -127,7 +154,7 @@ function extract_lexical_declaration_bindings<T>(
                       (loc) => sk({ loc, rib, context, counter })
                     )
                 ),
-              (reason) => fk(loc, reason)
+              (reason) => syntax_error(loc, reason)
             );
           } else {
             throw new Error(`HERE2 ${stx.type}:${stx.tag}`);
@@ -138,7 +165,7 @@ function extract_lexical_declaration_bindings<T>(
         }
       );
     } else {
-      return fk(ls, `expected a variable declaration; found ${ls.t.tag}`);
+      syntax_error(ls, `expected a variable declaration; found ${ls.t.tag}`);
     }
   }
   return go_down(
@@ -152,13 +179,13 @@ function extract_lexical_declaration_bindings<T>(
           return go_right(
             loc,
             (loc) => get_vars(loc, rib, context, counter),
-            (loc) => fk(loc, "no bindings after keyword")
+            (loc) => syntax_error(loc, "no bindings after keyword")
           );
         } else {
           throw new Error(`HERE? ${loc.t.type}:${loc.t.tag}`);
         }
       } else {
-        return fk(loc, "expected keyword const or let");
+        return syntax_error(loc, "expected keyword const or let");
       }
     },
     (_loc) => {
@@ -359,9 +386,8 @@ function preexpand_forms(step: {
                   throw invalid;
               }
             }
-            case "error": {
-              return { type: "SyntaxError", loc, reason: resolution.reason };
-            }
+            case "error":
+              syntax_error(loc, resolution.reason);
             default:
               const invalid: never = resolution;
               throw invalid;
@@ -385,10 +411,7 @@ function preexpand_forms(step: {
                 loc,
                 (loc) => debug("next of lexical")({ loc }),
                 (loc) => step.k({ loc, rib, context, counter })
-              ),
-            (loc, reason) => {
-              return { type: "SyntaxError", loc, reason };
-            }
+              )
           );
         }
         case "arrow_function":
@@ -497,12 +520,8 @@ function postexpand_done(loc: Loc): Step {
   return { type: "DONE", loc };
 }
 
-function expand_arrow_function<S>(
-  loc: Loc,
-  sk: (loc: Loc) => S,
-  fk: (loc: Loc, reason: string) => S
-): S {
-  return fk(loc, "TODO");
+function expand_arrow_function(loc: Loc): { loc: Loc } {
+  syntax_error(loc, "TODO expand_arrow_function");
 }
 
 function postexpand_body(step: {
@@ -545,7 +564,7 @@ function postexpand_body(step: {
               }
             }
             case "unbound":
-              return { type: "SyntaxError", loc, reason: "unbound identifier" };
+              syntax_error(loc, "unbound identifier");
           }
           return debug("resolved")({ loc, resolution });
         }
@@ -560,14 +579,10 @@ function postexpand_body(step: {
           return descend(loc);
         case "variable_declarator":
           return descend(loc);
-        case "arrow_function":
-          return expand_arrow_function(
-            isolate(loc),
-            (new_loc) => cont(change(loc, new_loc)),
-            (err_loc, reason) => {
-              return { type: "SyntaxError", loc: err_loc, reason };
-            }
-          );
+        case "arrow_function": {
+          const arr = in_isolation(loc, (loc) => expand_arrow_function(loc));
+          return cont(arr.loc);
+        }
         default: {
           if (list_handlers_table[loc.t.tag] !== "descend") {
             return debug(`unhandled '${loc.t.tag}' form in postexpand_body`)({
@@ -582,11 +597,19 @@ function postexpand_body(step: {
 }
 
 export function next_step(step: Step): Step {
-  switch (step.type) {
-    case "ExpandProgram":
-      return expand_program(step);
-    case "Inspect":
-      return step.k();
+  try {
+    switch (step.type) {
+      case "ExpandProgram":
+        return expand_program(step);
+      case "Inspect":
+        return step.k();
+    }
+  } catch (err) {
+    if (err instanceof SyntaxError) {
+      return { type: "SyntaxError", loc: err.loc, reason: err.message };
+    } else {
+      throw err;
+    }
   }
   throw new Error(`${step.type} is not implemented`);
 }
