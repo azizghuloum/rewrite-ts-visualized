@@ -4,6 +4,7 @@
 
 - [x] (Nov 16, 2024) lexical declarations (`let`, `const`) and lexical variables
 - [x] (Nov 18, 2024) `splice(() => {body})`
+- [x] (Nov 19, 2024) unit testing
 
 # TODO
 
@@ -27,3 +28,7 @@
 
 - [ ] add source locations to ast/stx forms (most likely to tags).
 - [ ] make a proper pretty printer
+
+# Some references
+
+- https://github.com/dsherret/ts-nameof/issues/121
