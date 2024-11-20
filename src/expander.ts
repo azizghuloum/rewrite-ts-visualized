@@ -299,18 +299,10 @@ function preexpand_body(step: {
   );
 }
 
-function handle_core_syntax<T>(
-  loc: Loc,
-  name: string,
-  pattern: STX,
-  k: (loc: Loc) => T
-): T {
+function handle_core_syntax(loc: Loc, name: string, pattern: STX): Loc {
   const handler = core_handlers[name];
-  if (handler) {
-    return handler(loc, pattern, k);
-  } else {
-    throw new Error(`missing handler for ${name}`);
-  }
+  assert(handler !== undefined);
+  return handler(loc, pattern);
 }
 
 const atom_handlers_table: { [tag in atom_tag]: "next" | "stop" } = {
@@ -346,87 +338,144 @@ function preexpand_forms(step: {
   counter: number;
   unit: CompilationUnit;
   context: Context;
-}): { loc: Loc; rib: Rib; context: Context; counter: number } {
-  return find_form({
-    loc: step.loc,
-    done: (loc) => ({
+}): goodies {
+  function next(loc: Loc): goodies {
+    return go_next(
       loc,
-      rib: step.rib,
-      context: step.context,
-      counter: step.counter,
-    }),
-    kid: ({ loc, cont }) => {
-      assert(loc.t.type === "atom");
-      const { tag, content, wrap } = loc.t;
-      switch (tag) {
-        case "identifier": {
-          const resolution = resolve(
-            content,
-            wrap,
-            step.context,
-            step.unit,
-            "normal_env"
-          );
-          switch (resolution.type) {
-            case "unbound":
-              return cont(loc);
-            case "bound": {
-              const binding = resolution.binding;
-              switch (binding.type) {
-                case "lexical":
-                  return cont(loc);
-                case "core_syntax": {
-                  const { name, pattern } = binding;
-                  return (
-                    //inspect(loc, `Handling core '${name}' syntax.`, () =>
-                    handle_core_syntax(loc, name, pattern, (loc) =>
-                      //inspect(loc, `After expanding '${name}'.`, () =>
-                      cont(loc)
-                    )
-                  );
-                  //);
-                }
-                default:
-                  const invalid: never = binding;
-                  throw invalid;
+      (loc) => h(find_form2(loc)),
+      (loc) => h({ type: "done", loc })
+    );
+  }
+  function h(ffrv: ffrv): goodies {
+    const loc = ffrv.loc;
+    switch (ffrv.type) {
+      case "done": {
+        return {
+          loc,
+          rib: step.rib,
+          context: step.context,
+          counter: step.counter,
+        };
+      }
+      case "identifier": {
+        assert(loc.t.type === "atom" && loc.t.tag === "identifier");
+        const { content, wrap } = loc.t;
+        const resolution = resolve(
+          content,
+          wrap,
+          step.context,
+          step.unit,
+          "normal_env"
+        );
+        switch (resolution.type) {
+          case "unbound":
+            return next(loc);
+          case "bound": {
+            const binding = resolution.binding;
+            switch (binding.type) {
+              case "lexical":
+                return next(loc);
+              case "core_syntax": {
+                const { name, pattern } = binding;
+                const new_loc = handle_core_syntax(loc, name, pattern);
+                return next(new_loc);
               }
+              default:
+                const invalid: never = binding;
+                throw invalid;
             }
-            case "error":
-              syntax_error(loc, resolution.reason);
-            default:
-              const invalid: never = resolution;
-              throw invalid;
+          }
+          case "error":
+            syntax_error(loc, resolution.reason);
+          default:
+            const invalid: never = resolution;
+            throw invalid;
+        }
+      }
+      case "list": {
+        assert(loc.t.type === "list");
+        switch (loc.t.tag) {
+          case "lexical_declaration": {
+            const goodies = extract_lexical_declaration_bindings(
+              loc,
+              step.rib,
+              step.context,
+              step.counter
+            );
+            return go_next(
+              goodies.loc,
+              (loc) => syntax_error(loc, "unexpected token after lexical"),
+              (loc) => ({ ...goodies, loc })
+            );
+          }
+          case "arrow_function":
+            return next(loc);
+          default: {
+            assert(list_handlers_table[loc.t.tag] === "descend");
+            return next(loc);
           }
         }
-        default:
-          debug(loc, "unhandled atom tag", { tag });
       }
-    },
-    klist: ({ loc, cont }) => {
-      if (loc.t.type !== "list") throw new Error("expected list");
-      switch (loc.t.tag) {
-        case "lexical_declaration": {
-          const goodies = extract_lexical_declaration_bindings(
-            loc,
-            step.rib,
-            step.context,
-            step.counter
-          );
-          return go_next(
-            goodies.loc,
-            (loc) => syntax_error(loc, "unexpected token after lexical"),
-            (loc) => ({ ...goodies, loc })
-          );
-        }
-        case "arrow_function":
-          return cont(loc);
-        default: {
-          assert(list_handlers_table[loc.t.tag] === "descend");
-          return cont(loc);
+    }
+  }
+  return h(find_form2(step.loc));
+}
+
+type ffrv =
+  | { type: "done"; loc: Loc }
+  | { type: "identifier"; loc: Loc }
+  | { type: "list"; loc: Loc };
+
+function find_form2(loc: Loc): ffrv {
+  function done(loc: Loc): ffrv {
+    return { type: "done", loc };
+  }
+  function find_form(loc: Loc): ffrv {
+    switch (loc.t.type) {
+      case "atom": {
+        const { tag, content } = loc.t;
+        const action = atom_handlers_table[tag];
+        switch (action) {
+          case "stop": {
+            return { type: "identifier", loc };
+          }
+          case "next": {
+            return go_next(loc, find_form, done);
+          }
+          case undefined:
+            throw new Error(`no table entry for atom ${tag}:${content}`);
+          default:
+            const invalid: never = action;
+            throw invalid;
         }
       }
-    },
-  });
+      case "list": {
+        const { tag } = loc.t;
+        const action = list_handlers_table[tag];
+        if (action === undefined) {
+          throw new Error(`no stop_table entry for ${tag}`);
+        }
+        switch (action) {
+          case "descend":
+            return go_down(loc, find_form, (loc) =>
+              go_next(loc, find_form, done)
+            );
+          case "stop":
+            return {
+              type: "list",
+              loc,
+            };
+          default:
+            const invalid: never = action;
+            throw invalid;
+        }
+      }
+      default:
+        const invalid: never = loc.t;
+        throw invalid;
+    }
+  }
+  return find_form(loc);
 }
 
 function find_form<T>({

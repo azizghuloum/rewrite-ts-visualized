@@ -4,7 +4,7 @@ import { LL } from "./llhelpers";
 import { Context, Loc, STX } from "./syntax-structures";
 import { go_next, go_down, mkzipper, stx_list_content } from "./zipper";
 
-type handler = <T>(loc: Loc, pattern: STX, k: (loc: Loc) => T) => T;
+type handler = (loc: Loc, pattern: STX) => Loc;
 
 const zipper_find: (loc: Loc, pred: (x: STX) => boolean) => Loc | null = (
   loc,
@@ -202,7 +202,7 @@ const unify_paths: (kwd: Path, code: Path) => unification | null = (
   throw new Error("unify_paths");
 };
 
-const splice: handler = (loc, pattern, k) => {
+const splice: handler = (loc, pattern) => {
   const kwd = find_identifier("splice", mkzipper(pattern));
   assert(kwd !== null);
   const unification = unify_paths(kwd.p, loc.p);
@@ -221,8 +221,7 @@ const splice: handler = (loc, pattern, k) => {
     wrap: undefined,
     content: body_code,
   };
-  const result_loc: Loc = { type: "loc", t: result, p: code_path };
-  return k(result_loc);
+  return { type: "loc", t: result, p: code_path };
 };
 
 export const pattern_match: <S>(
