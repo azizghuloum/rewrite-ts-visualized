@@ -1,14 +1,6 @@
 import { assert } from "./assert";
 import { AST, atom_tag } from "./AST";
-import {
-  CompilationUnit,
-  Context,
-  new_rib_id,
-  Rib,
-  Loc,
-  Wrap,
-  STX,
-} from "./syntax-structures";
+import { CompilationUnit, Context, new_rib_id, Rib, Loc, Wrap, STX } from "./syntax-structures";
 import {
   extend_unit,
   init_top_level,
@@ -71,11 +63,12 @@ function debug(loc: Loc, msg: string, info?: any): never {
   throw new DebugError(msg, loc, info);
 }
 
-const inspect: (loc: Loc, reason: string, k: () => Step) => Step = (
+const inspect: (loc: Loc, reason: string, k: () => Step) => Step = (loc, reason, k) => ({
+  type: "Inspect",
   loc,
   reason,
-  k
-) => ({ type: "Inspect", loc, reason, k });
+  k,
+});
 
 class SyntaxError extends Error {
   loc: Loc;
@@ -89,10 +82,7 @@ function syntax_error(loc: Loc, reason?: string): never {
   throw new SyntaxError(reason ?? "syntax error", loc);
 }
 
-const in_isolation: <S extends { loc: Loc }>(
-  loc: Loc,
-  f: (loc: Loc) => S
-) => S = (loc, f) => {
+const in_isolation: <S extends { loc: Loc }>(loc: Loc, f: (loc: Loc) => S) => S = (loc, f) => {
   try {
     const res = f(isolate(loc));
     return { ...res, loc: change(loc, res.loc) };
@@ -107,78 +97,59 @@ const in_isolation: <S extends { loc: Loc }>(
 
 type goodies = { loc: Loc; rib: Rib; context: Context; counter: number };
 
-function extract_lexical_declaration_bindings(
-  loc: Loc,
-  rib: Rib,
-  context: Context,
-  counter: number
-): goodies {
-  function after_vars(
-    ls: Loc,
-    rib: Rib,
-    context: Context,
-    counter: number
-  ): goodies {
-    if (ls.t.type === "atom" && ls.t.tag === "other") {
-      switch (ls.t.content) {
+function gen_lexical({ loc, rib, counter, context }: goodies): Omit<goodies, "loc"> {
+  const stx = loc.t;
+  assert(stx.type === "atom" && stx.tag === "identifier");
+  return extend_rib(
+    rib,
+    stx.content,
+    stx.wrap.marks,
+    counter,
+    "normal_env",
+    ({ rib, counter, label }) =>
+      extend_context(context, counter, label, "lexical", stx.content, ({ context, counter }) => ({
+        rib,
+        context,
+        counter,
+      })),
+    (reason) => syntax_error(loc, reason),
+  );
+}
+
+function extract_lexical_declaration_bindings({ loc, rib, context, counter }: goodies): goodies {
+  function after_vars({ loc, rib, context, counter }: goodies): goodies {
+    if (loc.t.type === "atom" && loc.t.tag === "other") {
+      switch (loc.t.content) {
         case ";":
           return go_right(
-            ls,
+            loc,
             (loc) => syntax_error(loc, "expected nothing after semicolon"),
-            (loc) => ({ loc, rib, context, counter })
+            (loc) => ({ loc, rib, context, counter }),
           );
         case ",":
           return go_right(
-            ls,
+            loc,
             (loc) => get_vars(loc, rib, context, counter),
-            (loc) => syntax_error(loc, "expected variable after ','")
+            (loc) => syntax_error(loc, "expected variable after ','"),
           );
       }
     }
-    syntax_error(ls, "expected a ',' or a ';'");
+    syntax_error(loc, "expected a ',' or a ';'");
   }
 
-  function get_vars(
-    ls: Loc,
-    rib: Rib,
-    context: Context,
-    counter: number
-  ): goodies {
+  function get_vars(ls: Loc, rib: Rib, context: Context, counter: number): goodies {
     if (ls.t.type === "list" && ls.t.tag === "variable_declarator") {
       return go_down(
         ls,
         (loc) => {
-          const stx = loc.t;
-          if (stx.type === "atom" && stx.tag === "identifier") {
-            return extend_rib(
-              rib,
-              stx.content,
-              stx.wrap.marks,
-              counter,
-              "normal_env",
-              ({ rib, counter, label }) =>
-                extend_context(
-                  context,
-                  counter,
-                  label,
-                  "lexical",
-                  stx.content,
-                  ({ context, counter }) =>
-                    go_next(
-                      ls,
-                      (loc) => after_vars(loc, rib, context, counter),
-                      (loc) => ({ loc, rib, context, counter })
-                    )
-                ),
-              (reason) => syntax_error(loc, reason)
-            );
-          } else {
-            throw new Error(`HERE2 ${stx.type}:${stx.tag}`);
-          }
+          const goodies = gen_lexical({ loc, rib, counter, context });
+          return go_next(
+            ls,
+            (loc) => after_vars({ ...goodies, loc }),
+            (loc) => ({ ...goodies, loc }),
+          );
         },
-        (_loc) => {
-          throw new Error("empty variable_declarator?");
-        }
+        syntax_error,
       );
     } else {
       syntax_error(ls, `expected a variable declaration; found ${ls.t.tag}`);
@@ -188,14 +159,11 @@ function extract_lexical_declaration_bindings(
     loc,
     (loc) => {
       if (loc.t.type === "atom") {
-        if (
-          loc.t.tag === "other" &&
-          (loc.t.content === "const" || loc.t.content === "let")
-        ) {
+        if (loc.t.tag === "other" && (loc.t.content === "const" || loc.t.content === "let")) {
           return go_right(
             loc,
             (loc) => get_vars(loc, rib, context, counter),
-            (loc) => syntax_error(loc, "no bindings after keyword")
+            (loc) => syntax_error(loc, "no bindings after keyword"),
           );
         } else {
           throw new Error(`HERE? ${loc.t.type}:${loc.t.tag}`);
@@ -204,9 +172,7 @@ function extract_lexical_declaration_bindings(
         syntax_error(loc, "expected keyword const or let");
       }
     },
-    (_loc) => {
-      throw new Error("empty?");
-    }
+    syntax_error,
   );
 }
 
@@ -227,7 +193,7 @@ function expand_program(step: {
   const loc = go_down(
     wrap_loc(step.loc, wrap),
     (x) => x,
-    (loc) => syntax_error(loc, "empty program?")
+    (loc) => syntax_error(loc, "empty program?"),
   );
   return preexpand_body({
     loc,
@@ -264,40 +230,22 @@ function preexpand_body(step: {
   unit: CompilationUnit;
   context: Context;
   counter: number;
-  k: (props: { loc: Loc; rib: Rib; context: Context; counter: number }) => Step;
+  k: (props: goodies) => Step;
 }): Step {
   const { loc, rib, context, counter } = in_isolation(step.loc, (loc) =>
-    preexpand_forms({ ...step, loc })
+    preexpand_forms({ ...step, loc }),
   );
   if (loc.t.tag === "slice") {
     const subforms = stx_list_content(loc.t);
-    const new_loc = change_splicing(
-      loc,
-      subforms === null ? [empty_statement, null] : subforms
-    );
+    const new_loc = change_splicing(loc, subforms === null ? [empty_statement, null] : subforms);
     return inspect(new_loc, "After splicing the body.", () =>
-      preexpand_body({
-        loc: new_loc,
-        rib,
-        unit: step.unit,
-        context,
-        counter,
-        k: step.k,
-      })
+      preexpand_body({ loc: new_loc, rib, unit: step.unit, context, counter, k: step.k }),
     );
   }
   return go_next<Step>(
     loc,
-    (loc) =>
-      preexpand_body({
-        loc,
-        rib,
-        counter,
-        context,
-        unit: step.unit,
-        k: step.k,
-      }),
-    (loc) => step.k({ loc, rib, context, counter })
+    (loc) => preexpand_body({ loc, rib, counter, context, unit: step.unit, k: step.k }),
+    (loc) => step.k({ loc, rib, context, counter }),
   );
 }
 
@@ -360,13 +308,7 @@ function preexpand_forms(step: {
       case "identifier": {
         assert(loc.t.type === "atom" && loc.t.tag === "identifier");
         const { content, wrap } = loc.t;
-        const resolution = resolve(
-          content,
-          wrap,
-          step.context,
-          step.unit,
-          "normal_env"
-        );
+        const resolution = resolve(content, wrap, step.context, step.unit, "normal_env");
         switch (resolution.type) {
           case "unbound":
             return next(loc);
@@ -396,16 +338,11 @@ function preexpand_forms(step: {
         assert(loc.t.type === "list");
         switch (loc.t.tag) {
           case "lexical_declaration": {
-            const goodies = extract_lexical_declaration_bindings(
-              loc,
-              step.rib,
-              step.context,
-              step.counter
-            );
+            const goodies = extract_lexical_declaration_bindings({ ...step, loc });
             return go_next(
               goodies.loc,
               (loc) => syntax_error(loc, "unexpected token after lexical"),
-              (loc) => ({ ...goodies, loc })
+              (loc) => ({ ...goodies, loc }),
             );
           }
           case "arrow_function":
@@ -457,9 +394,7 @@ function find_form(loc: Loc): ffrv {
         }
         switch (action) {
           case "descend":
-            return go_down(loc, find_form, (loc) =>
-              go_next(loc, find_form, done)
-            );
+            return go_down(loc, find_form, (loc) => go_next(loc, find_form, done));
           case "stop":
             return {
               type: "list",
@@ -483,7 +418,9 @@ function postexpand_program(step: {
   unit: CompilationUnit;
   counter: number;
   context: Context;
-}): { loc: Loc } {
+}): {
+  loc: Loc;
+} {
   assert(step.loc.t.tag === "program");
   return go_down(
     step.loc,
@@ -494,7 +431,7 @@ function postexpand_program(step: {
         counter: step.counter,
         context: step.context,
       }),
-    (loc) => ({ loc })
+    (loc) => ({ loc }),
   );
 }
 
@@ -563,11 +500,7 @@ function extract_parameters(loc: Loc): LL<STX> {
 }
 
 function check_punct(loc: Loc, content: string) {
-  if (
-    loc.t.type !== "atom" ||
-    loc.t.tag !== "other" ||
-    loc.t.content !== content
-  ) {
+  if (loc.t.type !== "atom" || loc.t.tag !== "other" || loc.t.content !== content) {
     syntax_error(loc, `expected '${content}'`);
   }
 }
@@ -584,7 +517,7 @@ function expand_arrow_function(loc: Loc): { loc: Loc } {
 
       debug(body, "body", body.t);
     },
-    invalid_form
+    invalid_form,
   );
 }
 
@@ -613,13 +546,7 @@ function postexpand_body(step: {
         const { tag, content, wrap } = loc.t;
         switch (tag) {
           case "identifier": {
-            const resolution = resolve(
-              content,
-              wrap,
-              step.context,
-              step.unit,
-              "normal_env"
-            );
+            const resolution = resolve(content, wrap, step.context, step.unit, "normal_env");
             switch (resolution.type) {
               case "bound": {
                 const { binding } = resolution;
@@ -636,7 +563,7 @@ function postexpand_body(step: {
                         type: "loc",
                         t: new_id,
                         p: { type: "top" },
-                      })
+                      }),
                     );
                   }
                 }
