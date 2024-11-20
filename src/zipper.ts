@@ -52,6 +52,24 @@ export function isolate(loc: Loc): Loc {
   return { type: "loc", t: loc.t, p: { type: "top" } };
 }
 
+export function unisolate(loc: Loc, new_loc: Loc): Loc {
+  function rewrap(op: Loc["p"], np: Loc["p"]): Loc["p"] {
+    switch (np.type) {
+      case "top":
+        return op;
+      case "node":
+        return {
+          type: "node",
+          tag: np.tag,
+          l: np.l,
+          p: rewrap(op, np.p),
+          r: np.r,
+        };
+    }
+  }
+  return { type: "loc", t: new_loc.t, p: rewrap(loc.p, new_loc.p) };
+}
+
 export function change(loc: Loc, new_loc: Loc): Loc {
   assert(new_loc.p.type === "top");
   return { type: "loc", t: new_loc.t, p: loc.p };

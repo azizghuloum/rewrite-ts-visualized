@@ -54,7 +54,12 @@ function absurdly(node: Parser.SyntaxNode): AST {
         if (ls.length === 1 || (ls.length === 2 && ls[1].content === ";")) {
           return ls[0];
         } else {
-          throw new Error("invalid expression_statement");
+          return {
+            type: "list",
+            tag: "ERROR",
+            wrap: undefined,
+            content: array_to_ll(ls),
+          };
         }
       }
       case "required_parameter": {

@@ -26,9 +26,11 @@ import {
   isolate,
   mkzipper,
   stx_list_content,
+  unisolate,
   wrap_loc,
 } from "./zipper";
 import { core_handlers } from "./syntax-core-patterns";
+import { LL } from "./llhelpers";
 
 export type Step =
   | {
@@ -83,8 +85,8 @@ class SyntaxError extends Error {
   }
 }
 
-function syntax_error(loc: Loc, reason: string): never {
-  throw new SyntaxError(reason, loc);
+function syntax_error(loc: Loc, reason?: string): never {
+  throw new SyntaxError(reason ?? "syntax error", loc);
 }
 
 const in_isolation: <S extends { loc: Loc }>(
@@ -96,7 +98,7 @@ const in_isolation: <S extends { loc: Loc }>(
     return { ...res, loc: change(loc, res.loc) };
   } catch (err) {
     if (err instanceof SyntaxError) {
-      syntax_error(change(loc, err.loc), err.message);
+      syntax_error(unisolate(loc, err.loc), err.message);
     } else {
       throw err;
     }
@@ -496,8 +498,94 @@ function postexpand_program(step: {
   );
 }
 
+function invalid_form(loc: Loc): never {
+  syntax_error(loc, "invalid form");
+}
+
+function itself(loc: Loc): Loc {
+  return loc;
+}
+
+function extract_parameters(loc: Loc): LL<STX> {
+  assert(loc.t.type === "list" && loc.t.tag === "formal_parameters");
+  function tail(loc: Loc): LL<STX> {
+    switch (loc.t.type) {
+      case "atom": {
+        switch (loc.t.tag) {
+          case "other": {
+            switch (loc.t.content) {
+              case ",":
+                return go_right(loc, head, invalid_form);
+              case ")":
+                return go_right(loc, invalid_form, () => null);
+            }
+          }
+        }
+      }
+    }
+    syntax_error(loc);
+  }
+  function head(loc: Loc): LL<STX> {
+    switch (loc.t.type) {
+      case "atom": {
+        switch (loc.t.tag) {
+          case "other": {
+            switch (loc.t.content) {
+              case ",":
+                return invalid_form(loc);
+              case ")":
+                return go_right(loc, invalid_form, () => null);
+            }
+          }
+        }
+      }
+    }
+    return [loc.t, go_right(loc, tail, invalid_form)];
+  }
+  function first_param(loc: Loc): LL<STX> {
+    switch (loc.t.type) {
+      case "atom": {
+        switch (loc.t.tag) {
+          case "identifier":
+            return go_right(loc, invalid_form, () => [loc.t, null]);
+          case "other": {
+            if (loc.t.content === "(") {
+              return go_right(loc, head, invalid_form);
+            }
+          }
+        }
+        return syntax_error(loc);
+      }
+    }
+    debug(loc, "non atom first_param");
+  }
+  return go_down(loc, first_param, invalid_form);
+}
+
+function check_punct(loc: Loc, content: string) {
+  if (
+    loc.t.type !== "atom" ||
+    loc.t.tag !== "other" ||
+    loc.t.content !== content
+  ) {
+    syntax_error(loc, `expected '${content}'`);
+  }
+}
+
 function expand_arrow_function(loc: Loc): { loc: Loc } {
-  syntax_error(loc, "TODO expand_arrow_function");
+  return go_down(
+    loc,
+    (loc) => {
+      const params = extract_parameters(loc);
+
+      const h2 = go_right(loc, itself, invalid_form);
+      check_punct(h2, "=>");
+      const body = go_right(h2, itself, invalid_form);
+
+      debug(body, "body", body.t);
+    },
+    invalid_form
+  );
 }
 
 function postexpand_body(step: {
