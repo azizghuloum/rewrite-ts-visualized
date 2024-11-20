@@ -295,6 +295,23 @@ const list_handlers_table: { [tag: string]: "descend" | "stop" } = {
   empty_statement: "descend",
 };
 
+function expand_concise_body(step: {
+  loc: Loc;
+  rib: Rib;
+  counter: number;
+  unit: CompilationUnit;
+  context: Context;
+}): { loc: Loc } {
+  const loc = step.loc;
+  if (loc.t.type === "list" && loc.t.tag === "statement_block") {
+    debug(loc, "concise statement_block");
+  } else {
+    const gs = preexpand_forms(step);
+    const result = postexpand_body({ ...gs, unit: step.unit });
+    return result;
+  }
+}
+
 function preexpand_forms(step: {
   loc: Loc;
   rib: Rib;
@@ -549,10 +566,12 @@ function expand_arrow_function({
   loc,
   counter,
   context,
+  unit,
 }: {
   loc: Loc;
   counter: number;
   context: Context;
+  unit: CompilationUnit;
 }): { loc: Loc } {
   return go_down(
     loc,
@@ -562,7 +581,20 @@ function expand_arrow_function({
       const arr = go_right(pgs.loc, itself, invalid_form);
       check_punct(arr, "=>");
       const body = go_right(arr, itself, invalid_form);
-      debug(body, "body");
+      const expanded_body = in_isolation(body, (body) => {
+        const [rib_id, new_counter] = new_rib_id(pgs.counter);
+        const wrap: Wrap = { marks: null, subst: [{ rib_id }, null] };
+        const loc = wrap_loc(body, wrap);
+        const new_unit = extend_unit(unit, rib_id, pgs.rib);
+        return expand_concise_body({
+          loc,
+          rib,
+          context: pgs.context,
+          counter: new_counter,
+          unit: new_unit,
+        });
+      });
+      return { loc: go_up(expanded_body.loc) };
     },
     invalid_form,
   );
