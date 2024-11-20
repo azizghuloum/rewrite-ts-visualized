@@ -26,9 +26,7 @@ function is_top_marked(wrap: Wrap): boolean {
 }
 
 function same_marks(m1: Marks, m2: Marks): boolean {
-  return m1 === null
-    ? m2 === null
-    : m2 !== null && m1[0] === m2[0] && same_marks(m1[1], m2[1]);
+  return m1 === null ? m2 === null : m2 !== null && m1[0] === m2[0] && same_marks(m1[1], m2[1]);
 }
 
 function id_to_label(
@@ -36,7 +34,7 @@ function id_to_label(
   marks: Marks,
   subst: Subst,
   unit: CompilationUnit,
-  resolution_type: "normal_env" | "types_env"
+  resolution_type: "normal_env" | "types_env",
 ): string | undefined {
   function loop(marks: Marks | null, subst: Subst): string | undefined {
     if (marks === null) throw new Error("missing marks");
@@ -66,7 +64,7 @@ export function resolve(
   { marks, subst }: Wrap,
   context: Context,
   unit: CompilationUnit,
-  resolution_type: "normal_env" | "types_env"
+  resolution_type: "normal_env" | "types_env",
 ): Resolution {
   const label = id_to_label(name, marks, subst, unit, resolution_type);
   if (label === undefined) {
@@ -87,7 +85,7 @@ export function extend_rib<S>(
   counter: number,
   env_type: "normal_env" | "types_env",
   sk: (args: { rib: Rib; counter: number; label: string }) => S,
-  fk: (reason: string) => S
+  fk: (reason: string) => S,
 ): S {
   const env = rib[env_type];
   const entry = env[name] ?? [];
@@ -109,7 +107,7 @@ export function extend_context<S>(
   label: string,
   binding_type: "lexical",
   original_name: string,
-  k: (args: { context: Context; counter: number }) => S
+  k: (args: { context: Context; name: string; counter: number }) => S,
 ): S {
   const new_name = `${original_name}_${counter}`;
   const new_counter = counter + 1;
@@ -117,7 +115,7 @@ export function extend_context<S>(
     ...context,
     [label]: { type: binding_type, name: new_name },
   };
-  return k({ context: new_context, counter: new_counter });
+  return k({ context: new_context, name: new_name, counter: new_counter });
 }
 
 function merge_wraps(outerwrap: Wrap, innerwrap?: Wrap): Wrap {
@@ -159,10 +157,7 @@ export function push_wrap(outerwrap: Wrap): (stx: AST | STX) => STX {
   };
 }
 
-function init_global_context(
-  patterns: CorePatterns,
-  wrap: (ast: AST) => STX
-): Context {
+function init_global_context(patterns: CorePatterns, wrap: (ast: AST) => STX): Context {
   const binding_entries = Object.entries(patterns).map(([name, pattern]) => [
     `global.${name}`,
     { type: "core_syntax", name, pattern: wrap(pattern) },
@@ -175,7 +170,7 @@ export type CorePatterns = { [k: string]: AST };
 
 export function init_top_level(
   ast: AST,
-  patterns: CorePatterns
+  patterns: CorePatterns,
 ): {
   stx: STX;
   counter: number;
@@ -206,11 +201,7 @@ export function init_top_level(
   };
 }
 
-export function extend_unit(
-  unit: CompilationUnit,
-  rib_id: string,
-  rib: Rib
-): CompilationUnit {
+export function extend_unit(unit: CompilationUnit, rib_id: string, rib: Rib): CompilationUnit {
   return {
     store: { ...unit.store, [rib_id]: rib },
   };

@@ -4,13 +4,7 @@ import treesitter_wasm_url from "web-tree-sitter/tree-sitter.wasm?url";
 import tsx_url from "./assets/tree-sitter-tsx.wasm?url";
 import { useEffect, useState } from "react";
 import { createBrowserRouter, RouterProvider } from "react-router-dom";
-import {
-  ASTExpr,
-  ASTExprSpan,
-  ASTHighlight,
-  ASTList,
-  ASTListSpan,
-} from "./ASTVis";
+import { ASTExpr, ASTExprSpan, ASTHighlight, ASTList, ASTListSpan } from "./ASTVis";
 import { Editor } from "./Editor";
 import * as Zipper from "./zipper";
 import { initial_step, next_step, Step } from "./expander";
@@ -29,7 +23,7 @@ function zipper_to_view(zipper: Loc): React.ReactElement {
     zipper,
     (x) => <ASTHighlight>{x}</ASTHighlight>,
     (x) => <ASTExpr ast={x} />,
-    (tag, children) => <ASTList tag={tag} items={children} />
+    (tag, children) => <ASTList tag={tag} items={children} />,
   );
 }
 
@@ -38,7 +32,7 @@ function zipper_to_span(zipper: Loc): React.ReactElement {
     zipper,
     (x) => <ASTHighlight>{x}</ASTHighlight>,
     (x) => <ASTExprSpan ast={x} />,
-    (tag, children) => <ASTListSpan tag={tag} items={children} />
+    (tag, children) => <ASTListSpan tag={tag} items={children} />,
   );
 }
 
@@ -62,13 +56,7 @@ function initial_state(step: Step): State {
   };
 }
 
-function StepperView({
-  step,
-  step_number,
-}: {
-  step: Step;
-  step_number: number;
-}) {
+function StepperView({ step, step_number }: { step: Step; step_number: number }) {
   const zipper_view = zipper_to_view(step.loc);
   return (
     <div>
@@ -78,7 +66,7 @@ function StepperView({
           <span style={{ fontWeight: "bold" }}>{step.reason}</span>
         ) : step.type === "DEBUG" ? (
           <span style={{ fontWeight: "bold", color: "red" }}>
-            {step.type}: {step.msg} {JSON.stringify(step.info)}
+            {step.type}: {step.msg} {step.info && JSON.stringify(step.info)}
           </span>
         ) : (
           <span style={{ fontWeight: "bold" }}>{step.type}</span>
@@ -208,7 +196,7 @@ function Example({ parser, code, onChange }: ExampleProps) {
 function Expander() {
   const [parser, set_parser] = useState<Parser | null>(null);
   const [sample, setSample] = useState(
-    localStorage.getItem("sample_program") ?? "console.log('hello world!');"
+    localStorage.getItem("sample_program") ?? "console.log('hello world!');",
   );
   useEffect(() => {
     load_parser({

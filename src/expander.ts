@@ -15,6 +15,7 @@ import {
   go_down,
   go_next,
   go_right,
+  go_up,
   isolate,
   mkzipper,
   stx_list_content,
@@ -22,7 +23,6 @@ import {
   wrap_loc,
 } from "./zipper";
 import { core_handlers } from "./syntax-core-patterns";
-import { LL } from "./llhelpers";
 
 export type Step =
   | {
@@ -97,7 +97,12 @@ const in_isolation: <S extends { loc: Loc }>(loc: Loc, f: (loc: Loc) => S) => S 
 
 type goodies = { loc: Loc; rib: Rib; context: Context; counter: number };
 
-function gen_lexical({ loc, rib, counter, context }: goodies): Omit<goodies, "loc"> {
+function gen_lexical({
+  loc,
+  rib,
+  counter,
+  context,
+}: goodies): Omit<goodies, "loc"> & { name: string } {
   const stx = loc.t;
   assert(stx.type === "atom" && stx.tag === "identifier");
   return extend_rib(
@@ -107,11 +112,19 @@ function gen_lexical({ loc, rib, counter, context }: goodies): Omit<goodies, "lo
     counter,
     "normal_env",
     ({ rib, counter, label }) =>
-      extend_context(context, counter, label, "lexical", stx.content, ({ context, counter }) => ({
-        rib,
+      extend_context(
         context,
         counter,
-      })),
+        label,
+        "lexical",
+        stx.content,
+        ({ context, counter, name }) => ({
+          rib,
+          context,
+          counter,
+          name,
+        }),
+      ),
     (reason) => syntax_error(loc, reason),
   );
 }
@@ -443,18 +456,20 @@ function itself(loc: Loc): Loc {
   return loc;
 }
 
-function extract_parameters(loc: Loc): LL<STX> {
-  assert(loc.t.type === "list" && loc.t.tag === "formal_parameters");
-  function tail(loc: Loc): LL<STX> {
+function extract_parameters(goodies: goodies): goodies {
+  //
+
+  function tail(goodies: goodies): goodies {
+    const loc = goodies.loc;
     switch (loc.t.type) {
       case "atom": {
         switch (loc.t.tag) {
           case "other": {
             switch (loc.t.content) {
               case ",":
-                return go_right(loc, head, invalid_form);
+                return go_right(loc, (loc) => head({ ...goodies, loc }), invalid_form);
               case ")":
-                return go_right(loc, invalid_form, () => null);
+                return go_right(loc, invalid_form, (loc) => ({ ...goodies, loc: go_up(loc) }));
             }
           }
         }
@@ -462,41 +477,66 @@ function extract_parameters(loc: Loc): LL<STX> {
     }
     syntax_error(loc);
   }
-  function head(loc: Loc): LL<STX> {
+
+  function head(goodies: goodies): goodies {
+    const loc = goodies.loc;
     switch (loc.t.type) {
       case "atom": {
         switch (loc.t.tag) {
+          case "identifier": {
+            const gs = identifier(goodies);
+            return go_right(gs.loc, (loc) => tail({ ...gs, loc }), invalid_form);
+          }
           case "other": {
             switch (loc.t.content) {
               case ",":
                 return invalid_form(loc);
               case ")":
-                return go_right(loc, invalid_form, () => null);
+                return go_right(loc, invalid_form, (loc) => ({ ...goodies, loc: go_up(loc) }));
             }
           }
         }
       }
     }
-    return [loc.t, go_right(loc, tail, invalid_form)];
+    syntax_error(loc);
   }
-  function first_param(loc: Loc): LL<STX> {
-    switch (loc.t.type) {
+
+  const rename = (loc: Loc, name: string) =>
+    change(loc, {
+      type: "loc",
+      p: { type: "top" },
+      t: { type: "atom", tag: "identifier", content: name, wrap: { marks: null, subst: null } },
+    });
+
+  function identifier(goodies: goodies): goodies {
+    const id = goodies.loc.t;
+    assert(id.type === "atom" && id.tag === "identifier");
+    const { name, ...gs } = gen_lexical(goodies);
+    return { ...gs, loc: rename(goodies.loc, name) };
+  }
+
+  function first_param(goodies: goodies): goodies {
+    switch (goodies.loc.t.type) {
       case "atom": {
-        switch (loc.t.tag) {
+        switch (goodies.loc.t.tag) {
           case "identifier":
-            return go_right(loc, invalid_form, () => [loc.t, null]);
+            const gs = identifier(goodies);
+            return go_right(gs.loc, invalid_form, (loc) => ({ ...gs, loc: go_up(loc) }));
           case "other": {
-            if (loc.t.content === "(") {
-              return go_right(loc, head, invalid_form);
+            if (goodies.loc.t.content === "(") {
+              return go_right(goodies.loc, (loc) => head({ ...goodies, loc }), invalid_form);
             }
           }
         }
-        return syntax_error(loc);
+        return syntax_error(goodies.loc);
       }
     }
-    debug(loc, "non atom first_param");
+    debug(goodies.loc, "non atom first_param");
   }
-  return go_down(loc, first_param, invalid_form);
+  {
+    assert(goodies.loc.t.type === "list" && goodies.loc.t.tag === "formal_parameters");
+    return go_down(goodies.loc, (loc) => first_param({ ...goodies, loc }), invalid_form);
+  }
 }
 
 function check_punct(loc: Loc, content: string) {
@@ -505,17 +545,24 @@ function check_punct(loc: Loc, content: string) {
   }
 }
 
-function expand_arrow_function(loc: Loc): { loc: Loc } {
+function expand_arrow_function({
+  loc,
+  counter,
+  context,
+}: {
+  loc: Loc;
+  counter: number;
+  context: Context;
+}): { loc: Loc } {
   return go_down(
     loc,
     (loc) => {
-      const params = extract_parameters(loc);
-
-      const h2 = go_right(loc, itself, invalid_form);
-      check_punct(h2, "=>");
-      const body = go_right(h2, itself, invalid_form);
-
-      debug(body, "body", body.t);
+      const rib: Rib = { type: "rib", normal_env: {}, types_env: {} };
+      const pgs = extract_parameters({ loc, rib, counter, context });
+      const arr = go_right(pgs.loc, itself, invalid_form);
+      check_punct(arr, "=>");
+      const body = go_right(arr, itself, invalid_form);
+      debug(body, "body");
     },
     invalid_form,
   );
@@ -585,7 +632,7 @@ function postexpand_body(step: {
           case "variable_declarator":
             return descend(loc);
           case "arrow_function": {
-            const arr = in_isolation(loc, (loc) => expand_arrow_function(loc));
+            const arr = in_isolation(loc, (loc) => expand_arrow_function({ ...step, loc }));
             return cont(arr.loc);
           }
           default: {

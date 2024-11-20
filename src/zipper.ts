@@ -16,7 +16,7 @@ export function reconvert<Y>(
   zipper: Loc,
   mark: (y: Y) => Y,
   conv: (x: STX) => Y,
-  wrap: (tag: string, children: Y[]) => Y
+  wrap: (tag: string, children: Y[]) => Y,
 ): Y {
   return Zipper.reconvert(zipper, mark, conv, wrap);
 }
@@ -30,11 +30,7 @@ export function stx_list_content(t: STX): LL<STX> {
   }
 }
 
-export function go_down<S>(
-  loc: Loc,
-  k: (loc: Loc) => S,
-  fk: (loc: Loc) => S
-): S {
+export function go_down<S>(loc: Loc, k: (loc: Loc) => S, fk: (loc: Loc) => S): S {
   if (loc.t.type === "list") {
     if (loc.t.content === null) {
       return fk(loc);
@@ -44,7 +40,7 @@ export function go_down<S>(
     Zipper.go_down(loc, (t, cb) => {
       assert(t.type === "list");
       return cb(t.tag, stx_list_content(t));
-    })
+    }),
   );
 }
 
@@ -89,11 +85,7 @@ function mkstx(tag: string, content: LL<STX>): STX {
   return { type: "list", tag, wrap: undefined, content };
 }
 
-export function go_next<S>(
-  loc: Loc,
-  sk: (loc: Loc) => S,
-  fk: (loc: Loc) => S
-): S {
+export function go_next<S>(loc: Loc, sk: (loc: Loc) => S, fk: (loc: Loc) => S): S {
   switch (loc.p.type) {
     case "node": {
       if (loc.p.r === null) {
@@ -108,15 +100,15 @@ export function go_next<S>(
   }
 }
 
-export function go_right<S>(
-  loc: Loc,
-  sk: (loc: Loc) => S,
-  fk: (loc: Loc) => S
-): S {
+export function go_right<S>(loc: Loc, sk: (loc: Loc) => S, fk: (loc: Loc) => S): S {
   if (loc.p.type === "node" && loc.p.r === null) {
     // no right of me
     return fk(loc);
   } else {
     return sk(Zipper.go_right(loc));
   }
+}
+
+export function go_up(loc: Loc): Loc {
+  return Zipper.go_up(loc, mkstx);
 }
