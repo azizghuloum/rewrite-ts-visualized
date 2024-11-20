@@ -339,24 +339,22 @@ function preexpand_forms(step: {
   unit: CompilationUnit;
   context: Context;
 }): goodies {
-  function next(loc: Loc): goodies {
-    return go_next(
+  function done(loc: Loc): goodies {
+    return {
       loc,
-      (loc) => h(find_form2(loc)),
-      (loc) => h({ type: "done", loc })
-    );
+      rib: step.rib,
+      context: step.context,
+      counter: step.counter,
+    };
+  }
+  function next(loc: Loc): goodies {
+    return go_next(loc, (loc) => h(find_form(loc)), done);
   }
   function h(ffrv: ffrv): goodies {
     const loc = ffrv.loc;
     switch (ffrv.type) {
-      case "done": {
-        return {
-          loc,
-          rib: step.rib,
-          context: step.context,
-          counter: step.counter,
-        };
-      }
+      case "done":
+        return done(loc);
       case "identifier": {
         assert(loc.t.type === "atom" && loc.t.tag === "identifier");
         const { content, wrap } = loc.t;
@@ -418,7 +416,7 @@ function preexpand_forms(step: {
       }
     }
   }
-  return h(find_form2(step.loc));
+  return h(find_form(step.loc));
 }
 
 type ffrv =
@@ -426,7 +424,7 @@ type ffrv =
   | { type: "identifier"; loc: Loc }
   | { type: "list"; loc: Loc };
 
-function find_form2(loc: Loc): ffrv {
+function find_form(loc: Loc): ffrv {
   function done(loc: Loc): ffrv {
     return { type: "done", loc };
   }
@@ -478,75 +476,6 @@ function find_form2(loc: Loc): ffrv {
   return find_form(loc);
 }
 
-function find_form<T>({
-  loc,
-  done,
-  kid,
-  klist,
-}: {
-  loc: Loc;
-  done: (loc: Loc) => T;
-  kid: (args: { loc: Loc; cont: (loc: Loc) => T; redo: (loc: Loc) => T }) => T;
-  klist: (args: {
-    loc: Loc;
-    cont: (loc: Loc) => T;
-    descend: (loc: Loc) => T;
-  }) => T;
-}): T {
-  function find_form(loc: Loc): T {
-    switch (loc.t.type) {
-      case "atom": {
-        const { tag, content } = loc.t;
-        const action = atom_handlers_table[tag];
-        switch (action) {
-          case "stop": {
-            return kid({
-              loc,
-              cont: (loc) => go_next(loc, find_form, done),
-              redo: find_form,
-            });
-          }
-          case "next": {
-            return go_next(loc, find_form, done);
-          }
-          case undefined:
-            throw new Error(`no table entry for atom ${tag}:${content}`);
-          default:
-            const invalid: never = action;
-            throw invalid;
-        }
-      }
-      case "list": {
-        const { tag } = loc.t;
-        const action = list_handlers_table[tag];
-        if (action === undefined) {
-          throw new Error(`no stop_table entry for ${tag}`);
-        }
-        switch (action) {
-          case "descend":
-            return go_down(loc, find_form, (loc) =>
-              go_next(loc, find_form, done)
-            );
-          case "stop":
-            return klist({
-              loc,
-              cont: (loc) => go_next(loc, find_form, done),
-              descend: (loc) =>
-                go_down(loc, find_form, (loc) => go_next(loc, find_form, done)),
-            });
-          default:
-            const invalid: never = action;
-            throw invalid;
-        }
-      }
-      default:
-        const invalid: never = loc.t;
-        throw invalid;
-    }
-  }
-  return find_form(loc);
-}
-
 function postexpand_program(step: {
   loc: Loc;
   unit: CompilationUnit;
@@ -577,67 +506,84 @@ function postexpand_body(step: {
   counter: number;
   context: Context;
 }): { loc: Loc } {
-  return find_form({
-    loc: step.loc,
-    done: (loc) => ({ loc }),
-    kid: ({ loc, cont }) => {
-      if (loc.t.type !== "atom") throw new Error("expected atom");
-      const { tag, content, wrap } = loc.t;
-      switch (tag) {
-        case "identifier": {
-          const resolution = resolve(
-            content,
-            wrap,
-            step.context,
-            step.unit,
-            "normal_env"
-          );
-          switch (resolution.type) {
-            case "bound": {
-              const { binding } = resolution;
-              switch (binding.type) {
-                case "lexical": {
-                  const new_id: STX = {
-                    type: "atom",
-                    tag: "identifier",
-                    wrap: { marks: null, subst: null },
-                    content: binding.name,
-                  };
-                  return cont(
-                    change(loc, { type: "loc", t: new_id, p: { type: "top" } })
-                  );
+  function done(loc: Loc): { loc: Loc } {
+    return { loc };
+  }
+  function cont(loc: Loc): { loc: Loc } {
+    return go_next(loc, (loc) => h(find_form(loc)), done);
+  }
+  function descend(loc: Loc): { loc: Loc } {
+    return go_down(loc, (loc) => h(find_form(loc)), cont);
+  }
+  function h(ffrv: ffrv): { loc: Loc } {
+    const loc = ffrv.loc;
+    switch (ffrv.type) {
+      case "done":
+        return done(loc);
+      case "identifier": {
+        assert(loc.t.type === "atom");
+        const { tag, content, wrap } = loc.t;
+        switch (tag) {
+          case "identifier": {
+            const resolution = resolve(
+              content,
+              wrap,
+              step.context,
+              step.unit,
+              "normal_env"
+            );
+            switch (resolution.type) {
+              case "bound": {
+                const { binding } = resolution;
+                switch (binding.type) {
+                  case "lexical": {
+                    const new_id: STX = {
+                      type: "atom",
+                      tag: "identifier",
+                      wrap: { marks: null, subst: null },
+                      content: binding.name,
+                    };
+                    return cont(
+                      change(loc, {
+                        type: "loc",
+                        t: new_id,
+                        p: { type: "top" },
+                      })
+                    );
+                  }
                 }
               }
+              case "unbound":
+                syntax_error(loc, "unbound identifier");
             }
-            case "unbound":
-              syntax_error(loc, "unbound identifier");
+            debug(loc, "resolved", resolution);
           }
-          debug(loc, "resolved", resolution);
-        }
-        default:
-          debug(loc, "unhandled atom tag", tag);
-      }
-    },
-    klist: ({ loc, cont, descend }) => {
-      if (loc.t.type !== "list") throw new Error("expected list");
-      switch (loc.t.tag) {
-        case "lexical_declaration":
-          return descend(loc);
-        case "variable_declarator":
-          return descend(loc);
-        case "arrow_function": {
-          const arr = in_isolation(loc, (loc) => expand_arrow_function(loc));
-          return cont(arr.loc);
-        }
-        default: {
-          if (list_handlers_table[loc.t.tag] !== "descend") {
-            debug(loc, `unhandled '${loc.t.tag}' form in postexpand_body`);
-          }
-          return cont(loc);
+          default:
+            debug(loc, "unhandled atom tag", tag);
         }
       }
-    },
-  });
+      case "list": {
+        if (loc.t.type !== "list") throw new Error("expected list");
+        switch (loc.t.tag) {
+          case "lexical_declaration":
+            return descend(loc);
+          case "variable_declarator":
+            return descend(loc);
+          case "arrow_function": {
+            const arr = in_isolation(loc, (loc) => expand_arrow_function(loc));
+            return cont(arr.loc);
+          }
+          default: {
+            if (list_handlers_table[loc.t.tag] !== "descend") {
+              debug(loc, `unhandled '${loc.t.tag}' form in postexpand_body`);
+            }
+            return cont(loc);
+          }
+        }
+      }
+    }
+  }
+  return h(find_form(step.loc));
 }
 
 export function next_step(step: Step): Step {
