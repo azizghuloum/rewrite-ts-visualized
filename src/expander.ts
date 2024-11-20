@@ -55,19 +55,19 @@ export function initial_step(ast: AST, patterns: CorePatterns): Step {
   };
 }
 
-const debug: (
-  msg: string
-) => ({ loc, ...info }: { loc: Loc; [k: string]: any }) => never =
-  (msg) =>
-  ({ loc, ..._info }) => {
-    throw new Error("FIXME DEBUG" + msg);
-    //({
-    //  type: "DEBUG",
-    //  loc,
-    //  msg,
-    //  info,
-    //});
-  };
+class DebugError extends Error {
+  loc: Loc;
+  info: any;
+  constructor(message: string, loc: Loc, info: any) {
+    super(message);
+    this.loc = loc;
+    this.info = info;
+  }
+}
+
+function debug(loc: Loc, msg: string, info?: any): never {
+  throw new DebugError(msg, loc, info);
+}
 
 const inspect: (loc: Loc, reason: string, k: () => Step) => Step = (
   loc,
@@ -83,9 +83,9 @@ class SyntaxError extends Error {
   }
 }
 
-const syntax_error: (loc: Loc, reason: string) => never = (loc, reason) => {
+function syntax_error(loc: Loc, reason: string): never {
   throw new SyntaxError(reason, loc);
-};
+}
 
 const in_isolation: <S extends { loc: Loc }>(
   loc: Loc,
@@ -103,21 +103,27 @@ const in_isolation: <S extends { loc: Loc }>(
   }
 };
 
-function extract_lexical_declaration_bindings<T>(
+type goodies = { loc: Loc; rib: Rib; context: Context; counter: number };
+
+function extract_lexical_declaration_bindings(
   loc: Loc,
   rib: Rib,
   context: Context,
-  counter: number,
-  sk: (args: { loc: Loc; rib: Rib; context: Context; counter: number }) => T
-): T {
-  function after_vars(ls: Loc, rib: Rib, context: Context, counter: number): T {
+  counter: number
+): goodies {
+  function after_vars(
+    ls: Loc,
+    rib: Rib,
+    context: Context,
+    counter: number
+  ): goodies {
     if (ls.t.type === "atom" && ls.t.tag === "other") {
       switch (ls.t.content) {
         case ";":
           return go_right(
             ls,
             (loc) => syntax_error(loc, "expected nothing after semicolon"),
-            (loc) => sk({ loc, rib, context, counter })
+            (loc) => ({ loc, rib, context, counter })
           );
         case ",":
           return go_right(
@@ -130,7 +136,12 @@ function extract_lexical_declaration_bindings<T>(
     syntax_error(ls, "expected a ',' or a ';'");
   }
 
-  function get_vars(ls: Loc, rib: Rib, context: Context, counter: number): T {
+  function get_vars(
+    ls: Loc,
+    rib: Rib,
+    context: Context,
+    counter: number
+  ): goodies {
     if (ls.t.type === "list" && ls.t.tag === "variable_declarator") {
       return go_down(
         ls,
@@ -154,7 +165,7 @@ function extract_lexical_declaration_bindings<T>(
                     go_next(
                       ls,
                       (loc) => after_vars(loc, rib, context, counter),
-                      (loc) => sk({ loc, rib, context, counter })
+                      (loc) => ({ loc, rib, context, counter })
                     )
                 ),
               (reason) => syntax_error(loc, reason)
@@ -188,7 +199,7 @@ function extract_lexical_declaration_bindings<T>(
           throw new Error(`HERE? ${loc.t.type}:${loc.t.tag}`);
         }
       } else {
-        return syntax_error(loc, "expected keyword const or let");
+        syntax_error(loc, "expected keyword const or let");
       }
     },
     (_loc) => {
@@ -227,13 +238,13 @@ function expand_program(step: {
       // context is filled also
       const unit = extend_unit(step.unit, rib_id, rib);
       // unit is now filled
-      return postexpand_program({
+      const final = postexpand_program({
         loc,
         counter,
         context,
         unit,
-        k: debug("finished postexpand"),
       });
+      return { type: "DONE", ...final };
     },
   });
 }
@@ -388,24 +399,23 @@ function preexpand_forms(step: {
           }
         }
         default:
-          return debug("unhandled atom tag")({ loc, tag });
+          debug(loc, "unhandled atom tag", { tag });
       }
     },
     klist: ({ loc, cont }) => {
       if (loc.t.type !== "list") throw new Error("expected list");
       switch (loc.t.tag) {
         case "lexical_declaration": {
-          return extract_lexical_declaration_bindings(
+          const goodies = extract_lexical_declaration_bindings(
             loc,
             step.rib,
             step.context,
-            step.counter,
-            ({ loc, rib, context, counter }) =>
-              go_next(
-                loc,
-                (loc) => debug("next of lexical")({ loc }),
-                (loc) => ({ loc, rib, context, counter })
-              )
+            step.counter
+          );
+          return go_next(
+            goodies.loc,
+            (loc) => syntax_error(loc, "unexpected token after lexical"),
+            (loc) => ({ ...goodies, loc })
           );
         }
         case "arrow_function":
@@ -493,8 +503,7 @@ function postexpand_program(step: {
   unit: CompilationUnit;
   counter: number;
   context: Context;
-  k: (args: { loc: Loc }) => Step;
-}): Step {
+}): { loc: Loc } {
   assert(step.loc.t.tag === "program");
   return go_down(
     step.loc,
@@ -504,14 +513,9 @@ function postexpand_program(step: {
         unit: step.unit,
         counter: step.counter,
         context: step.context,
-        k: step.k,
       }),
-    (loc) => step.k({ loc })
+    (loc) => ({ loc })
   );
-}
-
-function postexpand_done(loc: Loc): Step {
-  return { type: "DONE", loc };
 }
 
 function expand_arrow_function(loc: Loc): { loc: Loc } {
@@ -523,11 +527,10 @@ function postexpand_body(step: {
   unit: CompilationUnit;
   counter: number;
   context: Context;
-  k: (args: { loc: Loc }) => Step;
-}): Step {
+}): { loc: Loc } {
   return find_form({
     loc: step.loc,
-    done: postexpand_done,
+    done: (loc) => ({ loc }),
     kid: ({ loc, cont }) => {
       if (loc.t.type !== "atom") throw new Error("expected atom");
       const { tag, content, wrap } = loc.t;
@@ -560,10 +563,10 @@ function postexpand_body(step: {
             case "unbound":
               syntax_error(loc, "unbound identifier");
           }
-          return debug("resolved")({ loc, resolution });
+          debug(loc, "resolved", resolution);
         }
         default:
-          return debug("unhandled atom tag")({ loc, tag });
+          debug(loc, "unhandled atom tag", tag);
       }
     },
     klist: ({ loc, cont, descend }) => {
@@ -579,9 +582,7 @@ function postexpand_body(step: {
         }
         default: {
           if (list_handlers_table[loc.t.tag] !== "descend") {
-            return debug(`unhandled '${loc.t.tag}' form in postexpand_body`)({
-              loc,
-            });
+            debug(loc, `unhandled '${loc.t.tag}' form in postexpand_body`);
           }
           return cont(loc);
         }
@@ -601,6 +602,8 @@ export function next_step(step: Step): Step {
   } catch (err) {
     if (err instanceof SyntaxError) {
       return { type: "SyntaxError", loc: err.loc, reason: err.message };
+    } else if (err instanceof DebugError) {
+      return { type: "DEBUG", loc: err.loc, msg: err.message, info: err.info };
     } else {
       throw err;
     }

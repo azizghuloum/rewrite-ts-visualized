@@ -111,6 +111,7 @@ const id_tags: { [k in atom_tag]: boolean } = {
   other: false,
   regex_pattern: false,
   string_fragment: false,
+  ERROR: false,
 };
 
 const is_id: (x: STX) => boolean = (x) => x.type === "atom" && id_tags[x.tag];
