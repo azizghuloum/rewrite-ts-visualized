@@ -1,1021 +1,268 @@
 {
-  "loc": {
-    "p": {
-      "type": "top",
-    },
-    "t": {
-      "content": [
-        {
-          "content": [
-            {
-              "content": "const",
-              "tag": "other",
-              "type": "atom",
-              "wrap": {
-                "marks": [
-                  "top",
-                  null,
-                ],
-                "subst": [
-                  {
-                    "rib_id": "r1",
-                  },
-                  [
-                    {
-                      "rib_id": "r0",
-                    },
-                    null,
-                  ],
-                ],
-              },
-            },
-            [
-              {
-                "content": [
-                  {
-                    "content": "f_3",
-                    "tag": "identifier",
-                    "type": "atom",
-                    "wrap": {
-                      "marks": null,
-                      "subst": null,
-                    },
-                  },
-                  [
-                    {
-                      "content": "=",
-                      "tag": "other",
-                      "type": "atom",
-                      "wrap": {
-                        "marks": [
-                          "top",
-                          null,
-                        ],
-                        "subst": [
-                          {
-                            "rib_id": "r1",
-                          },
-                          [
-                            {
-                              "rib_id": "r0",
-                            },
-                            null,
-                          ],
-                        ],
-                      },
-                    },
-                    [
-                      {
-                        "content": [
-                          {
-                            "content": [
-                              {
-                                "content": "(",
-                                "tag": "other",
-                                "type": "atom",
-                                "wrap": {
-                                  "marks": [
-                                    "top",
-                                    null,
-                                  ],
-                                  "subst": [
-                                    {
-                                      "rib_id": "r1",
-                                    },
-                                    [
-                                      {
-                                        "rib_id": "r0",
-                                      },
-                                      null,
-                                    ],
-                                  ],
-                                },
-                              },
-                              [
-                                {
-                                  "content": "x_9",
-                                  "tag": "identifier",
-                                  "type": "atom",
-                                  "wrap": {
-                                    "marks": null,
-                                    "subst": null,
-                                  },
-                                },
-                                [
-                                  {
-                                    "content": ")",
-                                    "tag": "other",
-                                    "type": "atom",
-                                    "wrap": {
-                                      "marks": [
-                                        "top",
-                                        null,
-                                      ],
-                                      "subst": [
-                                        {
-                                          "rib_id": "r1",
-                                        },
-                                        [
-                                          {
-                                            "rib_id": "r0",
-                                          },
-                                          null,
-                                        ],
-                                      ],
-                                    },
-                                  },
-                                  null,
-                                ],
-                              ],
-                            ],
-                            "tag": "formal_parameters",
-                            "type": "list",
-                            "wrap": undefined,
-                          },
-                          [
-                            {
-                              "content": "=>",
-                              "tag": "other",
-                              "type": "atom",
-                              "wrap": {
-                                "marks": [
-                                  "top",
-                                  null,
-                                ],
-                                "subst": [
-                                  {
-                                    "rib_id": "r1",
-                                  },
-                                  [
-                                    {
-                                      "rib_id": "r0",
-                                    },
-                                    null,
-                                  ],
-                                ],
-                              },
-                            },
-                            [
-                              {
-                                "content": "x_9",
-                                "tag": "identifier",
-                                "type": "atom",
-                                "wrap": {
-                                  "marks": null,
-                                  "subst": null,
-                                },
-                              },
-                              null,
-                            ],
-                          ],
-                        ],
-                        "tag": "arrow_function",
-                        "type": "list",
-                        "wrap": undefined,
-                      },
-                      null,
-                    ],
-                  ],
-                ],
-                "tag": "variable_declarator",
-                "type": "list",
-                "wrap": undefined,
-              },
-              [
-                {
-                  "content": ";",
-                  "tag": "other",
-                  "type": "atom",
-                  "wrap": {
-                    "marks": [
-                      "top",
-                      null,
-                    ],
-                    "subst": [
-                      {
-                        "rib_id": "r1",
-                      },
-                      [
-                        {
-                          "rib_id": "r0",
-                        },
-                        null,
-                      ],
-                    ],
-                  },
-                },
-                null,
-              ],
-            ],
-          ],
-          "tag": "lexical_declaration",
-          "type": "list",
-          "wrap": undefined,
-        },
-        [
+  "tree": {
+    "children": [
+      {
+        "children": [
           {
-            "content": [
-              {
-                "content": "const",
-                "tag": "other",
-                "type": "atom",
-                "wrap": {
-                  "marks": [
-                    "top",
-                    null,
-                  ],
-                  "subst": [
-                    {
-                      "rib_id": "r1",
-                    },
-                    [
-                      {
-                        "rib_id": "r0",
-                      },
-                      null,
-                    ],
-                  ],
-                },
-              },
-              [
-                {
-                  "content": [
-                    {
-                      "content": "g_5",
-                      "tag": "identifier",
-                      "type": "atom",
-                      "wrap": {
-                        "marks": null,
-                        "subst": null,
-                      },
-                    },
-                    [
-                      {
-                        "content": "=",
-                        "tag": "other",
-                        "type": "atom",
-                        "wrap": {
-                          "marks": [
-                            "top",
-                            null,
-                          ],
-                          "subst": [
-                            {
-                              "rib_id": "r1",
-                            },
-                            [
-                              {
-                                "rib_id": "r0",
-                              },
-                              null,
-                            ],
-                          ],
-                        },
-                      },
-                      [
-                        {
-                          "content": [
-                            {
-                              "content": [
-                                {
-                                  "content": "(",
-                                  "tag": "other",
-                                  "type": "atom",
-                                  "wrap": {
-                                    "marks": [
-                                      "top",
-                                      null,
-                                    ],
-                                    "subst": [
-                                      {
-                                        "rib_id": "r1",
-                                      },
-                                      [
-                                        {
-                                          "rib_id": "r0",
-                                        },
-                                        null,
-                                      ],
-                                    ],
-                                  },
-                                },
-                                [
-                                  {
-                                    "content": "x_9",
-                                    "tag": "identifier",
-                                    "type": "atom",
-                                    "wrap": {
-                                      "marks": null,
-                                      "subst": null,
-                                    },
-                                  },
-                                  [
-                                    {
-                                      "content": ")",
-                                      "tag": "other",
-                                      "type": "atom",
-                                      "wrap": {
-                                        "marks": [
-                                          "top",
-                                          null,
-                                        ],
-                                        "subst": [
-                                          {
-                                            "rib_id": "r1",
-                                          },
-                                          [
-                                            {
-                                              "rib_id": "r0",
-                                            },
-                                            null,
-                                          ],
-                                        ],
-                                      },
-                                    },
-                                    null,
-                                  ],
-                                ],
-                              ],
-                              "tag": "formal_parameters",
-                              "type": "list",
-                              "wrap": undefined,
-                            },
-                            [
-                              {
-                                "content": "=>",
-                                "tag": "other",
-                                "type": "atom",
-                                "wrap": {
-                                  "marks": [
-                                    "top",
-                                    null,
-                                  ],
-                                  "subst": [
-                                    {
-                                      "rib_id": "r1",
-                                    },
-                                    [
-                                      {
-                                        "rib_id": "r0",
-                                      },
-                                      null,
-                                    ],
-                                  ],
-                                },
-                              },
-                              [
-                                {
-                                  "content": [
-                                    {
-                                      "content": "f_3",
-                                      "tag": "identifier",
-                                      "type": "atom",
-                                      "wrap": {
-                                        "marks": null,
-                                        "subst": null,
-                                      },
-                                    },
-                                    [
-                                      {
-                                        "content": [
-                                          {
-                                            "content": "(",
-                                            "tag": "other",
-                                            "type": "atom",
-                                            "wrap": {
-                                              "marks": [
-                                                "top",
-                                                null,
-                                              ],
-                                              "subst": [
-                                                {
-                                                  "rib_id": "r10",
-                                                },
-                                                [
-                                                  {
-                                                    "rib_id": "r1",
-                                                  },
-                                                  [
-                                                    {
-                                                      "rib_id": "r0",
-                                                    },
-                                                    null,
-                                                  ],
-                                                ],
-                                              ],
-                                            },
-                                          },
-                                          [
-                                            {
-                                              "content": "x_9",
-                                              "tag": "identifier",
-                                              "type": "atom",
-                                              "wrap": {
-                                                "marks": null,
-                                                "subst": null,
-                                              },
-                                            },
-                                            [
-                                              {
-                                                "content": ")",
-                                                "tag": "other",
-                                                "type": "atom",
-                                                "wrap": {
-                                                  "marks": [
-                                                    "top",
-                                                    null,
-                                                  ],
-                                                  "subst": [
-                                                    {
-                                                      "rib_id": "r10",
-                                                    },
-                                                    [
-                                                      {
-                                                        "rib_id": "r1",
-                                                      },
-                                                      [
-                                                        {
-                                                          "rib_id": "r0",
-                                                        },
-                                                        null,
-                                                      ],
-                                                    ],
-                                                  ],
-                                                },
-                                              },
-                                              null,
-                                            ],
-                                          ],
-                                        ],
-                                        "tag": "arguments",
-                                        "type": "list",
-                                        "wrap": undefined,
-                                      },
-                                      null,
-                                    ],
-                                  ],
-                                  "tag": "call_expression",
-                                  "type": "list",
-                                  "wrap": undefined,
-                                },
-                                null,
-                              ],
-                            ],
-                          ],
-                          "tag": "arrow_function",
-                          "type": "list",
-                          "wrap": undefined,
-                        },
-                        null,
-                      ],
-                    ],
-                  ],
-                  "tag": "variable_declarator",
-                  "type": "list",
-                  "wrap": undefined,
-                },
-                [
-                  {
-                    "content": ";",
-                    "tag": "other",
-                    "type": "atom",
-                    "wrap": {
-                      "marks": [
-                        "top",
-                        null,
-                      ],
-                      "subst": [
-                        {
-                          "rib_id": "r1",
-                        },
-                        [
-                          {
-                            "rib_id": "r0",
-                          },
-                          null,
-                        ],
-                      ],
-                    },
-                  },
-                  null,
-                ],
-              ],
-            ],
-            "tag": "lexical_declaration",
-            "type": "list",
-            "wrap": undefined,
+            "text": "const",
+            "type": "other",
           },
-          [
-            {
-              "content": [
-                {
-                  "content": "const",
-                  "tag": "other",
-                  "type": "atom",
-                  "wrap": {
-                    "marks": [
-                      "top",
-                      null,
-                    ],
-                    "subst": [
-                      {
-                        "rib_id": "r1",
-                      },
-                      [
-                        {
-                          "rib_id": "r0",
-                        },
-                        null,
-                      ],
-                    ],
-                  },
-                },
-                [
+          {
+            "children": [
+              {
+                "text": "f_3",
+                "type": "identifier",
+              },
+              {
+                "text": "=",
+                "type": "other",
+              },
+              {
+                "children": [
                   {
-                    "content": [
+                    "children": [
                       {
-                        "content": "h_7",
-                        "tag": "identifier",
-                        "type": "atom",
-                        "wrap": {
-                          "marks": null,
-                          "subst": null,
-                        },
+                        "text": "(",
+                        "type": "other",
                       },
-                      [
-                        {
-                          "content": "=",
-                          "tag": "other",
-                          "type": "atom",
-                          "wrap": {
-                            "marks": [
-                              "top",
-                              null,
-                            ],
-                            "subst": [
-                              {
-                                "rib_id": "r1",
-                              },
-                              [
-                                {
-                                  "rib_id": "r0",
-                                },
-                                null,
-                              ],
-                            ],
-                          },
-                        },
-                        [
-                          {
-                            "content": [
-                              {
-                                "content": [
-                                  {
-                                    "content": "(",
-                                    "tag": "other",
-                                    "type": "atom",
-                                    "wrap": {
-                                      "marks": [
-                                        "top",
-                                        null,
-                                      ],
-                                      "subst": [
-                                        {
-                                          "rib_id": "r1",
-                                        },
-                                        [
-                                          {
-                                            "rib_id": "r0",
-                                          },
-                                          null,
-                                        ],
-                                      ],
-                                    },
-                                  },
-                                  [
-                                    {
-                                      "content": "x_9",
-                                      "tag": "identifier",
-                                      "type": "atom",
-                                      "wrap": {
-                                        "marks": null,
-                                        "subst": null,
-                                      },
-                                    },
-                                    [
-                                      {
-                                        "content": ")",
-                                        "tag": "other",
-                                        "type": "atom",
-                                        "wrap": {
-                                          "marks": [
-                                            "top",
-                                            null,
-                                          ],
-                                          "subst": [
-                                            {
-                                              "rib_id": "r1",
-                                            },
-                                            [
-                                              {
-                                                "rib_id": "r0",
-                                              },
-                                              null,
-                                            ],
-                                          ],
-                                        },
-                                      },
-                                      null,
-                                    ],
-                                  ],
-                                ],
-                                "tag": "formal_parameters",
-                                "type": "list",
-                                "wrap": undefined,
-                              },
-                              [
-                                {
-                                  "content": "=>",
-                                  "tag": "other",
-                                  "type": "atom",
-                                  "wrap": {
-                                    "marks": [
-                                      "top",
-                                      null,
-                                    ],
-                                    "subst": [
-                                      {
-                                        "rib_id": "r1",
-                                      },
-                                      [
-                                        {
-                                          "rib_id": "r0",
-                                        },
-                                        null,
-                                      ],
-                                    ],
-                                  },
-                                },
-                                [
-                                  {
-                                    "content": [
-                                      {
-                                        "content": "x_9",
-                                        "tag": "identifier",
-                                        "type": "atom",
-                                        "wrap": {
-                                          "marks": null,
-                                          "subst": null,
-                                        },
-                                      },
-                                      [
-                                        {
-                                          "content": [
-                                            {
-                                              "content": "(",
-                                              "tag": "other",
-                                              "type": "atom",
-                                              "wrap": {
-                                                "marks": [
-                                                  "top",
-                                                  null,
-                                                ],
-                                                "subst": [
-                                                  {
-                                                    "rib_id": "r10",
-                                                  },
-                                                  [
-                                                    {
-                                                      "rib_id": "r1",
-                                                    },
-                                                    [
-                                                      {
-                                                        "rib_id": "r0",
-                                                      },
-                                                      null,
-                                                    ],
-                                                  ],
-                                                ],
-                                              },
-                                            },
-                                            [
-                                              {
-                                                "content": [
-                                                  {
-                                                    "content": [
-                                                      {
-                                                        "content": "(",
-                                                        "tag": "other",
-                                                        "type": "atom",
-                                                        "wrap": {
-                                                          "marks": [
-                                                            "top",
-                                                            null,
-                                                          ],
-                                                          "subst": [
-                                                            {
-                                                              "rib_id": "r10",
-                                                            },
-                                                            [
-                                                              {
-                                                                "rib_id": "r1",
-                                                              },
-                                                              [
-                                                                {
-                                                                  "rib_id": "r0",
-                                                                },
-                                                                null,
-                                                              ],
-                                                            ],
-                                                          ],
-                                                        },
-                                                      },
-                                                      [
-                                                        {
-                                                          "content": "x_12",
-                                                          "tag": "identifier",
-                                                          "type": "atom",
-                                                          "wrap": {
-                                                            "marks": null,
-                                                            "subst": null,
-                                                          },
-                                                        },
-                                                        [
-                                                          {
-                                                            "content": ")",
-                                                            "tag": "other",
-                                                            "type": "atom",
-                                                            "wrap": {
-                                                              "marks": [
-                                                                "top",
-                                                                null,
-                                                              ],
-                                                              "subst": [
-                                                                {
-                                                                  "rib_id": "r10",
-                                                                },
-                                                                [
-                                                                  {
-                                                                    "rib_id": "r1",
-                                                                  },
-                                                                  [
-                                                                    {
-                                                                      "rib_id": "r0",
-                                                                    },
-                                                                    null,
-                                                                  ],
-                                                                ],
-                                                              ],
-                                                            },
-                                                          },
-                                                          null,
-                                                        ],
-                                                      ],
-                                                    ],
-                                                    "tag": "formal_parameters",
-                                                    "type": "list",
-                                                    "wrap": undefined,
-                                                  },
-                                                  [
-                                                    {
-                                                      "content": "=>",
-                                                      "tag": "other",
-                                                      "type": "atom",
-                                                      "wrap": {
-                                                        "marks": [
-                                                          "top",
-                                                          null,
-                                                        ],
-                                                        "subst": [
-                                                          {
-                                                            "rib_id": "r10",
-                                                          },
-                                                          [
-                                                            {
-                                                              "rib_id": "r1",
-                                                            },
-                                                            [
-                                                              {
-                                                                "rib_id": "r0",
-                                                              },
-                                                              null,
-                                                            ],
-                                                          ],
-                                                        ],
-                                                      },
-                                                    },
-                                                    [
-                                                      {
-                                                        "content": [
-                                                          {
-                                                            "content": "f_3",
-                                                            "tag": "identifier",
-                                                            "type": "atom",
-                                                            "wrap": {
-                                                              "marks": null,
-                                                              "subst": null,
-                                                            },
-                                                          },
-                                                          [
-                                                            {
-                                                              "content": [
-                                                                {
-                                                                  "content": "(",
-                                                                  "tag": "other",
-                                                                  "type": "atom",
-                                                                  "wrap": {
-                                                                    "marks": [
-                                                                      "top",
-                                                                      null,
-                                                                    ],
-                                                                    "subst": [
-                                                                      {
-                                                                        "rib_id": "r13",
-                                                                      },
-                                                                      [
-                                                                        {
-                                                                          "rib_id": "r10",
-                                                                        },
-                                                                        [
-                                                                          {
-                                                                            "rib_id": "r1",
-                                                                          },
-                                                                          [
-                                                                            {
-                                                                              "rib_id": "r0",
-                                                                            },
-                                                                            null,
-                                                                          ],
-                                                                        ],
-                                                                      ],
-                                                                    ],
-                                                                  },
-                                                                },
-                                                                [
-                                                                  {
-                                                                    "content": "x_12",
-                                                                    "tag": "identifier",
-                                                                    "type": "atom",
-                                                                    "wrap": {
-                                                                      "marks": null,
-                                                                      "subst": null,
-                                                                    },
-                                                                  },
-                                                                  [
-                                                                    {
-                                                                      "content": ")",
-                                                                      "tag": "other",
-                                                                      "type": "atom",
-                                                                      "wrap": {
-                                                                        "marks": [
-                                                                          "top",
-                                                                          null,
-                                                                        ],
-                                                                        "subst": [
-                                                                          {
-                                                                            "rib_id": "r13",
-                                                                          },
-                                                                          [
-                                                                            {
-                                                                              "rib_id": "r10",
-                                                                            },
-                                                                            [
-                                                                              {
-                                                                                "rib_id": "r1",
-                                                                              },
-                                                                              [
-                                                                                {
-                                                                                  "rib_id": "r0",
-                                                                                },
-                                                                                null,
-                                                                              ],
-                                                                            ],
-                                                                          ],
-                                                                        ],
-                                                                      },
-                                                                    },
-                                                                    null,
-                                                                  ],
-                                                                ],
-                                                              ],
-                                                              "tag": "arguments",
-                                                              "type": "list",
-                                                              "wrap": undefined,
-                                                            },
-                                                            null,
-                                                          ],
-                                                        ],
-                                                        "tag": "call_expression",
-                                                        "type": "list",
-                                                        "wrap": undefined,
-                                                      },
-                                                      null,
-                                                    ],
-                                                  ],
-                                                ],
-                                                "tag": "arrow_function",
-                                                "type": "list",
-                                                "wrap": undefined,
-                                              },
-                                              [
-                                                {
-                                                  "content": ")",
-                                                  "tag": "other",
-                                                  "type": "atom",
-                                                  "wrap": {
-                                                    "marks": [
-                                                      "top",
-                                                      null,
-                                                    ],
-                                                    "subst": [
-                                                      {
-                                                        "rib_id": "r10",
-                                                      },
-                                                      [
-                                                        {
-                                                          "rib_id": "r1",
-                                                        },
-                                                        [
-                                                          {
-                                                            "rib_id": "r0",
-                                                          },
-                                                          null,
-                                                        ],
-                                                      ],
-                                                    ],
-                                                  },
-                                                },
-                                                null,
-                                              ],
-                                            ],
-                                          ],
-                                          "tag": "arguments",
-                                          "type": "list",
-                                          "wrap": undefined,
-                                        },
-                                        null,
-                                      ],
-                                    ],
-                                    "tag": "call_expression",
-                                    "type": "list",
-                                    "wrap": undefined,
-                                  },
-                                  null,
-                                ],
-                              ],
-                            ],
-                            "tag": "arrow_function",
-                            "type": "list",
-                            "wrap": undefined,
-                          },
-                          null,
-                        ],
-                      ],
+                      {
+                        "text": "x_9",
+                        "type": "identifier",
+                      },
+                      {
+                        "text": ")",
+                        "type": "other",
+                      },
                     ],
-                    "tag": "variable_declarator",
-                    "type": "list",
-                    "wrap": undefined,
+                    "type": "formal_parameters",
                   },
-                  [
-                    {
-                      "content": ";",
-                      "tag": "other",
-                      "type": "atom",
-                      "wrap": {
-                        "marks": [
-                          "top",
-                          null,
-                        ],
-                        "subst": [
-                          {
-                            "rib_id": "r1",
-                          },
-                          [
-                            {
-                              "rib_id": "r0",
-                            },
-                            null,
-                          ],
-                        ],
-                      },
-                    },
-                    null,
-                  ],
+                  {
+                    "text": "=>",
+                    "type": "other",
+                  },
+                  {
+                    "text": "x_9",
+                    "type": "identifier",
+                  },
                 ],
-              ],
-              "tag": "lexical_declaration",
-              "type": "list",
-              "wrap": undefined,
-            },
-            null,
-          ],
+                "type": "arrow_function",
+              },
+            ],
+            "type": "variable_declarator",
+          },
+          {
+            "text": ";",
+            "type": "other",
+          },
         ],
-      ],
-      "tag": "program",
-      "type": "list",
-      "wrap": undefined,
-    },
-    "type": "loc",
+        "type": "lexical_declaration",
+      },
+      {
+        "children": [
+          {
+            "text": "const",
+            "type": "other",
+          },
+          {
+            "children": [
+              {
+                "text": "g_5",
+                "type": "identifier",
+              },
+              {
+                "text": "=",
+                "type": "other",
+              },
+              {
+                "children": [
+                  {
+                    "children": [
+                      {
+                        "text": "(",
+                        "type": "other",
+                      },
+                      {
+                        "text": "x_9",
+                        "type": "identifier",
+                      },
+                      {
+                        "text": ")",
+                        "type": "other",
+                      },
+                    ],
+                    "type": "formal_parameters",
+                  },
+                  {
+                    "text": "=>",
+                    "type": "other",
+                  },
+                  {
+                    "children": [
+                      {
+                        "text": "f_3",
+                        "type": "identifier",
+                      },
+                      {
+                        "children": [
+                          {
+                            "text": "(",
+                            "type": "other",
+                          },
+                          {
+                            "text": "x_9",
+                            "type": "identifier",
+                          },
+                          {
+                            "text": ")",
+                            "type": "other",
+                          },
+                        ],
+                        "type": "arguments",
+                      },
+                    ],
+                    "type": "call_expression",
+                  },
+                ],
+                "type": "arrow_function",
+              },
+            ],
+            "type": "variable_declarator",
+          },
+          {
+            "text": ";",
+            "type": "other",
+          },
+        ],
+        "type": "lexical_declaration",
+      },
+      {
+        "children": [
+          {
+            "text": "const",
+            "type": "other",
+          },
+          {
+            "children": [
+              {
+                "text": "h_7",
+                "type": "identifier",
+              },
+              {
+                "text": "=",
+                "type": "other",
+              },
+              {
+                "children": [
+                  {
+                    "children": [
+                      {
+                        "text": "(",
+                        "type": "other",
+                      },
+                      {
+                        "text": "x_9",
+                        "type": "identifier",
+                      },
+                      {
+                        "text": ")",
+                        "type": "other",
+                      },
+                    ],
+                    "type": "formal_parameters",
+                  },
+                  {
+                    "text": "=>",
+                    "type": "other",
+                  },
+                  {
+                    "children": [
+                      {
+                        "text": "x_9",
+                        "type": "identifier",
+                      },
+                      {
+                        "children": [
+                          {
+                            "text": "(",
+                            "type": "other",
+                          },
+                          {
+                            "children": [
+                              {
+                                "children": [
+                                  {
+                                    "text": "(",
+                                    "type": "other",
+                                  },
+                                  {
+                                    "text": "x_12",
+                                    "type": "identifier",
+                                  },
+                                  {
+                                    "text": ")",
+                                    "type": "other",
+                                  },
+                                ],
+                                "type": "formal_parameters",
+                              },
+                              {
+                                "text": "=>",
+                                "type": "other",
+                              },
+                              {
+                                "children": [
+                                  {
+                                    "text": "f_3",
+                                    "type": "identifier",
+                                  },
+                                  {
+                                    "children": [
+                                      {
+                                        "text": "(",
+                                        "type": "other",
+                                      },
+                                      {
+                                        "text": "x_12",
+                                        "type": "identifier",
+                                      },
+                                      {
+                                        "text": ")",
+                                        "type": "other",
+                                      },
+                                    ],
+                                    "type": "arguments",
+                                  },
+                                ],
+                                "type": "call_expression",
+                              },
+                            ],
+                            "type": "arrow_function",
+                          },
+                          {
+                            "text": ")",
+                            "type": "other",
+                          },
+                        ],
+                        "type": "arguments",
+                      },
+                    ],
+                    "type": "call_expression",
+                  },
+                ],
+                "type": "arrow_function",
+              },
+            ],
+            "type": "variable_declarator",
+          },
+          {
+            "text": ";",
+            "type": "other",
+          },
+        ],
+        "type": "lexical_declaration",
+      },
+    ],
+    "type": "program",
   },
   "type": "DONE",
 }

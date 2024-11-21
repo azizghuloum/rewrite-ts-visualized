@@ -7,6 +7,7 @@ import tsx_url from "./src/assets/tree-sitter-tsx.wasm?url";
 import { core_patterns } from "./src/syntax-core-patterns";
 import { initial_step, next_step, Step } from "./src/expander";
 import Parser from "web-tree-sitter";
+import { ast_to_tree } from "./src/serialize";
 
 const test_dir = __dirname + "/tests";
 
@@ -31,7 +32,7 @@ async function compile_script(filename: string, parser: Parser) {
   }
   return {
     type: step.name,
-    loc: step.loc,
+    tree: ast_to_tree(step.loc.t),
     ...(step.error ? { reason: step.error } : {}),
   };
 }

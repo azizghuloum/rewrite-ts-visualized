@@ -13,3 +13,12 @@ export function array_to_ll<X>(a: X[]): LL<X> {
   for (let i = a.length - 1; i >= 0; i--) ll = [a[i], ll];
   return ll;
 }
+
+export function ll_to_array<X>(a: LL<X>): X[] {
+  let ls: X[] = [];
+  while (a !== null) {
+    ls.push(a[0]);
+    a = a[1];
+  }
+  return ls;
+}

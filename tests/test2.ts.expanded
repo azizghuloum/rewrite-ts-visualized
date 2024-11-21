@@ -1,149 +1,42 @@
 {
-  "loc": {
-    "p": {
-      "type": "top",
-    },
-    "t": {
-      "content": [
-        {
-          "content": [
-            {
-              "content": "const",
-              "tag": "other",
-              "type": "atom",
-              "wrap": {
-                "marks": [
-                  "top",
-                  null,
-                ],
-                "subst": [
-                  {
-                    "rib_id": "r1",
-                  },
-                  [
-                    {
-                      "rib_id": "r0",
-                    },
-                    null,
-                  ],
-                ],
-              },
-            },
-            [
-              {
-                "content": [
-                  {
-                    "content": "x_3",
-                    "tag": "identifier",
-                    "type": "atom",
-                    "wrap": {
-                      "marks": null,
-                      "subst": null,
-                    },
-                  },
-                  [
-                    {
-                      "content": "=",
-                      "tag": "other",
-                      "type": "atom",
-                      "wrap": {
-                        "marks": [
-                          "top",
-                          null,
-                        ],
-                        "subst": [
-                          {
-                            "rib_id": "r1",
-                          },
-                          [
-                            {
-                              "rib_id": "r0",
-                            },
-                            null,
-                          ],
-                        ],
-                      },
-                    },
-                    [
-                      {
-                        "content": "12",
-                        "tag": "number",
-                        "type": "atom",
-                        "wrap": {
-                          "marks": [
-                            "top",
-                            null,
-                          ],
-                          "subst": [
-                            {
-                              "rib_id": "r1",
-                            },
-                            [
-                              {
-                                "rib_id": "r0",
-                              },
-                              null,
-                            ],
-                          ],
-                        },
-                      },
-                      null,
-                    ],
-                  ],
-                ],
-                "tag": "variable_declarator",
-                "type": "list",
-                "wrap": undefined,
-              },
-              [
-                {
-                  "content": ";",
-                  "tag": "other",
-                  "type": "atom",
-                  "wrap": {
-                    "marks": [
-                      "top",
-                      null,
-                    ],
-                    "subst": [
-                      {
-                        "rib_id": "r1",
-                      },
-                      [
-                        {
-                          "rib_id": "r0",
-                        },
-                        null,
-                      ],
-                    ],
-                  },
-                },
-                null,
-              ],
-            ],
-          ],
-          "tag": "lexical_declaration",
-          "type": "list",
-          "wrap": undefined,
-        },
-        [
+  "tree": {
+    "children": [
+      {
+        "children": [
           {
-            "content": "x_3",
-            "tag": "identifier",
-            "type": "atom",
-            "wrap": {
-              "marks": null,
-              "subst": null,
-            },
+            "text": "const",
+            "type": "other",
           },
-          null,
+          {
+            "children": [
+              {
+                "text": "x_3",
+                "type": "identifier",
+              },
+              {
+                "text": "=",
+                "type": "other",
+              },
+              {
+                "text": "12",
+                "type": "number",
+              },
+            ],
+            "type": "variable_declarator",
+          },
+          {
+            "text": ";",
+            "type": "other",
+          },
         ],
-      ],
-      "tag": "program",
-      "type": "list",
-      "wrap": undefined,
-    },
-    "type": "loc",
+        "type": "lexical_declaration",
+      },
+      {
+        "text": "x_3",
+        "type": "identifier",
+      },
+    ],
+    "type": "program",
   },
   "type": "DONE",
 }
