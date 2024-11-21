@@ -367,7 +367,12 @@ function expand_concise_body(step: {
   const loc = step.loc;
   const gs =
     loc.t.type === "list" && loc.t.tag === "statement_block"
-      ? preexpand_block(step)
+      ? (({ loc, ...gs }) =>
+          go_down(
+            loc,
+            (loc) => ({ ...gs, loc }),
+            (loc) => debug(loc, "?"),
+          ))(preexpand_block(step))
       : preexpand_forms(step);
   const new_unit = extend_unit(step.unit, step.rib_id, gs.rib);
   return postexpand_body({ ...gs, unit: new_unit });
@@ -728,8 +733,6 @@ function postexpand_body(step: {
           case "lexical_declaration":
             return descend(loc);
           case "variable_declarator":
-            return descend(loc);
-          case "statement_block":
             return descend(loc);
           case "arrow_function": {
             const arr = in_isolation(loc, (loc) => expand_arrow_function({ ...step, loc }));
