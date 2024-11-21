@@ -12,6 +12,18 @@ export type atom_tag =
   | "ERROR"
   | "other";
 
+export type list_tag =
+  | "program"
+  | "lexical_declaration"
+  | "variable_declarator"
+  | "binary_expression"
+  | "call_expression"
+  | "arguments"
+  | "arrow_function"
+  | "formal_parameters"
+  | "statement_block"
+  | "ERROR";
+
 export type AST =
   | {
       type: "atom";
@@ -22,6 +34,6 @@ export type AST =
   | {
       type: "list";
       wrap?: undefined;
-      tag: string;
+      tag: list_tag;
       content: LL<AST>;
     };

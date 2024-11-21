@@ -1,5 +1,5 @@
 import { TaggedReconstructiveZipper } from "zipper";
-import { AST, atom_tag } from "./AST";
+import { AST, atom_tag, list_tag } from "./AST";
 import { LL } from "./llhelpers";
 
 export type TopMark = "top";
@@ -39,9 +39,7 @@ export type Env = { [name: string]: [LL<Mark>, string][] };
 
 export type Rib = { type: "rib"; types_env: Env; normal_env: Env };
 
-function label_generator(
-  prefix: string
-): (counter: number) => [string, number] {
+function label_generator(prefix: string): (counter: number) => [string, number] {
   return (counter: number) => [`${prefix}${counter}`, counter + 1];
 }
 
@@ -60,8 +58,8 @@ export type Subst = LL<Shift | RibRef>;
 export type Wrap = { marks: Marks; subst: Subst };
 
 export type STX =
-  | { type: "list"; tag: string; wrap: Wrap; content: LL<STX | AST> }
-  | { type: "list"; tag: string; wrap: undefined; content: LL<STX> }
+  | { type: "list"; tag: list_tag; wrap: Wrap; content: LL<STX | AST> }
+  | { type: "list"; tag: list_tag; wrap: undefined; content: LL<STX> }
   | { type: "atom"; tag: atom_tag; wrap: Wrap; content: string };
 
 export type Loc = TaggedReconstructiveZipper.Loc<string, STX>;

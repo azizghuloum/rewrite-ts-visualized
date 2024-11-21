@@ -1,6 +1,6 @@
 import Parser from "web-tree-sitter";
 import { assert } from "./assert";
-import { AST } from "./AST";
+import { AST, list_tag } from "./AST";
 import { array_to_ll } from "./llhelpers";
 
 export const load_parser = async (files: { parser_url: string; lang_url: string }) =>
@@ -20,6 +20,19 @@ export const load_parser = async (files: { parser_url: string; lang_url: string 
       parser.setLanguage(lang);
       return parser;
     });
+
+const list_tags: { [k in list_tag]: list_tag } = {
+  program: "program",
+  lexical_declaration: "lexical_declaration",
+  variable_declarator: "variable_declarator",
+  binary_expression: "binary_expression",
+  call_expression: "call_expression",
+  arguments: "arguments",
+  arrow_function: "arrow_function",
+  formal_parameters: "formal_parameters",
+  statement_block: "statement_block",
+  ERROR: "ERROR",
+};
 
 function absurdly(node: Parser.SyntaxNode): AST {
   const children = node.children;
@@ -88,9 +101,11 @@ function absurdly(node: Parser.SyntaxNode): AST {
         }
       }
     }
+    const tag = (list_tags as { [k: string]: list_tag })[node.type];
+    if (!tag) throw new Error(`unsupported tag '${node.type}'`);
     return {
       type: "list",
-      tag: node.type,
+      tag,
       content: array_to_ll(ls),
     };
   }

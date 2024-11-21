@@ -1,5 +1,4 @@
-import { assert } from "./assert";
-import { atom_tag } from "./AST";
+import { atom_tag, list_tag } from "./AST";
 import { LL, ll_to_array } from "./llhelpers";
 
 export type AST =
@@ -12,32 +11,9 @@ export type AST =
   | {
       type: "list";
       wrap?: any;
-      tag: string;
+      tag: list_tag;
       content: LL<AST>;
     };
-
-type list_tag =
-  | "program"
-  | "lexical_declaration"
-  | "variable_declarator"
-  | "binary_expression"
-  | "call_expression"
-  | "arguments"
-  | "arrow_function"
-  | "formal_parameters"
-  | "statement_block";
-
-const list_tags: { [k in list_tag]: list_tag } = {
-  program: "program",
-  lexical_declaration: "lexical_declaration",
-  variable_declarator: "variable_declarator",
-  binary_expression: "binary_expression",
-  call_expression: "call_expression",
-  arguments: "arguments",
-  arrow_function: "arrow_function",
-  formal_parameters: "formal_parameters",
-  statement_block: "statement_block",
-};
 
 type Tree =
   | {
@@ -55,9 +31,7 @@ export function ast_to_tree(ast: AST): Tree {
       return { type: ast.tag, text: ast.content };
     }
     case "list": {
-      const type = (list_tags as { [k: string]: list_tag })[ast.tag];
-      if (type === undefined) throw new Error(`unknown tag '${ast.tag}'`);
-      return { type, children: ll_to_array(ast.content).map(ast_to_tree) };
+      return { type: ast.tag, children: ll_to_array(ast.content).map(ast_to_tree) };
     }
   }
 }
