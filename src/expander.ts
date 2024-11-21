@@ -69,38 +69,22 @@ function debug(loc: Loc, msg: string, info?: any): never {
   throw new DebugError(msg, loc, info);
 }
 
-const inspect: <S>(loc: Loc, reason: string, k: () => S) => S = (loc, reason, k) => k();
-
-//const inspect: (loc: Loc, reason: string, k: () => Step) => Step = (loc, reason, k) => ({
-//  type: "Inspect",
-//  loc,
-//  reason,
-//  k,
-//});
-
-class SyntaxError extends Error {
-  loc: Loc;
-  constructor(message: string, loc: Loc) {
-    super(message);
-    this.loc = loc;
-  }
-}
+const inspect: (loc: Loc, reason: string, k: () => never) => never = (loc, reason, k) => {
+  throw new Step("Inspect", loc, undefined, k, reason);
+};
 
 function syntax_error(loc: Loc, reason?: string): never {
   throw new Step("SyntaxError", loc, reason ?? "syntax error");
 }
 
-const in_isolation: <S extends { loc: Loc }>(loc: Loc, f: (loc: Loc) => S) => S = (loc, f) => {
-  try {
-    const res = f(isolate(loc));
-    return { ...res, loc: change(loc, res.loc) };
-  } catch (err) {
-    if (err instanceof SyntaxError) {
-      syntax_error(unisolate(loc, err.loc), err.message);
-    } else {
-      throw err;
-    }
-  }
+const in_isolation: <G>(
+  loc: Loc,
+  f: (loc: Loc, k: (loc: Loc, g: G) => never) => never,
+  k: (loc: Loc, g: G) => never,
+) => never = (loc, f, k) => {
+  return f(isolate(loc), (res, g) => {
+    return k(unisolate(loc, res), g);
+  });
 };
 
 type goodies = { loc: Loc; rib: Rib; context: Context; counter: number };
@@ -227,13 +211,13 @@ function expand_program(step: {
       // context is filled also
       const unit = extend_unit(step.unit, rib_id, rib);
       // unit is now filled
-      const final = postexpand_program({
+      return postexpand_program({
         loc,
         counter,
         context,
         unit,
+        k: DONE,
       });
-      DONE(final.loc);
     },
   });
 }
@@ -253,31 +237,38 @@ function preexpand_body(step: {
   counter: number;
   k: (props: goodies) => never;
 }): never {
-  const { loc, rib, context, counter } = in_isolation(step.loc, (loc) =>
-    preexpand_forms({ ...step, loc }),
-  );
-  if (loc.t.tag === "slice") {
-    const subforms = stx_list_content(loc.t);
-    const new_loc = change_splicing(loc, subforms === null ? [empty_statement, null] : subforms);
-    return inspect(new_loc, "After splicing the body.", () =>
-      preexpand_body({ loc: new_loc, rib, unit: step.unit, context, counter, k: step.k }),
-    );
-  }
-  return go_next(
-    loc,
-    (loc) => preexpand_body({ loc, rib, counter, context, unit: step.unit, k: step.k }),
-    (loc) => step.k({ loc, rib, context, counter }),
+  return in_isolation<goodies>(
+    step.loc,
+    (loc, k) => {
+      const gs = preexpand_forms({ ...step, loc });
+      return k(gs.loc, gs);
+    },
+    (loc, { rib, context, counter }) => {
+      if (loc.t.tag === "slice") {
+        const subforms = stx_list_content(loc.t);
+        const new_loc = change_splicing(
+          loc,
+          subforms === null ? [empty_statement, null] : subforms,
+        );
+        return preexpand_body({ loc: new_loc, rib, unit: step.unit, context, counter, k: step.k });
+      }
+      return go_next(
+        loc,
+        (loc) => preexpand_body({ loc, rib, counter, context, unit: step.unit, k: step.k }),
+        (loc) => step.k({ loc, rib, context, counter }),
+      );
+    },
   );
 }
 
-function preexpand_body_curly<S>(step: {
+function preexpand_body_curly(step: {
   loc: Loc;
   rib: Rib;
   unit: CompilationUnit;
   context: Context;
   counter: number;
-  k: (props: goodies) => S;
-}): S {
+  k: (props: goodies) => never;
+}): never {
   if (step.loc.t.type === "atom" && step.loc.t.tag === "other" && step.loc.t.content === "}") {
     return go_right(step.loc, syntax_error, () =>
       step.k({
@@ -288,20 +279,29 @@ function preexpand_body_curly<S>(step: {
       }),
     );
   }
-  const { loc, rib, context, counter } = in_isolation(step.loc, (loc) =>
-    preexpand_forms({ ...step, loc }),
-  );
-  if (loc.t.tag === "slice") {
-    const subforms = stx_list_content(loc.t);
-    const new_loc = change_splicing(loc, subforms === null ? [empty_statement, null] : subforms);
-    return inspect(new_loc, "After splicing the body.", () =>
-      preexpand_body_curly({ loc: new_loc, rib, unit: step.unit, context, counter, k: step.k }),
-    );
-  }
-  return go_right(
-    loc,
-    (loc) => preexpand_body_curly({ loc, rib, counter, context, unit: step.unit, k: step.k }),
-    (loc) => syntax_error(loc, "no right"),
+  return in_isolation<goodies>(
+    step.loc,
+    (loc, k) => {
+      const gs = preexpand_forms({ ...step, loc });
+      return k(gs.loc, gs);
+    },
+    (loc, { rib, context, counter }) => {
+      if (loc.t.tag === "slice") {
+        const subforms = stx_list_content(loc.t);
+        const new_loc = change_splicing(
+          loc,
+          subforms === null ? [empty_statement, null] : subforms,
+        );
+        return inspect(new_loc, "spliced", () => {
+          preexpand_body_curly({ loc: new_loc, rib, unit: step.unit, context, counter, k: step.k });
+        });
+      }
+      return go_right(
+        loc,
+        (loc) => preexpand_body_curly({ loc, rib, counter, context, unit: step.unit, k: step.k }),
+        (loc) => syntax_error(loc, "no right"),
+      );
+    },
   );
 }
 
@@ -345,7 +345,8 @@ function preexpand_block(step: {
   counter: number;
   unit: CompilationUnit;
   context: Context;
-}) {
+  k: (goodies: goodies) => never;
+}): never {
   const loc = step.loc;
   assert(loc.t.type === "list" && loc.t.tag === "statement_block");
   const bodies = go_down(loc, itself, (loc) => syntax_error(loc, "no bodies"));
@@ -357,7 +358,7 @@ function preexpand_block(step: {
     k: (gs) => {
       const loc = gs.loc;
       assert(loc.t.type === "list" && loc.t.tag === "statement_block");
-      return gs;
+      return step.k(gs);
     },
   });
 }
@@ -369,19 +370,24 @@ function expand_concise_body(step: {
   counter: number;
   unit: CompilationUnit;
   context: Context;
-}): { loc: Loc } {
+  k: (loc: Loc) => never;
+}): never {
   const loc = step.loc;
-  const gs =
-    loc.t.type === "list" && loc.t.tag === "statement_block"
-      ? (({ loc, ...gs }) =>
+  const k: (gs: goodies) => never = (gs: goodies) => {
+    const new_unit = extend_unit(step.unit, step.rib_id, gs.rib);
+    return postexpand_body({ ...gs, unit: new_unit, k: step.k });
+  };
+  return loc.t.type === "list" && loc.t.tag === "statement_block"
+    ? preexpand_block({
+        ...step,
+        k: ({ loc, ...gs }) =>
           go_down(
             loc,
-            (loc) => ({ ...gs, loc }),
-            (loc) => debug(loc, "?"),
-          ))(preexpand_block(step))
-      : preexpand_forms(step);
-  const new_unit = extend_unit(step.unit, step.rib_id, gs.rib);
-  return postexpand_body({ ...gs, unit: new_unit });
+            (loc) => k({ ...gs, loc }),
+            (loc) => debug(loc, "???"),
+          ),
+      })
+    : k(preexpand_forms(step));
 }
 
 function preexpand_forms(step: {
@@ -520,9 +526,8 @@ function postexpand_program(step: {
   unit: CompilationUnit;
   counter: number;
   context: Context;
-}): {
-  loc: Loc;
-} {
+  k: (loc: Loc) => never;
+}): never {
   assert(step.loc.t.tag === "program");
   return go_down(
     step.loc,
@@ -532,8 +537,9 @@ function postexpand_program(step: {
         unit: step.unit,
         counter: step.counter,
         context: step.context,
+        k: step.k,
       }),
-    (loc) => ({ loc }),
+    (loc) => step.k(loc),
   );
 }
 
@@ -639,12 +645,14 @@ function expand_arrow_function({
   counter,
   context,
   unit,
+  arrow_k,
 }: {
   loc: Loc;
   counter: number;
   context: Context;
   unit: CompilationUnit;
-}): { loc: Loc } {
+  arrow_k: (loc: Loc, _?: undefined) => never;
+}): never {
   return go_down(
     loc,
     (loc) => {
@@ -657,21 +665,27 @@ function expand_arrow_function({
       const arr = go_right(pgs.loc, itself, invalid_form);
       check_punct(arr, "=>");
       const body = go_right(arr, itself, invalid_form);
-      const expanded_body = in_isolation(body, (body) => {
-        const [rib_id, new_counter] = new_rib_id(pgs.counter);
-        const wrap: Wrap = { marks: null, subst: [{ rib_id }, null] };
-        const loc = wrap_loc(body, wrap);
-        const new_unit = extend_unit(unit, rib_id, pgs.rib); // params are in rib
-        return expand_concise_body({
-          loc,
-          rib: pgs.rib,
-          rib_id,
-          context: pgs.context,
-          counter: new_counter,
-          unit: new_unit,
-        });
-      });
-      return { loc: go_up(expanded_body.loc) };
+      return in_isolation(
+        body,
+        (body, k) => {
+          const [rib_id, new_counter] = new_rib_id(pgs.counter);
+          const wrap: Wrap = { marks: null, subst: [{ rib_id }, null] };
+          const loc = wrap_loc(body, wrap);
+          const new_unit = extend_unit(unit, rib_id, pgs.rib); // params are in rib
+          return expand_concise_body({
+            loc,
+            rib: pgs.rib,
+            rib_id,
+            context: pgs.context,
+            counter: new_counter,
+            unit: new_unit,
+            k: (loc) => k(loc, undefined),
+          });
+        },
+        (loc) => {
+          return arrow_k(loc);
+        },
+      );
     },
     invalid_form,
   );
@@ -682,17 +696,18 @@ function postexpand_body(step: {
   unit: CompilationUnit;
   counter: number;
   context: Context;
-}): { loc: Loc } {
-  function done(loc: Loc): { loc: Loc } {
-    return { loc };
+  k: (loc: Loc) => never;
+}): never {
+  function done(loc: Loc): never {
+    return step.k(loc);
   }
-  function cont(loc: Loc): { loc: Loc } {
+  function cont(loc: Loc): never {
     return go_next(loc, (loc) => h(find_form(loc)), done);
   }
-  function descend(loc: Loc): { loc: Loc } {
+  function descend(loc: Loc): never {
     return go_down(loc, (loc) => h(find_form(loc)), cont);
   }
-  function h(ffrv: ffrv): { loc: Loc } {
+  function h(ffrv: ffrv): never {
     const loc = ffrv.loc;
     switch (ffrv.type) {
       case "done":
@@ -741,8 +756,11 @@ function postexpand_body(step: {
           case "variable_declarator":
             return descend(loc);
           case "arrow_function": {
-            const arr = in_isolation(loc, (loc) => expand_arrow_function({ ...step, loc }));
-            return cont(arr.loc);
+            return in_isolation(
+              loc,
+              (loc, k) => expand_arrow_function({ ...step, loc, arrow_k: k }),
+              cont,
+            );
           }
           default: {
             if (list_handlers_table[loc.t.tag] !== "descend") {
@@ -769,12 +787,5 @@ export function next_step(step: Step): Step {
     } else {
       throw err;
     }
-    //if (err instanceof SyntaxError) {
-    //  return { type: "SyntaxError", loc: err.loc, reason: err.message };
-    //} else if (err instanceof DebugError) {
-    //  return { type: "DEBUG", loc: err.loc, msg: err.message, info: err.info };
-    //} else {
-    //  throw err;
-    //}
   }
 }
