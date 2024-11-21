@@ -97,7 +97,11 @@ function absurdly(node: Parser.SyntaxNode): AST {
 }
 
 export function parse_with(parser: Parser, code: string): AST {
-  const node = parser.parse(code);
-  const ast = absurdly(node.rootNode);
-  return ast;
+  try {
+    const node = parser.parse(code);
+    const ast = absurdly(node.rootNode);
+    return ast;
+  } catch (err) {
+    return { type: "atom", tag: "ERROR", content: JSON.stringify(err) };
+  }
 }

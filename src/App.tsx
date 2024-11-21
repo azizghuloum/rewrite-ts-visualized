@@ -62,14 +62,12 @@ function StepperView({ step, step_number }: { step: Step; step_number: number })
     <div>
       <div>
         <div>step: {step_number}</div>
-        {step.type === "Inspect" ? (
-          <span style={{ fontWeight: "bold" }}>{step.reason}</span>
-        ) : step.type === "DEBUG" ? (
-          <span style={{ fontWeight: "bold", color: "red" }}>
-            {step.type}: {step.msg} {step.info && JSON.stringify(step.info)}
+        {step.info ? (
+          <span style={{ fontWeight: "bold" }}>
+            {step.name}: {JSON.stringify(step.info)}
           </span>
         ) : (
-          <span style={{ fontWeight: "bold" }}>{step.type}</span>
+          <span style={{ fontWeight: "bold" }}>{step.name}</span>
         )}
       </div>
       <div
@@ -108,11 +106,7 @@ function Example({ parser, code, onChange }: ExampleProps) {
   useEffect(() => {
     const cancel = timeout(0, () => {
       setState((state) => {
-        if (
-          state.error !== null ||
-          state.step_number === max_fuel ||
-          state.last_step.type === "DONE"
-        )
+        if (state.error !== null || state.step_number === max_fuel || !state.last_step.next)
           return state;
         const next_state = (() => {
           try {
@@ -121,12 +115,7 @@ function Example({ parser, code, onChange }: ExampleProps) {
               prev_steps: [...state.prev_steps, state.last_step],
               last_step: step,
               step_number: state.step_number + 1,
-              error:
-                step.type === "SyntaxError"
-                  ? `Syntax Error: ${step.reason}`
-                  : step.type === "DEBUG"
-                    ? `DEBUG (${step.msg}): ${JSON.stringify(step.info)}`
-                    : null,
+              error: step.error ? `${step.name}: ${step.error}` : null,
               pointer: state.pointer,
             };
             return next_state;

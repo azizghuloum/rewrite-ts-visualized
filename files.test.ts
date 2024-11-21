@@ -5,7 +5,7 @@ import { load_parser, parse_with } from "./src/parser-loader";
 import treesitter_wasm_url from "web-tree-sitter/tree-sitter.wasm?url";
 import tsx_url from "./src/assets/tree-sitter-tsx.wasm?url";
 import { core_patterns } from "./src/syntax-core-patterns";
-import { initial_step, next_step } from "./src/expander";
+import { initial_step, next_step, Step } from "./src/expander";
 import Parser from "web-tree-sitter";
 
 const test_dir = __dirname + "/tests";
@@ -17,23 +17,23 @@ async function compile_script(filename: string, parser: Parser) {
   const parse = (code: string) => parse_with(parser, code);
   const patterns = core_patterns(parse);
   let step = initial_step(parse(code), patterns);
-  while (true) {
-    switch (step.type) {
-      case "DONE":
-      case "SyntaxError":
-        return step;
-      case "ExpandProgram":
-      case "Inspect":
-        step = next_step(step);
-        continue;
-      case "DEBUG":
-        console.error(step);
-        throw new Error("crashed");
-      default:
-        const invalid: never = step;
-        throw invalid;
+  while (step.next) {
+    try {
+      step.next();
+      throw new Error("unexpected return");
+    } catch (x) {
+      if (x instanceof Step && !step.error) {
+        step = x;
+      } else {
+        throw x;
+      }
     }
   }
+  return {
+    type: step.name,
+    loc: step.loc,
+    ...(step.error ? { reason: step.error } : {}),
+  };
 }
 
 suite("files in tests dir", async () => {
@@ -46,8 +46,8 @@ suite("files in tests dir", async () => {
     test(`expanding file ${x}`, async () => {
       const test_file = `${test_dir}/${x}`;
       await expect(await compile_script(test_file, parser)).toMatchFileSnapshot(
-        `${test_file}.expanded`
+        `${test_file}.expanded`,
       );
-    })
+    }),
   );
 });

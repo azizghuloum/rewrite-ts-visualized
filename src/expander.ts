@@ -24,29 +24,35 @@ import {
 } from "./zipper";
 import { core_handlers } from "./syntax-core-patterns";
 
-export type Step =
-  | {
-      type: "ExpandProgram";
-      loc: Loc;
-      unit: CompilationUnit;
-      context: Context;
-      counter: number;
-    }
-  | { type: "SyntaxError"; loc: Loc; reason: string }
-  | { type: "Inspect"; loc: Loc; reason: string; k: () => Step }
-  | { type: "DONE"; loc: Loc }
-  | { type: "DEBUG"; loc: Loc; msg: string; info: any };
+export class Step {
+  name: string;
+  loc: Loc;
+  next?: () => never;
+  error?: string | undefined;
+  info?: any;
+  constructor(name: string, loc: Loc, error?: string, next?: () => never, info?: any) {
+    this.name = name;
+    this.loc = loc;
+    this.error = error;
+    this.next = next;
+    this.info = info;
+  }
+}
+
+class SInitial extends Step {
+  constructor(loc: Loc, unit: CompilationUnit, context: Context, counter: number) {
+    super("ExpandProgram", loc, undefined, () => expand_program({ loc, unit, context, counter }));
+  }
+}
+
+const DONE = (loc: Loc) => {
+  throw new Step("DONE", loc);
+};
 
 export function initial_step(ast: AST, patterns: CorePatterns): Step {
   const { stx, counter, unit, context } = init_top_level(ast, patterns);
   const loc: Loc = mkzipper(stx);
-  return {
-    type: "ExpandProgram",
-    loc,
-    counter,
-    unit,
-    context,
-  };
+  return new SInitial(loc, unit, context, counter);
 }
 
 class DebugError extends Error {
@@ -81,7 +87,7 @@ class SyntaxError extends Error {
 }
 
 function syntax_error(loc: Loc, reason?: string): never {
-  throw new SyntaxError(reason ?? "syntax error", loc);
+  throw new Step("SyntaxError", loc, reason ?? "syntax error");
 }
 
 const in_isolation: <S extends { loc: Loc }>(loc: Loc, f: (loc: Loc) => S) => S = (loc, f) => {
@@ -196,7 +202,7 @@ function expand_program(step: {
   unit: CompilationUnit;
   context: Context;
   counter: number;
-}): Step {
+}): never {
   assert(step.loc.t.tag === "program");
   const rib: Rib = {
     type: "rib",
@@ -227,7 +233,7 @@ function expand_program(step: {
         context,
         unit,
       });
-      return { type: "DONE", ...final };
+      DONE(final.loc);
     },
   });
 }
@@ -245,8 +251,8 @@ function preexpand_body(step: {
   unit: CompilationUnit;
   context: Context;
   counter: number;
-  k: (props: goodies) => Step;
-}): Step {
+  k: (props: goodies) => never;
+}): never {
   const { loc, rib, context, counter } = in_isolation(step.loc, (loc) =>
     preexpand_forms({ ...step, loc }),
   );
@@ -257,7 +263,7 @@ function preexpand_body(step: {
       preexpand_body({ loc: new_loc, rib, unit: step.unit, context, counter, k: step.k }),
     );
   }
-  return go_next<Step>(
+  return go_next(
     loc,
     (loc) => preexpand_body({ loc, rib, counter, context, unit: step.unit, k: step.k }),
     (loc) => step.k({ loc, rib, context, counter }),
@@ -752,21 +758,23 @@ function postexpand_body(step: {
 }
 
 export function next_step(step: Step): Step {
+  if (!step.next) throw new Error("no next step");
   try {
-    switch (step.type) {
-      case "ExpandProgram":
-        return expand_program(step);
-      case "Inspect":
-        return step.k();
-    }
+    const x = step.next();
+    console.error(x);
+    throw new Error("invalid return from step function");
   } catch (err) {
-    if (err instanceof SyntaxError) {
-      return { type: "SyntaxError", loc: err.loc, reason: err.message };
-    } else if (err instanceof DebugError) {
-      return { type: "DEBUG", loc: err.loc, msg: err.message, info: err.info };
+    if (err instanceof Step) {
+      return err;
     } else {
       throw err;
     }
+    //if (err instanceof SyntaxError) {
+    //  return { type: "SyntaxError", loc: err.loc, reason: err.message };
+    //} else if (err instanceof DebugError) {
+    //  return { type: "DEBUG", loc: err.loc, msg: err.message, info: err.info };
+    //} else {
+    //  throw err;
+    //}
   }
-  throw new Error(`${step.type} is not implemented`);
 }
