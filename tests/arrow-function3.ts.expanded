@@ -1,0 +1,507 @@
+{
+  "loc": {
+    "p": {
+      "type": "top",
+    },
+    "t": {
+      "content": [
+        {
+          "content": [
+            {
+              "content": "const",
+              "tag": "other",
+              "type": "atom",
+              "wrap": {
+                "marks": [
+                  "top",
+                  null,
+                ],
+                "subst": [
+                  {
+                    "rib_id": "r1",
+                  },
+                  [
+                    {
+                      "rib_id": "r0",
+                    },
+                    null,
+                  ],
+                ],
+              },
+            },
+            [
+              {
+                "content": [
+                  {
+                    "content": "foo_3",
+                    "tag": "identifier",
+                    "type": "atom",
+                    "wrap": {
+                      "marks": null,
+                      "subst": null,
+                    },
+                  },
+                  [
+                    {
+                      "content": "=",
+                      "tag": "other",
+                      "type": "atom",
+                      "wrap": {
+                        "marks": [
+                          "top",
+                          null,
+                        ],
+                        "subst": [
+                          {
+                            "rib_id": "r1",
+                          },
+                          [
+                            {
+                              "rib_id": "r0",
+                            },
+                            null,
+                          ],
+                        ],
+                      },
+                    },
+                    [
+                      {
+                        "content": [
+                          {
+                            "content": [
+                              {
+                                "content": "(",
+                                "tag": "other",
+                                "type": "atom",
+                                "wrap": {
+                                  "marks": [
+                                    "top",
+                                    null,
+                                  ],
+                                  "subst": [
+                                    {
+                                      "rib_id": "r1",
+                                    },
+                                    [
+                                      {
+                                        "rib_id": "r0",
+                                      },
+                                      null,
+                                    ],
+                                  ],
+                                },
+                              },
+                              [
+                                {
+                                  "content": "x_5",
+                                  "tag": "identifier",
+                                  "type": "atom",
+                                  "wrap": {
+                                    "marks": null,
+                                    "subst": null,
+                                  },
+                                },
+                                [
+                                  {
+                                    "content": ")",
+                                    "tag": "other",
+                                    "type": "atom",
+                                    "wrap": {
+                                      "marks": [
+                                        "top",
+                                        null,
+                                      ],
+                                      "subst": [
+                                        {
+                                          "rib_id": "r1",
+                                        },
+                                        [
+                                          {
+                                            "rib_id": "r0",
+                                          },
+                                          null,
+                                        ],
+                                      ],
+                                    },
+                                  },
+                                  null,
+                                ],
+                              ],
+                            ],
+                            "tag": "formal_parameters",
+                            "type": "list",
+                            "wrap": undefined,
+                          },
+                          [
+                            {
+                              "content": "=>",
+                              "tag": "other",
+                              "type": "atom",
+                              "wrap": {
+                                "marks": [
+                                  "top",
+                                  null,
+                                ],
+                                "subst": [
+                                  {
+                                    "rib_id": "r1",
+                                  },
+                                  [
+                                    {
+                                      "rib_id": "r0",
+                                    },
+                                    null,
+                                  ],
+                                ],
+                              },
+                            },
+                            [
+                              {
+                                "content": [
+                                  {
+                                    "content": "{",
+                                    "tag": "other",
+                                    "type": "atom",
+                                    "wrap": {
+                                      "marks": [
+                                        "top",
+                                        null,
+                                      ],
+                                      "subst": [
+                                        {
+                                          "rib_id": "r6",
+                                        },
+                                        [
+                                          {
+                                            "rib_id": "r1",
+                                          },
+                                          [
+                                            {
+                                              "rib_id": "r0",
+                                            },
+                                            null,
+                                          ],
+                                        ],
+                                      ],
+                                    },
+                                  },
+                                  [
+                                    {
+                                      "content": [
+                                        {
+                                          "content": "const",
+                                          "tag": "other",
+                                          "type": "atom",
+                                          "wrap": {
+                                            "marks": [
+                                              "top",
+                                              null,
+                                            ],
+                                            "subst": [
+                                              {
+                                                "rib_id": "r6",
+                                              },
+                                              [
+                                                {
+                                                  "rib_id": "r1",
+                                                },
+                                                [
+                                                  {
+                                                    "rib_id": "r0",
+                                                  },
+                                                  null,
+                                                ],
+                                              ],
+                                            ],
+                                          },
+                                        },
+                                        [
+                                          {
+                                            "content": [
+                                              {
+                                                "content": "bar_8",
+                                                "tag": "identifier",
+                                                "type": "atom",
+                                                "wrap": {
+                                                  "marks": null,
+                                                  "subst": null,
+                                                },
+                                              },
+                                              [
+                                                {
+                                                  "content": "=",
+                                                  "tag": "other",
+                                                  "type": "atom",
+                                                  "wrap": {
+                                                    "marks": [
+                                                      "top",
+                                                      null,
+                                                    ],
+                                                    "subst": [
+                                                      {
+                                                        "rib_id": "r6",
+                                                      },
+                                                      [
+                                                        {
+                                                          "rib_id": "r1",
+                                                        },
+                                                        [
+                                                          {
+                                                            "rib_id": "r0",
+                                                          },
+                                                          null,
+                                                        ],
+                                                      ],
+                                                    ],
+                                                  },
+                                                },
+                                                [
+                                                  {
+                                                    "content": [
+                                                      {
+                                                        "content": "x_5",
+                                                        "tag": "identifier",
+                                                        "type": "atom",
+                                                        "wrap": {
+                                                          "marks": null,
+                                                          "subst": null,
+                                                        },
+                                                      },
+                                                      [
+                                                        {
+                                                          "content": [
+                                                            {
+                                                              "content": "(",
+                                                              "tag": "other",
+                                                              "type": "atom",
+                                                              "wrap": {
+                                                                "marks": [
+                                                                  "top",
+                                                                  null,
+                                                                ],
+                                                                "subst": [
+                                                                  {
+                                                                    "rib_id": "r6",
+                                                                  },
+                                                                  [
+                                                                    {
+                                                                      "rib_id": "r1",
+                                                                    },
+                                                                    [
+                                                                      {
+                                                                        "rib_id": "r0",
+                                                                      },
+                                                                      null,
+                                                                    ],
+                                                                  ],
+                                                                ],
+                                                              },
+                                                            },
+                                                            [
+                                                              {
+                                                                "content": "13",
+                                                                "tag": "number",
+                                                                "type": "atom",
+                                                                "wrap": {
+                                                                  "marks": [
+                                                                    "top",
+                                                                    null,
+                                                                  ],
+                                                                  "subst": [
+                                                                    {
+                                                                      "rib_id": "r6",
+                                                                    },
+                                                                    [
+                                                                      {
+                                                                        "rib_id": "r1",
+                                                                      },
+                                                                      [
+                                                                        {
+                                                                          "rib_id": "r0",
+                                                                        },
+                                                                        null,
+                                                                      ],
+                                                                    ],
+                                                                  ],
+                                                                },
+                                                              },
+                                                              [
+                                                                {
+                                                                  "content": ")",
+                                                                  "tag": "other",
+                                                                  "type": "atom",
+                                                                  "wrap": {
+                                                                    "marks": [
+                                                                      "top",
+                                                                      null,
+                                                                    ],
+                                                                    "subst": [
+                                                                      {
+                                                                        "rib_id": "r6",
+                                                                      },
+                                                                      [
+                                                                        {
+                                                                          "rib_id": "r1",
+                                                                        },
+                                                                        [
+                                                                          {
+                                                                            "rib_id": "r0",
+                                                                          },
+                                                                          null,
+                                                                        ],
+                                                                      ],
+                                                                    ],
+                                                                  },
+                                                                },
+                                                                null,
+                                                              ],
+                                                            ],
+                                                          ],
+                                                          "tag": "arguments",
+                                                          "type": "list",
+                                                          "wrap": undefined,
+                                                        },
+                                                        null,
+                                                      ],
+                                                    ],
+                                                    "tag": "call_expression",
+                                                    "type": "list",
+                                                    "wrap": undefined,
+                                                  },
+                                                  null,
+                                                ],
+                                              ],
+                                            ],
+                                            "tag": "variable_declarator",
+                                            "type": "list",
+                                            "wrap": undefined,
+                                          },
+                                          [
+                                            {
+                                              "content": ";",
+                                              "tag": "other",
+                                              "type": "atom",
+                                              "wrap": {
+                                                "marks": [
+                                                  "top",
+                                                  null,
+                                                ],
+                                                "subst": [
+                                                  {
+                                                    "rib_id": "r6",
+                                                  },
+                                                  [
+                                                    {
+                                                      "rib_id": "r1",
+                                                    },
+                                                    [
+                                                      {
+                                                        "rib_id": "r0",
+                                                      },
+                                                      null,
+                                                    ],
+                                                  ],
+                                                ],
+                                              },
+                                            },
+                                            null,
+                                          ],
+                                        ],
+                                      ],
+                                      "tag": "lexical_declaration",
+                                      "type": "list",
+                                      "wrap": undefined,
+                                    },
+                                    [
+                                      {
+                                        "content": "}",
+                                        "tag": "other",
+                                        "type": "atom",
+                                        "wrap": {
+                                          "marks": [
+                                            "top",
+                                            null,
+                                          ],
+                                          "subst": [
+                                            {
+                                              "rib_id": "r6",
+                                            },
+                                            [
+                                              {
+                                                "rib_id": "r1",
+                                              },
+                                              [
+                                                {
+                                                  "rib_id": "r0",
+                                                },
+                                                null,
+                                              ],
+                                            ],
+                                          ],
+                                        },
+                                      },
+                                      null,
+                                    ],
+                                  ],
+                                ],
+                                "tag": "statement_block",
+                                "type": "list",
+                                "wrap": undefined,
+                              },
+                              null,
+                            ],
+                          ],
+                        ],
+                        "tag": "arrow_function",
+                        "type": "list",
+                        "wrap": undefined,
+                      },
+                      null,
+                    ],
+                  ],
+                ],
+                "tag": "variable_declarator",
+                "type": "list",
+                "wrap": undefined,
+              },
+              [
+                {
+                  "content": ";",
+                  "tag": "other",
+                  "type": "atom",
+                  "wrap": {
+                    "marks": [
+                      "top",
+                      null,
+                    ],
+                    "subst": [
+                      {
+                        "rib_id": "r1",
+                      },
+                      [
+                        {
+                          "rib_id": "r0",
+                        },
+                        null,
+                      ],
+                    ],
+                  },
+                },
+                null,
+              ],
+            ],
+          ],
+          "tag": "lexical_declaration",
+          "type": "list",
+          "wrap": undefined,
+        },
+        null,
+      ],
+      "tag": "program",
+      "type": "list",
+      "wrap": undefined,
+    },
+    "type": "loc",
+  },
+  "type": "DONE",
+}

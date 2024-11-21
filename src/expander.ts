@@ -23,7 +23,6 @@ import {
   wrap_loc,
 } from "./zipper";
 import { core_handlers } from "./syntax-core-patterns";
-import { M } from "vite/dist/node/types.d-aGj9QkWt";
 
 export type Step =
   | {
@@ -324,6 +323,7 @@ const list_handlers_table: { [tag: string]: "descend" | "stop" } = {
   variable_declarator: "stop",
   slice: "stop",
   arrow_function: "stop",
+  statement_block: "stop",
   expression_statement: "descend",
   call_expression: "descend",
   arguments: "descend",
@@ -359,19 +359,18 @@ function preexpand_block(step: {
 function expand_concise_body(step: {
   loc: Loc;
   rib: Rib;
+  rib_id: string;
   counter: number;
   unit: CompilationUnit;
   context: Context;
 }): { loc: Loc } {
   const loc = step.loc;
-  if (loc.t.type === "list" && loc.t.tag === "statement_block") {
-    const blockgs = preexpand_block(step);
-    debug(loc, "concise statement_block");
-  } else {
-    const gs = preexpand_forms(step);
-    const result = postexpand_body({ ...gs, unit: step.unit });
-    return result;
-  }
+  const gs =
+    loc.t.type === "list" && loc.t.tag === "statement_block"
+      ? preexpand_block(step)
+      : preexpand_forms(step);
+  const new_unit = extend_unit(step.unit, step.rib_id, gs.rib);
+  return postexpand_body({ ...gs, unit: new_unit });
 }
 
 function preexpand_forms(step: {
@@ -651,10 +650,11 @@ function expand_arrow_function({
         const [rib_id, new_counter] = new_rib_id(pgs.counter);
         const wrap: Wrap = { marks: null, subst: [{ rib_id }, null] };
         const loc = wrap_loc(body, wrap);
-        const new_unit = extend_unit(unit, rib_id, pgs.rib);
+        const new_unit = extend_unit(unit, rib_id, pgs.rib); // params are in rib
         return expand_concise_body({
           loc,
           rib: pgs.rib,
+          rib_id,
           context: pgs.context,
           counter: new_counter,
           unit: new_unit,
@@ -728,6 +728,8 @@ function postexpand_body(step: {
           case "lexical_declaration":
             return descend(loc);
           case "variable_declarator":
+            return descend(loc);
+          case "statement_block":
             return descend(loc);
           case "arrow_function": {
             const arr = in_isolation(loc, (loc) => expand_arrow_function({ ...step, loc }));
