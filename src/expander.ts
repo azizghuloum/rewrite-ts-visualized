@@ -23,6 +23,7 @@ import {
   wrap_loc,
 } from "./zipper";
 import { core_handlers } from "./syntax-core-patterns";
+import { M } from "vite/dist/node/types.d-aGj9QkWt";
 
 export type Step =
   | {
@@ -63,12 +64,14 @@ function debug(loc: Loc, msg: string, info?: any): never {
   throw new DebugError(msg, loc, info);
 }
 
-const inspect: (loc: Loc, reason: string, k: () => Step) => Step = (loc, reason, k) => ({
-  type: "Inspect",
-  loc,
-  reason,
-  k,
-});
+const inspect: <S>(loc: Loc, reason: string, k: () => S) => S = (loc, reason, k) => k();
+
+//const inspect: (loc: Loc, reason: string, k: () => Step) => Step = (loc, reason, k) => ({
+//  type: "Inspect",
+//  loc,
+//  reason,
+//  k,
+//});
 
 class SyntaxError extends Error {
   loc: Loc;
@@ -262,6 +265,41 @@ function preexpand_body(step: {
   );
 }
 
+function preexpand_body_curly<S>(step: {
+  loc: Loc;
+  rib: Rib;
+  unit: CompilationUnit;
+  context: Context;
+  counter: number;
+  k: (props: goodies) => S;
+}): S {
+  if (step.loc.t.type === "atom" && step.loc.t.tag === "other" && step.loc.t.content === "}") {
+    return go_right(step.loc, syntax_error, () =>
+      step.k({
+        loc: go_up(step.loc),
+        context: step.context,
+        counter: step.counter,
+        rib: step.rib,
+      }),
+    );
+  }
+  const { loc, rib, context, counter } = in_isolation(step.loc, (loc) =>
+    preexpand_forms({ ...step, loc }),
+  );
+  if (loc.t.tag === "slice") {
+    const subforms = stx_list_content(loc.t);
+    const new_loc = change_splicing(loc, subforms === null ? [empty_statement, null] : subforms);
+    return inspect(new_loc, "After splicing the body.", () =>
+      preexpand_body_curly({ loc: new_loc, rib, unit: step.unit, context, counter, k: step.k }),
+    );
+  }
+  return go_right(
+    loc,
+    (loc) => preexpand_body_curly({ loc, rib, counter, context, unit: step.unit, k: step.k }),
+    (loc) => syntax_error(loc, "no right"),
+  );
+}
+
 function handle_core_syntax(loc: Loc, name: string, pattern: STX): Loc {
   const handler = core_handlers[name];
   assert(handler !== undefined);
@@ -295,6 +333,29 @@ const list_handlers_table: { [tag: string]: "descend" | "stop" } = {
   empty_statement: "descend",
 };
 
+function preexpand_block(step: {
+  loc: Loc;
+  rib: Rib;
+  counter: number;
+  unit: CompilationUnit;
+  context: Context;
+}) {
+  const loc = step.loc;
+  assert(loc.t.type === "list" && loc.t.tag === "statement_block");
+  const bodies = go_down(loc, itself, (loc) => syntax_error(loc, "no bodies"));
+  assert(bodies.t.type === "atom" && bodies.t.tag === "other" && bodies.t.content === "{");
+  const bodies_rest = go_right(bodies, itself, (loc) => syntax_error(loc, "no body rest"));
+  return preexpand_body_curly({
+    ...step,
+    loc: bodies_rest,
+    k: (gs) => {
+      const loc = gs.loc;
+      assert(loc.t.type === "list" && loc.t.tag === "statement_block");
+      return gs;
+    },
+  });
+}
+
 function expand_concise_body(step: {
   loc: Loc;
   rib: Rib;
@@ -304,6 +365,7 @@ function expand_concise_body(step: {
 }): { loc: Loc } {
   const loc = step.loc;
   if (loc.t.type === "list" && loc.t.tag === "statement_block") {
+    const blockgs = preexpand_block(step);
     debug(loc, "concise statement_block");
   } else {
     const gs = preexpand_forms(step);
@@ -576,8 +638,12 @@ function expand_arrow_function({
   return go_down(
     loc,
     (loc) => {
-      const rib: Rib = { type: "rib", normal_env: {}, types_env: {} };
-      const pgs = extract_parameters({ loc, rib, counter, context });
+      const pgs = extract_parameters({
+        loc,
+        rib: { type: "rib", normal_env: {}, types_env: {} },
+        counter,
+        context,
+      });
       const arr = go_right(pgs.loc, itself, invalid_form);
       check_punct(arr, "=>");
       const body = go_right(arr, itself, invalid_form);
@@ -588,7 +654,7 @@ function expand_arrow_function({
         const new_unit = extend_unit(unit, rib_id, pgs.rib);
         return expand_concise_body({
           loc,
-          rib,
+          rib: pgs.rib,
           context: pgs.context,
           counter: new_counter,
           unit: new_unit,

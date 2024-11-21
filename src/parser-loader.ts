@@ -3,10 +3,7 @@ import { assert } from "./assert";
 import { AST } from "./AST";
 import { array_to_ll } from "./llhelpers";
 
-export const load_parser = async (files: {
-  parser_url: string;
-  lang_url: string;
-}) =>
+export const load_parser = async (files: { parser_url: string; lang_url: string }) =>
   Parser.init({
     locateFile(scriptName: string, _scriptDirectory: string) {
       const m: { [k: string]: string } = {
@@ -68,19 +65,27 @@ function absurdly(node: Parser.SyntaxNode): AST {
         return x;
       }
       case "arrow_function": {
-        assert(ls.length === 3);
-        const fmls = ls[0];
-        if (fmls.type === "atom" && fmls.tag === "identifier") {
-          // const lparen: AST = { type: "atom", tag: "other", content: "(" };
-          // const rparen: AST = { type: "atom", tag: "other", content: ")" };
-          const rfmls: AST = {
+        if (ls.length === 3) {
+          const fmls = ls[0];
+          if (fmls.type === "atom" && fmls.tag === "identifier") {
+            // const lparen: AST = { type: "atom", tag: "other", content: "(" };
+            // const rparen: AST = { type: "atom", tag: "other", content: ")" };
+            const rfmls: AST = {
+              type: "list",
+              tag: "formal_parameters",
+              content: array_to_ll([fmls]),
+            };
+            ls[0] = rfmls;
+          }
+          assert(ls[0].type === "list");
+        } else {
+          return {
             type: "list",
-            tag: "formal_parameters",
-            content: array_to_ll([fmls]),
+            tag: "ERROR",
+            wrap: undefined,
+            content: array_to_ll(ls),
           };
-          ls[0] = rfmls;
         }
-        assert(ls[0].type === "list");
       }
     }
     return {

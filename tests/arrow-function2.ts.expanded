@@ -1,0 +1,427 @@
+{
+  "loc": {
+    "p": {
+      "l": null,
+      "p": {
+        "l": [
+          {
+            "content": "const",
+            "tag": "other",
+            "type": "atom",
+            "wrap": {
+              "marks": [
+                "top",
+                null,
+              ],
+              "subst": [
+                {
+                  "rib_id": "r6",
+                },
+                [
+                  {
+                    "rib_id": "r1",
+                  },
+                  [
+                    {
+                      "rib_id": "r0",
+                    },
+                    null,
+                  ],
+                ],
+              ],
+            },
+          },
+          null,
+        ],
+        "p": {
+          "l": [
+            {
+              "content": "{",
+              "tag": "other",
+              "type": "atom",
+              "wrap": {
+                "marks": [
+                  "top",
+                  null,
+                ],
+                "subst": [
+                  {
+                    "rib_id": "r6",
+                  },
+                  [
+                    {
+                      "rib_id": "r1",
+                    },
+                    [
+                      {
+                        "rib_id": "r0",
+                      },
+                      null,
+                    ],
+                  ],
+                ],
+              },
+            },
+            null,
+          ],
+          "p": {
+            "l": [
+              {
+                "content": "=>",
+                "tag": "other",
+                "type": "atom",
+                "wrap": {
+                  "marks": [
+                    "top",
+                    null,
+                  ],
+                  "subst": [
+                    {
+                      "rib_id": "r1",
+                    },
+                    [
+                      {
+                        "rib_id": "r0",
+                      },
+                      null,
+                    ],
+                  ],
+                },
+              },
+              [
+                {
+                  "content": [
+                    {
+                      "content": "(",
+                      "tag": "other",
+                      "type": "atom",
+                      "wrap": {
+                        "marks": [
+                          "top",
+                          null,
+                        ],
+                        "subst": [
+                          {
+                            "rib_id": "r1",
+                          },
+                          [
+                            {
+                              "rib_id": "r0",
+                            },
+                            null,
+                          ],
+                        ],
+                      },
+                    },
+                    [
+                      {
+                        "content": "x_5",
+                        "tag": "identifier",
+                        "type": "atom",
+                        "wrap": {
+                          "marks": null,
+                          "subst": null,
+                        },
+                      },
+                      [
+                        {
+                          "content": ")",
+                          "tag": "other",
+                          "type": "atom",
+                          "wrap": {
+                            "marks": [
+                              "top",
+                              null,
+                            ],
+                            "subst": [
+                              {
+                                "rib_id": "r1",
+                              },
+                              [
+                                {
+                                  "rib_id": "r0",
+                                },
+                                null,
+                              ],
+                            ],
+                          },
+                        },
+                        null,
+                      ],
+                    ],
+                  ],
+                  "tag": "formal_parameters",
+                  "type": "list",
+                  "wrap": undefined,
+                },
+                null,
+              ],
+            ],
+            "p": {
+              "l": [
+                {
+                  "content": "=",
+                  "tag": "other",
+                  "type": "atom",
+                  "wrap": {
+                    "marks": [
+                      "top",
+                      null,
+                    ],
+                    "subst": [
+                      {
+                        "rib_id": "r1",
+                      },
+                      [
+                        {
+                          "rib_id": "r0",
+                        },
+                        null,
+                      ],
+                    ],
+                  },
+                },
+                [
+                  {
+                    "content": "foo_3",
+                    "tag": "identifier",
+                    "type": "atom",
+                    "wrap": {
+                      "marks": null,
+                      "subst": null,
+                    },
+                  },
+                  null,
+                ],
+              ],
+              "p": {
+                "l": [
+                  {
+                    "content": "const",
+                    "tag": "other",
+                    "type": "atom",
+                    "wrap": {
+                      "marks": [
+                        "top",
+                        null,
+                      ],
+                      "subst": [
+                        {
+                          "rib_id": "r1",
+                        },
+                        [
+                          {
+                            "rib_id": "r0",
+                          },
+                          null,
+                        ],
+                      ],
+                    },
+                  },
+                  null,
+                ],
+                "p": {
+                  "l": null,
+                  "p": {
+                    "type": "top",
+                  },
+                  "r": null,
+                  "tag": "program",
+                  "type": "node",
+                },
+                "r": [
+                  {
+                    "content": ";",
+                    "tag": "other",
+                    "type": "atom",
+                    "wrap": {
+                      "marks": [
+                        "top",
+                        null,
+                      ],
+                      "subst": [
+                        {
+                          "rib_id": "r1",
+                        },
+                        [
+                          {
+                            "rib_id": "r0",
+                          },
+                          null,
+                        ],
+                      ],
+                    },
+                  },
+                  null,
+                ],
+                "tag": "lexical_declaration",
+                "type": "node",
+              },
+              "r": null,
+              "tag": "variable_declarator",
+              "type": "node",
+            },
+            "r": null,
+            "tag": "arrow_function",
+            "type": "node",
+          },
+          "r": [
+            {
+              "content": "}",
+              "tag": "other",
+              "type": "atom",
+              "wrap": {
+                "marks": [
+                  "top",
+                  null,
+                ],
+                "subst": [
+                  {
+                    "rib_id": "r6",
+                  },
+                  [
+                    {
+                      "rib_id": "r1",
+                    },
+                    [
+                      {
+                        "rib_id": "r0",
+                      },
+                      null,
+                    ],
+                  ],
+                ],
+              },
+            },
+            null,
+          ],
+          "tag": "statement_block",
+          "type": "node",
+        },
+        "r": [
+          {
+            "content": ";",
+            "tag": "other",
+            "type": "atom",
+            "wrap": {
+              "marks": [
+                "top",
+                null,
+              ],
+              "subst": [
+                {
+                  "rib_id": "r6",
+                },
+                [
+                  {
+                    "rib_id": "r1",
+                  },
+                  [
+                    {
+                      "rib_id": "r0",
+                    },
+                    null,
+                  ],
+                ],
+              ],
+            },
+          },
+          null,
+        ],
+        "tag": "lexical_declaration",
+        "type": "node",
+      },
+      "r": [
+        {
+          "content": "=",
+          "tag": "other",
+          "type": "atom",
+          "wrap": {
+            "marks": [
+              "top",
+              null,
+            ],
+            "subst": [
+              {
+                "rib_id": "r6",
+              },
+              [
+                {
+                  "rib_id": "r1",
+                },
+                [
+                  {
+                    "rib_id": "r0",
+                  },
+                  null,
+                ],
+              ],
+            ],
+          },
+        },
+        [
+          {
+            "content": "13",
+            "tag": "number",
+            "type": "atom",
+            "wrap": {
+              "marks": [
+                "top",
+                null,
+              ],
+              "subst": [
+                {
+                  "rib_id": "r6",
+                },
+                [
+                  {
+                    "rib_id": "r1",
+                  },
+                  [
+                    {
+                      "rib_id": "r0",
+                    },
+                    null,
+                  ],
+                ],
+              ],
+            },
+          },
+          null,
+        ],
+      ],
+      "tag": "variable_declarator",
+      "type": "node",
+    },
+    "t": {
+      "content": "x",
+      "tag": "identifier",
+      "type": "atom",
+      "wrap": {
+        "marks": [
+          "top",
+          null,
+        ],
+        "subst": [
+          {
+            "rib_id": "r6",
+          },
+          [
+            {
+              "rib_id": "r1",
+            },
+            [
+              {
+                "rib_id": "r0",
+              },
+              null,
+            ],
+          ],
+        ],
+      },
+    },
+    "type": "loc",
+  },
+  "reason": "x is already defined in normal_env",
+  "type": "SyntaxError",
+}
