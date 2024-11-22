@@ -2,15 +2,16 @@ import "./App.css";
 import Parser from "web-tree-sitter";
 import treesitter_wasm_url from "web-tree-sitter/tree-sitter.wasm?url";
 import tsx_url from "./assets/tree-sitter-tsx.wasm?url";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { createBrowserRouter, RouterProvider } from "react-router-dom";
 import { ASTExpr, ASTExprSpan, ASTHighlight, ASTList, ASTListSpan } from "./ASTVis";
-import { Editor } from "./Editor";
+import { Editor, EditorP } from "./Editor";
 import * as Zipper from "./zipper";
 import { initial_step, next_step, Step } from "./expander";
 import { Loc } from "./syntax-structures";
 import { core_patterns } from "./syntax-core-patterns";
 import { load_parser, parse_with } from "./parser-loader";
+import { pprint } from "./pprint";
 
 type ExampleProps = {
   parser: Parser;
@@ -24,15 +25,6 @@ function zipper_to_view(zipper: Loc): React.ReactElement {
     (x) => <ASTHighlight>{x}</ASTHighlight>,
     (x) => <ASTExpr ast={x} />,
     (tag, children) => <ASTList tag={tag} items={children} />,
-  );
-}
-
-function zipper_to_span(zipper: Loc): React.ReactElement {
-  return Zipper.reconvert(
-    zipper,
-    (x) => <ASTHighlight>{x}</ASTHighlight>,
-    (x) => <ASTExprSpan ast={x} />,
-    (tag, children) => <ASTListSpan tag={tag} items={children} />,
   );
 }
 
@@ -96,7 +88,7 @@ function timeout(delay: number, f: () => void): () => void {
 }
 
 function Example({ parser, code, onChange }: ExampleProps) {
-  function init_state() {
+  function init_state(): State {
     const parse = (code: string) => parse_with(parser, code);
     const patterns = core_patterns(parse);
     return initial_state(initial_step(parse(code), patterns));
@@ -135,6 +127,7 @@ function Example({ parser, code, onChange }: ExampleProps) {
     state.pointer === null || state.pointer >= state.prev_steps.length
       ? [state.last_step, state.step_number]
       : [state.prev_steps[state.pointer], state.pointer];
+  const code_to_display = useMemo(() => pprint(display_step.loc), [display_step]);
   return (
     <div>
       <input
@@ -168,14 +161,13 @@ function Example({ parser, code, onChange }: ExampleProps) {
           border: "2px solid #444",
         }}
       >
-        <div style={{ flexBasis: "40%", flexGrow: "100" }}>
+        <div style={{ flexBasis: "60%", flexGrow: "100" }}>
           <Editor code={code} onChange={onChange} />
+          <hr />
+          <EditorP code={code_to_display} />
         </div>
-        <div style={{ flexBasis: "30%", flexGrow: "0" }}>
+        <div style={{ flexBasis: "40%", flexGrow: "0" }}>
           <StepperView step={display_step} step_number={display_number} />
-        </div>
-        <div className="code" style={{ flexBasis: "20%", flexGrow: "100" }}>
-          {zipper_to_span(display_step.loc)}
         </div>
       </div>
     </div>

@@ -762,6 +762,9 @@ function postexpand_body(step: {
               cont,
             );
           }
+          case "slice": {
+            return syntax_error(loc, "invalid slice");
+          }
           default: {
             if (list_handlers_table[loc.t.tag] !== "descend") {
               debug(loc, `unhandled '${loc.t.tag}' form in postexpand_body`);

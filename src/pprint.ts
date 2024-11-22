@@ -3,7 +3,10 @@ import { ll_to_array } from "./llhelpers";
 import { Loc } from "./syntax-structures";
 import { reconvert } from "./zipper";
 import { list_tag } from "./AST";
-import * as prettier from "prettier";
+import * as prettier from "prettier/standalone";
+import * as prettier_ts from "prettier/plugins/typescript";
+import * as prettier_estree from "prettier/plugins/estree";
+import { assert } from "./assert";
 
 type ns = string | ns[];
 
@@ -36,6 +39,9 @@ function loc_to_ns(loc: Loc): ns {
     switch (tag) {
       case "binary_expression":
         return ["(", ls, ")"];
+      case "program":
+      case "statement_block":
+        return ls.map((x) => [x, "\n"]);
     }
     return ls;
   }
@@ -61,14 +67,8 @@ function loc_to_ns(loc: Loc): ns {
 function ns_to_string(main_ns: ns) {
   const ac: string[] = [];
 
-  function need_space(x: string, y: string) {
-    return true;
-  }
-
   function push(x: string) {
-    if (need_space(ac[ac.length - 1] || "(", x)) {
-      ac.push(" ");
-    }
+    ac.push(" ");
     ac.push(x);
   }
 
@@ -86,6 +86,13 @@ function ns_to_string(main_ns: ns) {
 
 export async function pprint(loc: Loc) {
   const src = ns_to_string(loc_to_ns(loc)).join("");
-  const pretty = await prettier.format(src, { parser: "typescript" });
-  return pretty;
+  try {
+    const pretty = await prettier.format(src, {
+      parser: "typescript",
+      plugins: [prettier_ts, prettier_estree],
+    });
+    return pretty;
+  } catch (err) {
+    return src;
+  }
 }
