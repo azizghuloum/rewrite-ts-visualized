@@ -6,7 +6,6 @@ import { list_tag } from "./AST";
 import * as prettier from "prettier/standalone";
 import * as prettier_ts from "prettier/plugins/typescript";
 import * as prettier_estree from "prettier/plugins/estree";
-import { assert } from "./assert";
 
 type ns = string | ns[];
 
@@ -23,10 +22,19 @@ function loc_to_ns(loc: Loc): ns {
         switch (stx.tag) {
           case "number":
           case "identifier":
+          case "property_identifier":
+          case "shorthand_property_identifier":
+          case "type_identifier":
+          case "jsx_text":
+          case "string_fragment":
+          case "regex_pattern":
           case "other":
             return stx.content;
+          case "ERROR":
+            return "!!!ERROR!!! " + stx.content + " !!!ERROR!!!";
           default:
-            throw new Error(`unhandled atom '${stx.tag}'`);
+            const invalid: never = stx;
+            throw invalid;
         }
       }
       default:

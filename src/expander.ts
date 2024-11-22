@@ -1,5 +1,5 @@
 import { assert } from "./assert";
-import { AST, atom_tag } from "./AST";
+import { AST, atom_tag, list_tag } from "./AST";
 import { CompilationUnit, Context, new_rib_id, Rib, Loc, Wrap, STX } from "./syntax-structures";
 import {
   extend_unit,
@@ -324,19 +324,22 @@ const atom_handlers_table: { [tag in atom_tag]: "next" | "stop" } = {
   other: "next",
 };
 
-const list_handlers_table: { [tag: string]: "descend" | "stop" } = {
+const list_handlers_table: { [tag in list_tag]: "descend" | "stop" } = {
   lexical_declaration: "stop",
   variable_declarator: "stop",
   slice: "stop",
   arrow_function: "stop",
   statement_block: "stop",
-  expression_statement: "descend",
+  //expression_statement: "descend",
   call_expression: "descend",
   arguments: "descend",
   binary_expression: "descend",
   array: "descend",
   member_expression: "descend",
   empty_statement: "descend",
+  formal_parameters: "stop",
+  program: "stop",
+  ERROR: "stop",
 };
 
 function preexpand_block(step: {
@@ -414,7 +417,11 @@ function preexpand_forms(step: {
       case "done":
         return done(loc);
       case "identifier": {
-        assert(loc.t.type === "atom" && loc.t.tag === "identifier");
+        assert(
+          (loc.t.type === "atom" && loc.t.tag === "identifier") ||
+            loc.t.tag === "property_identifier",
+          loc.t,
+        );
         const { content, wrap } = loc.t;
         const resolution = resolve(content, wrap, step.context, step.unit, "normal_env");
         switch (resolution.type) {

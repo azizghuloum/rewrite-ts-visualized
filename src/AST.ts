@@ -22,7 +22,28 @@ export type list_tag =
   | "arrow_function"
   | "formal_parameters"
   | "statement_block"
+  | "empty_statement"
+  | "array"
+  | "member_expression"
+  | "slice"
   | "ERROR";
+
+export const list_tags: { [k in list_tag]: list_tag } = {
+  program: "program",
+  lexical_declaration: "lexical_declaration",
+  variable_declarator: "variable_declarator",
+  binary_expression: "binary_expression",
+  call_expression: "call_expression",
+  arguments: "arguments",
+  arrow_function: "arrow_function",
+  formal_parameters: "formal_parameters",
+  statement_block: "statement_block",
+  empty_statement: "empty_statement",
+  slice: "slice",
+  array: "array",
+  member_expression: "member_expression",
+  ERROR: "ERROR",
+};
 
 export type AST =
   | {

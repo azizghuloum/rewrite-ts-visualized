@@ -1,6 +1,6 @@
 import Parser from "web-tree-sitter";
 import { assert } from "./assert";
-import { AST, list_tag } from "./AST";
+import { AST, list_tag, list_tags } from "./AST";
 import { array_to_ll } from "./llhelpers";
 
 export const load_parser = async (files: { parser_url: string; lang_url: string }) =>
@@ -20,19 +20,6 @@ export const load_parser = async (files: { parser_url: string; lang_url: string 
       parser.setLanguage(lang);
       return parser;
     });
-
-const list_tags: { [k in list_tag]: list_tag } = {
-  program: "program",
-  lexical_declaration: "lexical_declaration",
-  variable_declarator: "variable_declarator",
-  binary_expression: "binary_expression",
-  call_expression: "call_expression",
-  arguments: "arguments",
-  arrow_function: "arrow_function",
-  formal_parameters: "formal_parameters",
-  statement_block: "statement_block",
-  ERROR: "ERROR",
-};
 
 function absurdly(node: Parser.SyntaxNode): AST {
   const children = node.children;
@@ -117,6 +104,7 @@ export function parse_with(parser: Parser, code: string): AST {
     const ast = absurdly(node.rootNode);
     return ast;
   } catch (err) {
-    return { type: "atom", tag: "ERROR", content: JSON.stringify(err) };
+    console.error(err);
+    return { type: "list", tag: "ERROR", content: null };
   }
 }
