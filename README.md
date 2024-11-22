@@ -2,16 +2,19 @@
 
 # Progress
 
+## basic expressions, statements, and declarations
+
 - [x] (Nov 16, 2024) lexical declarations (`let`, `const`) and lexical variables
-- [x] (Nov 18, 2024) `splice(() => {body})`
-- [x] (Nov 19, 2024) unit testing
 - [x] (Nov 21, 2024) arrow functions `(args) => {body}` and `(args) => expr`
-
-# TODO
-
-## arrow functions
-
-- [ ] initializer expressions, e.g., `(x = 12) => x`;
+- [ ] arrow functions initializer expressions, e.g., `(x = 12) => x`;
+- [ ] function declarations
+- [ ] return statement
+- [ ] if statement
+- [ ] while loop
+- [ ] for loop
+- [ ] object literals
+- [ ] array literals
+- [ ] class declarations
 
 ## types
 
@@ -21,6 +24,7 @@
 
 ## rewrite forms
 
+- [x] (Nov 18, 2024) `splice(() => {body})`
 - [ ] `rewrite_rules(x, [pattern, literals?, template]*, expr)` (aka. `let-syntax` with `syntax-rules`)
 
 ## separate compilations
@@ -31,8 +35,14 @@
 
 ## general improvements
 
+- [x] (Nov 23, 2024) make a proper pretty printer (using prettier for now)
 - [ ] add source locations to ast/stx forms (most likely to tags).
-- [ ] make a proper pretty printer
+
+## code quality
+
+- [x] (Nov 19, 2024) unit testing
+- [ ] code coverage reports
+- [ ] remove unused exports in code base
 
 # Some references
 
