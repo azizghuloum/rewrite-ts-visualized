@@ -1,42 +1,6 @@
-{
-  "tree": {
-    "children": [
-      {
-        "children": [
-          {
-            "text": "const",
-            "type": "other",
-          },
-          {
-            "children": [
-              {
-                "text": "x_3",
-                "type": "identifier",
-              },
-              {
-                "text": "=",
-                "type": "other",
-              },
-              {
-                "text": "12",
-                "type": "number",
-              },
-            ],
-            "type": "variable_declarator",
-          },
-          {
-            "text": ";",
-            "type": "other",
-          },
-        ],
-        "type": "lexical_declaration",
-      },
-      {
-        "text": "x_3",
-        "type": "identifier",
-      },
-    ],
-    "type": "program",
-  },
-  "type": "DONE",
-}
+/**/
+const x_3 = 12;
+x_3;
+/**/
+================================
+DONE

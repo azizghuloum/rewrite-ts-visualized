@@ -7,7 +7,7 @@ import tsx_url from "./src/assets/tree-sitter-tsx.wasm?url";
 import { core_patterns } from "./src/syntax-core-patterns";
 import { initial_step, Step } from "./src/expander";
 import Parser from "web-tree-sitter";
-import { pprint } from "./src/printer";
+import { pprint } from "./src/pprint";
 
 const test_dir = __dirname + "/tests";
 
@@ -30,12 +30,12 @@ async function compile_script(filename: string, parser: Parser) {
       }
     }
   }
-  const prog = pprint(step.loc);
-  const out = `${prog}
-================================
-${step.name}
-${step.error}
-`;
+  const prog = await pprint(step.loc);
+  const out =
+    prog +
+    "================================\n" +
+    `${step.name}\n` +
+    (step.error ? `${step.error}\n` : "");
   return out;
 }
 
