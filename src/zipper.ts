@@ -3,6 +3,7 @@ import { assert } from "./assert";
 import { LL, llappend, llmap } from "./llhelpers";
 import { STX, Loc, Wrap } from "./syntax-structures";
 import { push_wrap } from "./STX";
+import { list_tag } from "./AST";
 
 export function wrap_loc(loc: Loc, wrap: Wrap): Loc {
   return Zipper.change(loc, push_wrap(wrap)(loc.t));
@@ -16,7 +17,7 @@ export function reconvert<Y>(
   zipper: Loc,
   mark: (y: Y) => Y,
   conv: (x: STX) => Y,
-  wrap: (tag: string, children: Y[]) => Y,
+  wrap: (tag: list_tag, children: Y[]) => Y,
 ): Y {
   return Zipper.reconvert(zipper, mark, conv, wrap);
 }
@@ -81,7 +82,7 @@ export function change_splicing(loc: Loc, list: [STX, LL<STX>]): Loc {
   };
 }
 
-function mkstx(tag: string, content: LL<STX>): STX {
+function mkstx(tag: list_tag, content: LL<STX>): STX {
   return { type: "list", tag, wrap: undefined, content };
 }
 

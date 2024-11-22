@@ -1,8 +1,4 @@
-{
-  "reason": "x is already defined in normal_env",
-  "tree": {
-    "text": "x",
-    "type": "identifier",
-  },
-  "type": "SyntaxError",
-}
+ const /**/ x /**/ = 13;
+================================
+SyntaxError
+x is already defined in normal_env

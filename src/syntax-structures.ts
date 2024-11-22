@@ -62,7 +62,7 @@ export type STX =
   | { type: "list"; tag: list_tag; wrap: undefined; content: LL<STX> }
   | { type: "atom"; tag: atom_tag; wrap: Wrap; content: string };
 
-export type Loc = TaggedReconstructiveZipper.Loc<string, STX>;
+export type Loc = TaggedReconstructiveZipper.Loc<list_tag, STX>;
 
 export type Binding =
   | { type: "lexical"; name: string }

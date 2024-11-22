@@ -5,9 +5,9 @@ import { load_parser, parse_with } from "./src/parser-loader";
 import treesitter_wasm_url from "web-tree-sitter/tree-sitter.wasm?url";
 import tsx_url from "./src/assets/tree-sitter-tsx.wasm?url";
 import { core_patterns } from "./src/syntax-core-patterns";
-import { initial_step, next_step, Step } from "./src/expander";
+import { initial_step, Step } from "./src/expander";
 import Parser from "web-tree-sitter";
-import { ast_to_tree } from "./src/serialize";
+import { pprint } from "./src/printer";
 
 const test_dir = __dirname + "/tests";
 
@@ -30,11 +30,13 @@ async function compile_script(filename: string, parser: Parser) {
       }
     }
   }
-  return {
-    type: step.name,
-    tree: ast_to_tree(step.loc.t),
-    ...(step.error ? { reason: step.error } : {}),
-  };
+  const prog = pprint(step.loc);
+  const out = `${prog}
+================================
+${step.name}
+${step.error}
+`;
+  return out;
 }
 
 suite("files in tests dir", async () => {
