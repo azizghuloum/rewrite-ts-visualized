@@ -6,7 +6,7 @@ import {
   init_top_level,
   resolve,
   extend_rib,
-  extend_context,
+  extend_context_lexical,
   CorePatterns,
 } from "./STX";
 import {
@@ -52,7 +52,7 @@ function gen_lexical({
     counter,
     "normal_env",
     ({ rib, counter, label }) =>
-      extend_context(
+      extend_context_lexical(
         context,
         counter,
         label,
@@ -258,11 +258,13 @@ function handle_core_syntax(
   name: string,
   context: Context,
   unit: CompilationUnit,
+  counter: number,
+  k: (gs: { loc: Loc; counter: number; unit: CompilationUnit; context: Context }) => never,
   pattern: STX,
-): Loc {
+): never {
   const handler = core_handlers[name];
   assert(handler !== undefined);
-  return handler(loc, context, unit, pattern);
+  return handler(loc, context, unit, counter, k, pattern);
 }
 
 const atom_handlers_table: { [tag in atom_tag]: "next" | "stop" } = {
@@ -387,8 +389,18 @@ function preexpand_forms(step: {
                 return next(loc);
               case "core_syntax": {
                 const { name, pattern } = binding;
-                const new_loc = handle_core_syntax(loc, name, step.context, step.unit, pattern);
+                const new_loc = handle_core_syntax(
+                  loc,
+                  name,
+                  step.context,
+                  step.unit,
+                  step.counter,
+                  pattern,
+                );
                 return next(new_loc);
+              }
+              case "syntax_rules_transformer": {
+                throw new Error("handle syntax_rules_transformer");
               }
               default:
                 const invalid: never = binding;

@@ -1,4 +1,5 @@
-import { AST } from "./AST";
+import { assert } from "./assert";
+import { AST, id_tags } from "./AST";
 import { llappend } from "./llhelpers";
 import { core_handlers } from "./syntax-core-patterns";
 import {
@@ -96,6 +97,12 @@ export function free_id_equal(
   }
 }
 
+export function bound_id_equal(id1: STX, id2: STX): boolean {
+  assert(id1.type === "atom" && id_tags[id1.tag]);
+  assert(id2.type === "atom" && id_tags[id2.tag]);
+  return id1.content === id2.content && same_marks(id1.wrap.marks, id2.wrap.marks);
+}
+
 export function extend_rib<S>(
   rib: Rib,
   name: string,
@@ -119,7 +126,11 @@ export function extend_rib<S>(
   return sk({ rib: new_rib, counter: new_counter, label });
 }
 
-export function extend_context<S>(
+export function extend_context(context: Context, label: string, binding: Binding): Context {
+  return { ...context, [label]: binding };
+}
+
+export function extend_context_lexical<S>(
   context: Context,
   counter: number,
   label: string,

@@ -12,6 +12,19 @@ export type atom_tag =
   | "ERROR"
   | "other";
 
+export const id_tags: { [k in atom_tag]: boolean } = {
+  identifier: true,
+  type_identifier: true,
+  property_identifier: true,
+  shorthand_property_identifier: true,
+  jsx_text: false,
+  number: false,
+  other: false,
+  regex_pattern: false,
+  string_fragment: false,
+  ERROR: false,
+};
+
 export type list_tag =
   | "program"
   | "lexical_declaration"
