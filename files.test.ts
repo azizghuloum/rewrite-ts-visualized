@@ -5,9 +5,10 @@ import { load_parser, parse_with } from "./src/parser-loader";
 import treesitter_wasm_url from "web-tree-sitter/tree-sitter.wasm?url";
 import tsx_url from "./src/assets/tree-sitter-tsx.wasm?url";
 import { core_patterns } from "./src/syntax-core-patterns";
-import { initial_step, Step } from "./src/expander";
+import { initial_step } from "./src/expander";
 import Parser from "web-tree-sitter";
 import { pprint } from "./src/pprint";
+import { Step } from "./src/step";
 
 const test_dir = __dirname + "/tests";
 

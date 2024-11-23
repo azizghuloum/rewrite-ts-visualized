@@ -1,5 +1,6 @@
 import { AST } from "./AST";
 import { llappend } from "./llhelpers";
+import { core_handlers } from "./syntax-core-patterns";
 import {
   antimark,
   Binding,
@@ -75,6 +76,23 @@ export function resolve(
     return { type: "bound", binding };
   } else {
     return { type: "error", reason: "out of context" };
+  }
+}
+
+export function free_id_equal(
+  name1: string,
+  wrap1: Wrap,
+  name2: string,
+  wrap2: Wrap,
+  unit: CompilationUnit,
+  resolution_type: "normal_env" | "types_env",
+): boolean {
+  const label1 = id_to_label(name1, wrap1.marks, wrap1.subst, unit, resolution_type);
+  const label2 = id_to_label(name2, wrap2.marks, wrap2.subst, unit, resolution_type);
+  if (label1 === undefined && label2 === undefined) {
+    return name1 === name2;
+  } else {
+    return label1 === label2;
   }
 }
 
@@ -187,9 +205,9 @@ export function init_top_level(
       [rib_id]: {
         type: "rib",
         types_env: {},
-        normal_env: {
-          splice: [[top_marks, "global.splice"]],
-        },
+        normal_env: Object.fromEntries(
+          Object.keys(core_handlers).map((name) => [name, [[top_marks, `global.${name}`]]]),
+        ),
       },
     },
   };

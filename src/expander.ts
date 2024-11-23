@@ -16,28 +16,12 @@ import {
   go_next,
   go_right,
   go_up,
-  isolate,
   mkzipper,
   stx_list_content,
-  unisolate,
   wrap_loc,
 } from "./zipper";
 import { core_handlers } from "./syntax-core-patterns";
-
-export class Step {
-  name: string;
-  loc: Loc;
-  next?: () => never;
-  error?: string | undefined;
-  info?: any;
-  constructor(name: string, loc: Loc, error?: string, next?: () => never, info?: any) {
-    this.name = name;
-    this.loc = loc;
-    this.error = error;
-    this.next = next;
-    this.info = info;
-  }
-}
+import { debug, DONE, inspect, in_isolation, Step, syntax_error } from "./step";
 
 class SInitial extends Step {
   constructor(loc: Loc, unit: CompilationUnit, context: Context, counter: number) {
@@ -45,47 +29,11 @@ class SInitial extends Step {
   }
 }
 
-const DONE = (loc: Loc) => {
-  throw new Step("DONE", loc);
-};
-
 export function initial_step(ast: AST, patterns: CorePatterns): Step {
   const { stx, counter, unit, context } = init_top_level(ast, patterns);
   const loc: Loc = mkzipper(stx);
   return new SInitial(loc, unit, context, counter);
 }
-
-class DebugError extends Error {
-  loc: Loc;
-  info: any;
-  constructor(message: string, loc: Loc, info: any) {
-    super(message);
-    this.loc = loc;
-    this.info = info;
-  }
-}
-
-function debug(loc: Loc, msg: string, info?: any): never {
-  throw new DebugError(msg, loc, info);
-}
-
-const inspect: (loc: Loc, reason: string, k: () => never) => never = (loc, reason, k) => {
-  throw new Step("Inspect", loc, undefined, k, reason);
-};
-
-function syntax_error(loc: Loc, reason?: string): never {
-  throw new Step("SyntaxError", loc, reason ?? "syntax error");
-}
-
-const in_isolation: <G>(
-  loc: Loc,
-  f: (loc: Loc, k: (loc: Loc, g: G) => never) => never,
-  k: (loc: Loc, g: G) => never,
-) => never = (loc, f, k) => {
-  return f(isolate(loc), (res, g) => {
-    return k(unisolate(loc, res), g);
-  });
-};
 
 type goodies = { loc: Loc; rib: Rib; context: Context; counter: number };
 
@@ -305,10 +253,16 @@ function preexpand_body_curly(step: {
   );
 }
 
-function handle_core_syntax(loc: Loc, name: string, pattern: STX): Loc {
+function handle_core_syntax(
+  loc: Loc,
+  name: string,
+  context: Context,
+  unit: CompilationUnit,
+  pattern: STX,
+): Loc {
   const handler = core_handlers[name];
   assert(handler !== undefined);
-  return handler(loc, pattern);
+  return handler(loc, context, unit, pattern);
 }
 
 const atom_handlers_table: { [tag in atom_tag]: "next" | "stop" } = {
@@ -330,7 +284,6 @@ const list_handlers_table: { [tag in list_tag]: "descend" | "stop" } = {
   slice: "stop",
   arrow_function: "stop",
   statement_block: "stop",
-  //expression_statement: "descend",
   call_expression: "descend",
   arguments: "descend",
   binary_expression: "descend",
@@ -434,7 +387,7 @@ function preexpand_forms(step: {
                 return next(loc);
               case "core_syntax": {
                 const { name, pattern } = binding;
-                const new_loc = handle_core_syntax(loc, name, pattern);
+                const new_loc = handle_core_syntax(loc, name, step.context, step.unit, pattern);
                 return next(new_loc);
               }
               default:
@@ -463,7 +416,7 @@ function preexpand_forms(step: {
           case "arrow_function":
             return next(loc);
           default: {
-            assert(list_handlers_table[loc.t.tag] === "descend");
+            assert(list_handlers_table[loc.t.tag] === "descend", `non descend tag '${loc.t.tag}'`);
             return next(loc);
           }
         }
