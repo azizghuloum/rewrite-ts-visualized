@@ -4,7 +4,7 @@ import { LL, ll_to_array } from "./llhelpers";
 import { debug, syntax_error } from "./step";
 import { free_id_equal } from "./STX";
 import { CompilationUnit, Context, Loc, STX } from "./syntax-structures";
-import { go_next, go_down, mkzipper, stx_list_content } from "./zipper";
+import { go_next, go_down, mkzipper, stx_list_content, go_up, change } from "./zipper";
 
 type handler = (loc: Loc, context: Context, unit: CompilationUnit, pattern: STX) => Loc;
 
@@ -44,7 +44,7 @@ const path_depth: (p: Path) => number = (p) => (p.type === "top" ? 0 : path_dept
 
 export type subst = [STX, LL<STX>][];
 
-export type unification = { code_path: Path; subst: subst };
+export type unification = { loc: Loc; subst: subst };
 
 const merge_subst: (s1: subst | null, s2: subst | null, unit: CompilationUnit) => subst | null = (
   s1,
@@ -92,7 +92,7 @@ const merge_unification: (
 ) => unification | null = (u1, s2, unit) => {
   const s = merge_subst(u1.subst, s2, unit);
   if (s === null) return null;
-  return { code_path: u1.code_path, subst: s };
+  return { loc: u1.loc, subst: s };
 };
 
 const unify_left: (pat: LL<STX>, code: LL<STX>) => subst | null = (pat, code) => {
@@ -178,24 +178,25 @@ const unify_right: (kwdls: LL<STX>, codels: LL<STX>, unit: CompilationUnit) => s
   return f(count_ids(kwdls), kwdls, codels);
 };
 
-const unify_paths: (kwd: Path, code: Path, unit: CompilationUnit) => unification | null = (
+const unify_paths: (kwd: Path, loc: Loc, unit: CompilationUnit) => unification | null = (
   kwd,
-  code,
+  loc,
   unit,
 ) => {
-  if (kwd.type === "node" && code.type === "node") {
-    if (kwd.tag !== code.tag) return null;
-    const s1 = unify_left(kwd.l, code.l);
+  const p = loc.p;
+  if (kwd.type === "node" && p.type === "node") {
+    if (kwd.tag !== p.tag) return null;
+    const s1 = unify_left(kwd.l, p.l);
     if (!s1) return null;
-    const s2 = unify_right(kwd.r, code.r, unit);
+    const s2 = unify_right(kwd.r, p.r, unit);
     if (!s2) return null;
     const s3 = merge_subst(s1, s2, unit);
     if (!s3) return null;
-    const u4 = unify_paths(kwd.p, code.p, unit);
+    const u4 = unify_paths(kwd.p, go_up(loc), unit);
     if (!u4) return null;
     return merge_unification(u4, s3, unit);
   } else if (kwd.type === "top") {
-    return { code_path: code, subst: [] };
+    return { loc, subst: [] };
   }
   throw new Error("unify_paths");
 };
@@ -212,16 +213,16 @@ export const core_pattern_match: (
   const pattern = binding.pattern;
   const kwd = find_identifier(name, mkzipper(pattern));
   assert(kwd !== null, `keyword ${name} does not include itself in its pattern`);
-  const unification = unify_paths(kwd.p, loc.p, unit);
+  const unification = unify_paths(kwd.p, loc, unit);
   return k(unification);
 };
 
 const splice: handler = (loc, _context, unit, pattern) => {
   const kwd = find_identifier("splice", mkzipper(pattern));
   assert(kwd !== null);
-  const unification = unify_paths(kwd.p, loc.p, unit);
+  const unification = unify_paths(kwd.p, loc, unit);
   assert(unification !== null);
-  const { code_path, subst } = unification;
+  const { subst } = unification;
   assert(subst.length === 1);
   const [body_kwd, body_code] = subst[0];
   assert(body_kwd.type === "atom" && body_kwd.tag === "identifier" && body_kwd.content === "body");
@@ -231,7 +232,7 @@ const splice: handler = (loc, _context, unit, pattern) => {
     wrap: undefined,
     content: body_code,
   };
-  return { type: "loc", t: result, p: code_path };
+  return change(unification.loc, mkzipper(result));
 };
 
 function literal_binding(name: string, subst: subst, unit: CompilationUnit): boolean {
@@ -245,20 +246,58 @@ function literal_binding(name: string, subst: subst, unit: CompilationUnit): boo
   return same_lhs(lhs, rhs, unit);
 }
 
-const using_syntax_rules: handler = (loc, context, unit, pattern) => {
-  return core_pattern_match(loc, context, unit, "using_syntax_rules", (unification) => {
-    if (!unification) syntax_error(loc);
-    const { subst, code_path } = unification;
+function parse_array(stx: STX, loc: Loc): LL<STX> {
+  if (stx.type !== "list" || stx.tag !== "array") syntax_error(loc, "all clauses must be arrays");
+  function finalize(ls: LL<STX>): LL<STX> {
+    if (ls === null) return null;
+    syntax_error(loc, "unexpected content after ]");
+  }
+  function snd(ls: LL<STX>): LL<STX> {
+    if (ls === null) syntax_error(loc, "missing ]");
+    if (ls[0].content === "]") return finalize(ls[1]);
+    if (ls[0].content === ",") return fst(ls[1]);
+    syntax_error(loc, "unexpected content after ','");
+  }
+  function fst(ls: LL<STX>): LL<STX> {
+    if (ls === null) syntax_error(loc, "missing content or ]");
+    if (ls[0].content === "]") return finalize(ls[1]);
+    if (ls[0].content === ",") syntax_error(loc, "unexpected ',' after [");
+    return [ls[0], snd(ls[1])];
+  }
+  function init(ls: LL<STX>): LL<STX> {
+    if (ls === null) syntax_error(loc, "missing array content");
+    if (ls[0].content === "[") return fst(ls[1]);
+    syntax_error(loc, "missing [");
+  }
+  return init(stx_list_content(stx));
+}
+
+type syntax_rules_clause = { name: STX; pattern: STX; template: STX };
+
+function parse_syntax_rules_clause(stx: STX, loc: Loc): syntax_rules_clause {
+  const content = ll_to_array(parse_array(stx, loc));
+  if (content.length !== 3) syntax_error(loc, "each clause must have 3 parts");
+  const [name, pattern, template] = content;
+  if (!is_id(name)) syntax_error(loc, "first part of clause must be an identifier");
+  return { name, pattern, template };
+}
+
+const using_syntax_rules: handler = (orig_loc, context, unit) => {
+  return core_pattern_match(orig_loc, context, unit, "using_syntax_rules", (unification) => {
+    if (!unification) syntax_error(orig_loc);
+    const { subst, loc } = unification;
     if (!literal_binding("rewrite", subst, unit)) syntax_error(loc, ".rewrite expected");
     const expression_binding = subst.find(([lhs]) => lhs.content === "expression");
     const clauses_binding = subst.find(([lhs]) => lhs.content === "clauses");
     assert(expression_binding !== undefined);
     assert(clauses_binding !== undefined);
-    const clauses = ll_to_array(clauses_binding[1]);
     const expression_list = ll_to_array(expression_binding[1]);
     if (expression_list.length === 0) syntax_error(loc, "missing expression in .rewrite()");
     if (expression_list.length > 1) syntax_error(loc, "too many expressions in .rewrite()");
     const expression = expression_list[0];
+    const clauses = ll_to_array(clauses_binding[1])
+      .filter((x) => x.content !== ",")
+      .map((x) => parse_syntax_rules_clause(x, loc));
     debug(loc, "USING_SYNTAX_RULES", { clauses, expression });
   });
 };
