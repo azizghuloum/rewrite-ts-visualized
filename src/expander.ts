@@ -35,13 +35,14 @@ export function initial_step(ast: AST, patterns: CorePatterns): Step {
   return new SInitial(loc, unit, context, counter);
 }
 
-type goodies = { loc: Loc; rib: Rib; context: Context; counter: number };
+type goodies = { loc: Loc; rib: Rib; context: Context; counter: number; unit: CompilationUnit };
 
 function gen_lexical({
   loc,
   rib,
   counter,
   context,
+  unit,
 }: goodies): Omit<goodies, "loc"> & { name: string } {
   const stx = loc.t;
   assert(stx.type === "atom" && stx.tag === "identifier");
@@ -63,21 +64,28 @@ function gen_lexical({
           context,
           counter,
           name,
+          unit,
         }),
       ),
     (reason) => syntax_error(loc, reason),
   );
 }
 
-function extract_lexical_declaration_bindings({ loc, rib, context, counter }: goodies): goodies {
-  function after_vars({ loc, rib, context, counter }: goodies): goodies {
+function extract_lexical_declaration_bindings({
+  loc,
+  rib,
+  context,
+  counter,
+  unit,
+}: goodies): goodies {
+  function after_vars({ loc, rib, context, counter, unit }: goodies): goodies {
     if (loc.t.type === "atom" && loc.t.tag === "other") {
       switch (loc.t.content) {
         case ";":
           return go_right(
             loc,
             (loc) => syntax_error(loc, "expected nothing after semicolon"),
-            (loc) => ({ loc, rib, context, counter }),
+            (loc) => ({ loc, rib, context, counter, unit }),
           );
         case ",":
           return go_right(
@@ -95,7 +103,7 @@ function extract_lexical_declaration_bindings({ loc, rib, context, counter }: go
       return go_down(
         ls,
         (loc) => {
-          const goodies = gen_lexical({ loc, rib, counter, context });
+          const goodies = gen_lexical({ loc, rib, counter, context, unit });
           return go_next(
             ls,
             (loc) => after_vars({ ...goodies, loc }),
@@ -187,25 +195,13 @@ function preexpand_body(step: {
 }): never {
   return in_isolation<goodies>(
     step.loc,
-    (loc, k) => {
-      const gs = preexpand_forms({ ...step, loc });
-      return k(gs.loc, gs);
-    },
-    (loc, { rib, context, counter }) => {
-      if (loc.t.tag === "slice") {
-        const subforms = stx_list_content(loc.t);
-        const new_loc = change_splicing(
-          loc,
-          subforms === null ? [empty_statement, null] : subforms,
-        );
-        return preexpand_body({ loc: new_loc, rib, unit: step.unit, context, counter, k: step.k });
-      }
-      return go_next(
+    (loc, k) => preexpand_forms({ ...step, loc, k: (gs) => k(gs.loc, gs) }),
+    (loc, { rib, context, counter, unit }) =>
+      go_next(
         loc,
-        (loc) => preexpand_body({ loc, rib, counter, context, unit: step.unit, k: step.k }),
-        (loc) => step.k({ loc, rib, context, counter }),
-      );
-    },
+        (loc) => preexpand_body({ loc, rib, counter, context, unit, k: step.k }),
+        (loc) => step.k({ loc, rib, context, counter, unit }),
+      ),
   );
 }
 
@@ -224,15 +220,13 @@ function preexpand_body_curly(step: {
         context: step.context,
         counter: step.counter,
         rib: step.rib,
+        unit: step.unit,
       }),
     );
   }
   return in_isolation<goodies>(
     step.loc,
-    (loc, k) => {
-      const gs = preexpand_forms({ ...step, loc });
-      return k(gs.loc, gs);
-    },
+    (loc, k) => preexpand_forms({ ...step, loc, k: (gs) => k(gs.loc, gs) }),
     (loc, { rib, context, counter }) => {
       if (loc.t.tag === "slice") {
         const subforms = stx_list_content(loc.t);
@@ -283,7 +277,7 @@ const atom_handlers_table: { [tag in atom_tag]: "next" | "stop" } = {
 const list_handlers_table: { [tag in list_tag]: "descend" | "stop" } = {
   lexical_declaration: "stop",
   variable_declarator: "stop",
-  slice: "stop",
+  slice: "descend",
   arrow_function: "stop",
   statement_block: "stop",
   call_expression: "descend",
@@ -345,7 +339,7 @@ function expand_concise_body(step: {
             (loc) => debug(loc, "???"),
           ),
       })
-    : k(preexpand_forms(step));
+    : preexpand_forms({ ...step, k });
 }
 
 function preexpand_forms(step: {
@@ -354,19 +348,21 @@ function preexpand_forms(step: {
   counter: number;
   unit: CompilationUnit;
   context: Context;
-}): goodies {
-  function done(loc: Loc): goodies {
-    return {
+  k: (goodies: goodies) => never;
+}): never {
+  function done(loc: Loc): never {
+    return step.k({
       loc,
       rib: step.rib,
       context: step.context,
       counter: step.counter,
-    };
+      unit: step.unit,
+    });
   }
-  function next(loc: Loc): goodies {
+  function next(loc: Loc): never {
     return go_next(loc, (loc) => h(find_form(loc)), done);
   }
-  function h(ffrv: ffrv): goodies {
+  function h(ffrv: ffrv): never {
     const loc = ffrv.loc;
     switch (ffrv.type) {
       case "done":
@@ -389,15 +385,20 @@ function preexpand_forms(step: {
                 return next(loc);
               case "core_syntax": {
                 const { name, pattern } = binding;
-                const new_loc = handle_core_syntax(
-                  loc,
-                  name,
-                  step.context,
-                  step.unit,
-                  step.counter,
-                  pattern,
+                return inspect(loc, "core syntax input", () =>
+                  handle_core_syntax(
+                    loc,
+                    name,
+                    step.context,
+                    step.unit,
+                    step.counter,
+                    ({ loc, counter, unit, context }) =>
+                      inspect(loc, "core syntax output", () =>
+                        preexpand_forms({ loc, rib: step.rib, counter, unit, context, k: step.k }),
+                      ),
+                    pattern,
+                  ),
                 );
-                return next(new_loc);
               }
               case "syntax_rules_transformer": {
                 throw new Error("handle syntax_rules_transformer");
@@ -421,8 +422,9 @@ function preexpand_forms(step: {
             const goodies = extract_lexical_declaration_bindings({ ...step, loc });
             return go_next(
               goodies.loc,
-              (loc) => syntax_error(loc, "unexpected token after lexical"),
-              (loc) => ({ ...goodies, loc }),
+              //(loc) => syntax_error(loc, "unexpected token after lexical"),
+              (loc) => preexpand_forms({ ...goodies, loc, k: step.k }),
+              (loc) => step.k({ ...goodies, loc }),
             );
           }
           case "arrow_function":
@@ -633,6 +635,7 @@ function expand_arrow_function({
         rib: { type: "rib", normal_env: {}, types_env: {} },
         counter,
         context,
+        unit,
       });
       const arr = go_right(pgs.loc, itself, invalid_form);
       check_punct(arr, "=>");
@@ -643,7 +646,7 @@ function expand_arrow_function({
           const [rib_id, new_counter] = new_rib_id(pgs.counter);
           const wrap: Wrap = { marks: null, subst: [{ rib_id }, null] };
           const loc = wrap_loc(body, wrap);
-          const new_unit = extend_unit(unit, rib_id, pgs.rib); // params are in rib
+          const new_unit = extend_unit(pgs.unit, rib_id, pgs.rib); // params are in rib
           return expand_concise_body({
             loc,
             rib: pgs.rib,
