@@ -327,7 +327,7 @@ function expand_concise_body(step: {
 }): never {
   const loc = step.loc;
   const k: (gs: goodies) => never = (gs: goodies) => {
-    const new_unit = extend_unit(step.unit, step.rib_id, gs.rib);
+    const new_unit = extend_unit(gs.unit, step.rib_id, gs.rib);
     return postexpand_body({ ...gs, unit: new_unit, k: step.k });
   };
   return loc.t.type === "list" && loc.t.tag === "statement_block"
