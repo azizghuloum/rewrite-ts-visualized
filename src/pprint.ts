@@ -45,6 +45,7 @@ function loc_to_ns(loc: Loc): ns {
 
   function ns_list(tag: list_tag, ls: ns[]): ns {
     switch (tag) {
+      case "arrow_function":
       case "binary_expression":
         return ["(", ls, ")"];
       case "program":
