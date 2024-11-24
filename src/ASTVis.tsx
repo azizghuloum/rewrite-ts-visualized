@@ -1,7 +1,7 @@
 import React from "react";
 import { LL } from "./llhelpers";
-import { Wrap } from "./STX";
 import * as AST from "./AST";
+import { Wrap } from "./syntax-structures";
 
 type STX =
   | { type: "atom"; tag: string; wrap?: Wrap; content: string }
@@ -10,12 +10,14 @@ type STX =
 const colormap: { [k in AST.atom_tag]: string } = {
   identifier: "yellow",
   property_identifier: "lime",
+  shorthand_property_identifier: "lime",
   number: "magenta",
   type_identifier: "orange",
   jsx_text: "teal",
   string_fragment: "cyan",
   regex_pattern: "magenta",
   other: "grey",
+  ERROR: "red",
 };
 
 function token_color(token_type: string): string | undefined {
@@ -61,13 +63,7 @@ function ASTToken({
   );
 }
 
-export function Indented({
-  tag,
-  items,
-}: {
-  tag: React.ReactElement;
-  items: React.ReactElement[];
-}) {
+export function Indented({ tag, items }: { tag: React.ReactElement; items: React.ReactElement[] }) {
   return (
     <div style={{ display: "block" }}>
       {tag}
@@ -89,13 +85,7 @@ export function Indented({
   );
 }
 
-export function ASTList({
-  tag,
-  items,
-}: {
-  tag: string;
-  items: React.ReactElement[];
-}) {
+export function ASTList({ tag, items }: { tag: string; items: React.ReactElement[] }) {
   const tag_element = <div style={{ fontStyle: "italic" }}>{tag}:</div>;
   return <Indented tag={tag_element} items={items} />;
 }
@@ -120,18 +110,11 @@ export function ASTExpr({ ast }: { ast: STX }) {
         </div>
         <div style={{ fontWeight: "bold" }}>
           subst:{" "}
-          {map_to_array(ast.wrap.subst, (x) =>
-            x === "shift" ? "shift" : x.rib_id
-          ).join(",")}
+          {map_to_array(ast.wrap.subst, (x) => (x === "shift" ? "shift" : x.rib_id)).join(",")}
         </div>
       </>
     );
-    return (
-      <Indented
-        tag={tag}
-        items={[<ASTExpr ast={{ ...ast, wrap: undefined }} />]}
-      />
-    );
+    return <Indented tag={tag} items={[<ASTExpr ast={{ ...ast, wrap: undefined }} />]} />;
   }
   switch (ast.type) {
     case "atom":
@@ -169,10 +152,7 @@ export function ASTHighlight({ children }: { children: React.ReactElement }) {
 export function ASTExprSpan({ ast }: { ast: STX }) {
   switch (ast.type) {
     case "atom": {
-      //return <span>{ast.content + (ast.content === ";" ? "\n" : " ")}</span>;
-      const x = (
-        <ASTToken token_type={ast.tag} token_content={ast.content} renamed />
-      );
+      const x = <ASTToken token_type={ast.tag} token_content={ast.content} renamed />;
       return [";", "}"].includes(ast.content) ? (
         <span>
           {x}
@@ -196,13 +176,7 @@ export function ASTExprSpan({ ast }: { ast: STX }) {
   }
 }
 
-export function ASTListSpan({
-  tag,
-  items,
-}: {
-  tag: string;
-  items: React.ReactElement[];
-}) {
+export function ASTListSpan({ items }: { tag: string; items: React.ReactElement[] }) {
   return (
     <span>
       {items.map((x, i) => (
