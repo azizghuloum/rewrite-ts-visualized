@@ -167,7 +167,7 @@ function Example({ parser, code, onChange }: ExampleProps) {
           <hr />
           <EditorP code={code_to_display} />
         </div>
-        <div style={{ flexBasis: "40%", flexGrow: "0" }}>
+        <div style={{ flexBasis: "40%", flexGrow: "0", marginLeft: ".5em", marginRight: ".5em" }}>
           <StepperView step={display_step} step_number={display_number} />
         </div>
       </div>
@@ -178,7 +178,7 @@ function Example({ parser, code, onChange }: ExampleProps) {
 function Expander() {
   const [parser, set_parser] = useState<Parser | null>(null);
   const [sample, setSample] = useState(
-    localStorage.getItem("sample_program") ?? "console.log('hello world!');",
+    localStorage.getItem("sample_program") ?? "const foo = (x) => x;\nfoo(12);\n",
   );
   useEffect(() => {
     load_parser({
