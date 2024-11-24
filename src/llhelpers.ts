@@ -4,6 +4,14 @@ export function llappend<X>(a1: LL<X>, a2: LL<X>): LL<X> {
   return a1 === null ? a2 : [a1[0], llappend(a1[1], a2)];
 }
 
+export function llreduce<X, AC>(ls: LL<X>, f: (x: X, ac: AC) => AC, ac: AC): AC {
+  if (ls === null) {
+    return ac;
+  } else {
+    return f(ls[0], llreduce(ls[1], f, ac));
+  }
+}
+
 export function llmap<X, Y>(ls: LL<X>, f: (x: X) => Y): LL<Y> {
   return ls === null ? null : [f(ls[0]), llmap(ls[1], f)];
 }

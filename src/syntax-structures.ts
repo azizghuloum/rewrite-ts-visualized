@@ -45,6 +45,8 @@ function label_generator(prefix: string): (counter: number) => [string, number] 
 
 export const new_rib_id = label_generator("r");
 
+export const new_mark = label_generator("m");
+
 export type CompilationUnit = {
   store: { [rib_id: string]: Rib };
 };

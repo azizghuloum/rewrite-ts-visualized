@@ -1,6 +1,6 @@
 import { assert } from "./assert";
 import { AST, id_tags } from "./AST";
-import { llappend } from "./llhelpers";
+import { LL, llappend } from "./llhelpers";
 import { core_handlers } from "./syntax-core-patterns";
 import {
   antimark,
@@ -44,7 +44,9 @@ function id_to_label(
     if (subst[0] === shift) return loop(marks[1], subst[1]);
     const env = (({ rib_id }) => {
       const rib = unit.store[rib_id];
-      if (rib === undefined) throw new Error("missing rib");
+      if (rib === undefined) {
+        throw new Error(`missing rib '${rib_id}', unit:${Object.keys(unit.store).join(",")}`);
+      }
       return rib[resolution_type];
     })(subst[0]);
     const ls = env[name];
@@ -147,13 +149,29 @@ export function extend_context_lexical<S>(
   return k({ context: new_context, name: new_name, counter: new_counter });
 }
 
+function llcancel<X>(ls1: [X, LL<X>], ls2: [X, LL<X>]): LL<X> {
+  function f(x: X, ls: LL<X>): LL<X> {
+    if (ls === null) {
+      return ls2[1];
+    } else {
+      return [x, f(ls[0], ls[1])];
+    }
+  }
+  return f(ls1[0], ls1[1]);
+}
+
 function merge_wraps(outerwrap: Wrap, innerwrap?: Wrap): Wrap {
   if (innerwrap === undefined) return outerwrap;
   if (is_top_marked(outerwrap)) {
     throw new Error("merge of top-marked outer");
   }
   if (outerwrap.marks && innerwrap.marks && innerwrap.marks[0] === antimark) {
-    throw new Error("found antimark");
+    assert(outerwrap.subst !== null);
+    assert(innerwrap.subst !== null);
+    return {
+      marks: llcancel(outerwrap.marks, innerwrap.marks),
+      subst: llcancel(outerwrap.subst, innerwrap.subst),
+    };
   } else {
     return {
       marks: llappend(outerwrap.marks, innerwrap.marks),

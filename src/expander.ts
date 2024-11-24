@@ -20,7 +20,7 @@ import {
   stx_list_content,
   wrap_loc,
 } from "./zipper";
-import { core_handlers } from "./syntax-core-patterns";
+import { apply_syntax_rules, core_handlers } from "./syntax-core-patterns";
 import { debug, DONE, inspect, in_isolation, Step, syntax_error } from "./step";
 
 class SInitial extends Step {
@@ -162,16 +162,14 @@ function expand_program(step: {
     unit: extend_unit(step.unit, rib_id, rib), // rib is empty
     context: step.context,
     counter,
-    k: ({ loc, rib, counter, context }) => {
+    k: ({ loc, rib, counter, context, unit }) => {
       // rib is filled
       // context is filled also
-      const unit = extend_unit(step.unit, rib_id, rib);
-      // unit is now filled
       return postexpand_program({
         loc,
         counter,
         context,
-        unit,
+        unit: extend_unit(unit, rib_id, rib),
         k: DONE,
       });
     },
@@ -393,7 +391,7 @@ function preexpand_forms(step: {
                     step.unit,
                     step.counter,
                     ({ loc, counter, unit, context }) =>
-                      inspect(loc, "core syntax output", () =>
+                      inspect(loc, `core syntax output store=${Object.keys(unit.store)}`, () =>
                         preexpand_forms({ loc, rib: step.rib, counter, unit, context, k: step.k }),
                       ),
                     pattern,
@@ -401,7 +399,19 @@ function preexpand_forms(step: {
                 );
               }
               case "syntax_rules_transformer": {
-                throw new Error("handle syntax_rules_transformer");
+                const { clauses } = binding;
+                inspect(
+                  loc,
+                  `before expanding store=${Object.keys(step.unit.store).join(",")}`,
+                  () =>
+                    apply_syntax_rules(loc, clauses, step.unit, step.counter, (loc, counter) =>
+                      inspect(
+                        loc,
+                        `after expanding store=${Object.keys(step.unit.store).join(",")}`,
+                        () => preexpand_forms({ ...step, counter, loc }),
+                      ),
+                    ),
+                );
               }
               default:
                 const invalid: never = binding;
@@ -503,6 +513,7 @@ function postexpand_program(step: {
   k: (loc: Loc) => never;
 }): never {
   assert(step.loc.t.tag === "program");
+  // console.log(`postexpand store=${Object.keys(step.unit.store).join(",")}`);
   return go_down(
     step.loc,
     (loc) =>

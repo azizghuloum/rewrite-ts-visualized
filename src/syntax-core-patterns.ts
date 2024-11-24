@@ -1,7 +1,7 @@
 import { assert } from "./assert";
 import { AST, id_tags } from "./AST";
-import { LL, ll_to_array } from "./llhelpers";
-import { syntax_error } from "./step";
+import { LL, llappend, llmap, llreduce, ll_to_array } from "./llhelpers";
+import { debug, syntax_error } from "./step";
 import {
   bound_id_equal,
   extend_context,
@@ -10,7 +10,17 @@ import {
   free_id_equal,
   push_wrap,
 } from "./STX";
-import { CompilationUnit, Context, Loc, new_rib_id, Rib, STX, Wrap } from "./syntax-structures";
+import {
+  antimark,
+  CompilationUnit,
+  Context,
+  Loc,
+  new_rib_id,
+  new_mark,
+  Rib,
+  shift,
+  STX,
+} from "./syntax-structures";
 import { go_next, go_down, mkzipper, stx_list_content, go_up, change } from "./zipper";
 
 type handler = (
@@ -369,6 +379,70 @@ const using_syntax_rules: handler = (orig_loc, orig_context, orig_unit, orig_cou
     },
   );
 };
+
+function find_clause(
+  loc: Loc,
+  clauses: syntax_rules_clause[],
+  unit: CompilationUnit,
+): { loc: Loc; subst: subst; template: STX } {
+  for (const { pattern, template } of clauses) {
+    const unification = unify_paths(pattern.p, loc, unit);
+    if (unification) return { ...unification, template };
+  }
+  syntax_error(loc, "invalid syntax (no pattern matched)");
+}
+
+function search_and_replace(stx: STX, subst: subst, loc: Loc): LL<STX> {
+  switch (stx.type) {
+    case "atom": {
+      if (is_id(stx)) {
+        const replacement = subst.find(([lhs]) => bound_id_equal(lhs, stx));
+        if (!replacement) return [stx, null];
+        return replacement[1];
+      } else {
+        return [stx, null];
+      }
+    }
+    case "list":
+      return [
+        {
+          type: "list",
+          tag: stx.tag,
+          wrap: undefined,
+          content: llreduce(
+            llmap(stx_list_content(stx), (x) => search_and_replace(x, subst, loc)),
+            llappend,
+            null as LL<STX>,
+          ),
+        },
+        null,
+      ];
+      throw new Error("not yet in search_and_replace");
+    default:
+      const invalid: never = stx;
+      throw invalid;
+  }
+}
+
+export function apply_syntax_rules(
+  orig_loc: Loc,
+  clauses: syntax_rules_clause[],
+  unit: CompilationUnit,
+  orig_counter: number,
+  k: (loc: Loc, counter: number) => never,
+): never {
+  const do_antimark = push_wrap({ marks: [antimark, null], subst: [shift, null] });
+  const { loc, subst, template } = find_clause(orig_loc, clauses, unit);
+  const antimarked_subst: subst = subst.map(([lhs, rhs]) => [lhs, llmap(rhs, do_antimark)]);
+  const expressionls = search_and_replace(template, antimarked_subst, loc);
+  if (expressionls === null) syntax_error(loc, "splicing error of empty slice");
+  if (expressionls[1] !== null) syntax_error(loc, "splicing error of more than one thing");
+  const expression = expressionls[0];
+  const [mark, new_counter] = new_mark(orig_counter);
+  const do_mark = push_wrap({ marks: [mark, null], subst: [shift, null] });
+  const new_loc = change(loc, mkzipper(do_mark(expression)));
+  return k(new_loc, new_counter);
+}
 
 //export const pattern_match: <S>(
 //  loc: Loc,
