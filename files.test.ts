@@ -42,8 +42,9 @@ async function compile_script(filename: string, parser: Parser) {
 
 suite("files in tests dir", async () => {
   const test_files = readdirSync(test_dir).filter((x) => x.match(/\.ts$/));
+  console.log(treesitter_wasm_url);
   const parser = await load_parser({
-    parser_url: cleanup_url(treesitter_wasm_url),
+    parser_url: cleanup_url(`./${treesitter_wasm_url}`),
     lang_url: cleanup_url(tsx_url),
   });
   test_files.forEach((x) =>

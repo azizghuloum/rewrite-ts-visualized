@@ -1,5 +1,5 @@
 {
-  "name": "ts-rewriter-vis",
+  "name": "ts-rewrite-system-visualized",
   "private": true,
   "version": "0.0.0",
   "type": "module",
@@ -12,12 +12,13 @@
   },
   "dependencies": {
     "@codemirror/lang-javascript": "^6.2.2",
+    "@types/node": "^22.7.5",
     "@uiw/codemirror-theme-abcdef": "^4.23.6",
     "@uiw/react-codemirror": "^4.23.6",
     "prettier": "^3.3.3",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
-    "react-router-dom": "^6.27.0",
+    "react-router-dom": "^7.0.1",
     "tree-sitter-typescript": "*",
     "web-tree-sitter": "^0.24.3",
     "zipper": "https://github.com/azizghuloum/zipper.git"
