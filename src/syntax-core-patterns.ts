@@ -174,7 +174,12 @@ const unify_right: (kwdls: LL<STX>, codels: LL<STX>, unit: CompilationUnit) => s
         if (s1 === null) return null;
         return extend_subst([fst_pattern, fsts], s1, unit);
       } else {
-        throw new Error("not last one");
+        if (codels === null) return null;
+        const fsts: LL<STX> = [codels[0], null];
+        const rests = codels[1];
+        const s1 = f(count - 1, rest_patterns, rests);
+        if (s1 === null) return null;
+        return extend_subst([fst_pattern, fsts], s1, unit);
       }
     }
     if (codels === null) return null;

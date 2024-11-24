@@ -30,6 +30,7 @@ export type list_tag =
   | "lexical_declaration"
   | "variable_declarator"
   | "binary_expression"
+  | "unary_expression"
   | "call_expression"
   | "arguments"
   | "arrow_function"
@@ -39,6 +40,7 @@ export type list_tag =
   | "array"
   | "member_expression"
   | "parenthesized_expression"
+  | "ternary_expression"
   | "slice"
   | "ERROR";
 
@@ -47,6 +49,7 @@ export const list_tags: { [k in list_tag]: list_tag } = {
   lexical_declaration: "lexical_declaration",
   variable_declarator: "variable_declarator",
   binary_expression: "binary_expression",
+  unary_expression: "unary_expression",
   call_expression: "call_expression",
   arguments: "arguments",
   arrow_function: "arrow_function",
@@ -57,6 +60,7 @@ export const list_tags: { [k in list_tag]: list_tag } = {
   array: "array",
   member_expression: "member_expression",
   parenthesized_expression: "parenthesized_expression",
+  ternary_expression: "ternary_expression",
   ERROR: "ERROR",
 };
 

@@ -47,6 +47,8 @@ function loc_to_ns(loc: Loc): ns {
     switch (tag) {
       case "arrow_function":
       case "binary_expression":
+      case "unary_expression":
+      case "ternary_expression":
         return ["(", ls, ")"];
       case "program":
       case "statement_block":

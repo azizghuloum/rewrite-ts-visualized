@@ -281,12 +281,14 @@ const list_handlers_table: { [tag in list_tag]: "descend" | "stop" } = {
   call_expression: "descend",
   arguments: "descend",
   binary_expression: "descend",
+  unary_expression: "descend",
   array: "descend",
   member_expression: "descend",
   empty_statement: "descend",
   formal_parameters: "stop",
   program: "stop",
   parenthesized_expression: "descend",
+  ternary_expression: "descend",
   ERROR: "stop",
 };
 
