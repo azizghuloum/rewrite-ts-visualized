@@ -225,8 +225,9 @@ const unify_paths: (kwd: Path, loc: Loc, unit: CompilationUnit) => unification |
     return merge_unification(u4, s3, unit);
   } else if (kwd.type === "top") {
     return { loc, subst: [] };
+  } else {
+    return null;
   }
-  throw new Error("unify_paths");
 };
 
 export const core_pattern_match: (

@@ -1,4 +1,5 @@
 using_syntax_rules(
   [not, not(x) ? a : b, x ? b : a],
   [not, not(x), !x],
-).rewrite(not(not(not(1))) ? 2 : not(3))
+  [not, not, (x) => not(x)],
+).rewrite(not(not(not(1))) ? not : not(3))
