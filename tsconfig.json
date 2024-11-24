@@ -6,6 +6,11 @@
     "resolveJsonModule": true,
     "esModuleInterop": true,
     "forceConsistentCasingInFileNames": true,
+    "strictNullChecks": true,
+    "strictFunctionTypes": true,
+    "noImplicitReturns": true,
+    "noImplicitAny": true,
+    "alwaysStrict": true,
     "strict": true,
     "jsx": "react-jsx",
     "skipLibCheck": true
