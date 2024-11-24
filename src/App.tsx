@@ -1,17 +1,18 @@
 import "./App.css";
 import Parser from "web-tree-sitter";
 import treesitter_wasm_url from "web-tree-sitter/tree-sitter.wasm?url";
-import tsx_url from "./assets/tree-sitter-tsx.wasm?url";
+import tsx_url from "tree-sitter-typescript/tree-sitter-tsx.wasm?url";
 import { useEffect, useMemo, useState } from "react";
 import { createBrowserRouter, RouterProvider } from "react-router-dom";
-import { ASTExpr, ASTExprSpan, ASTHighlight, ASTList, ASTListSpan } from "./ASTVis";
+import { ASTExpr, ASTHighlight, ASTList } from "./ASTVis";
 import { Editor, EditorP } from "./Editor";
 import * as Zipper from "./zipper";
-import { initial_step, next_step, Step } from "./expander";
+import { initial_step, next_step } from "./expander";
 import { Loc } from "./syntax-structures";
 import { core_patterns } from "./syntax-core-patterns";
 import { load_parser, parse_with } from "./parser-loader";
 import { pprint } from "./pprint";
+import { Step } from "./step";
 
 type ExampleProps = {
   parser: Parser;
