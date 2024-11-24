@@ -383,7 +383,7 @@ function preexpand_forms(step: {
                 return next(loc);
               case "core_syntax": {
                 const { name, pattern } = binding;
-                return inspect(loc, "core syntax input", () =>
+                return inspect(loc, "core form", () =>
                   handle_core_syntax(
                     loc,
                     name,
@@ -391,7 +391,7 @@ function preexpand_forms(step: {
                     step.unit,
                     step.counter,
                     ({ loc, counter, unit, context }) =>
-                      inspect(loc, `core syntax output store=${Object.keys(unit.store)}`, () =>
+                      inspect(loc, `core output`, () =>
                         preexpand_forms({ loc, rib: step.rib, counter, unit, context, k: step.k }),
                       ),
                     pattern,
@@ -400,17 +400,12 @@ function preexpand_forms(step: {
               }
               case "syntax_rules_transformer": {
                 const { clauses } = binding;
-                inspect(
-                  loc,
-                  `before expanding store=${Object.keys(step.unit.store).join(",")}`,
-                  () =>
-                    apply_syntax_rules(loc, clauses, step.unit, step.counter, (loc, counter) =>
-                      inspect(
-                        loc,
-                        `after expanding store=${Object.keys(step.unit.store).join(",")}`,
-                        () => preexpand_forms({ ...step, counter, loc }),
-                      ),
+                inspect(loc, `transformer form`, () =>
+                  apply_syntax_rules(loc, clauses, step.unit, step.counter, (loc, counter) =>
+                    inspect(loc, `transformer output`, () =>
+                      preexpand_forms({ ...step, counter, loc }),
                     ),
+                  ),
                 );
               }
               default:
