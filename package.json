@@ -20,7 +20,7 @@
     "react-router-dom": "^6.27.0",
     "tree-sitter-typescript": "*",
     "web-tree-sitter": "^0.24.3",
-    "zipper": "*"
+    "zipper": "https://github.com/azizghuloum/zipper.git"
   },
   "devDependencies": {
     "@eslint/js": "^9.11.1",
