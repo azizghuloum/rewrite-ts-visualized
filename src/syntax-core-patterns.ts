@@ -329,7 +329,9 @@ const using_syntax_rules: handler = (orig_loc, orig_context, orig_unit, orig_cou
           .map((x) => parse_syntax_rules_clause(x, loc)),
         (x, y) => bound_id_equal(x, y),
       );
-      const [new_rib, new_counter, final_context] = clauses.reduce(
+      const [rib_id, new_counter] = new_rib_id(orig_counter);
+      const do_wrap = push_wrap({ marks: null, subst: [{ rib_id }, null] });
+      const [new_rib, final_counter, final_context] = clauses.reduce(
         (ac: [Rib, number, Context], [lhs, rhs]) => {
           assert(lhs.type === "atom" && lhs.wrap !== undefined);
           return extend_rib(
@@ -341,20 +343,23 @@ const using_syntax_rules: handler = (orig_loc, orig_context, orig_unit, orig_cou
             ({ rib, counter, label }) => [
               rib,
               counter,
-              extend_context(ac[2], label, { type: "syntax_rules_transformer", clauses: rhs }),
+              extend_context(ac[2], label, {
+                type: "syntax_rules_transformer",
+                clauses: rhs.map(({ pattern, template }) => ({
+                  pattern,
+                  template: do_wrap(template),
+                })),
+              }),
             ],
             (reason) => {
               throw new Error(`"${reason}" shouldnt happen if things are partitioned properly`);
             },
           );
         },
-        [{ type: "rib", normal_env: {}, types_env: {} }, orig_counter, orig_context],
+        [{ type: "rib", normal_env: {}, types_env: {} }, new_counter, orig_context],
       );
-      const [rib_id, final_counter] = new_rib_id(new_counter);
       const final_unit = extend_unit(orig_unit, rib_id, new_rib);
-      const new_wrap: Wrap = { marks: null, subst: [{ rib_id }, null] };
-      const final_expression = push_wrap(new_wrap)(expression);
-      const final_loc = change(loc, mkzipper(final_expression));
+      const final_loc = change(loc, mkzipper(do_wrap(expression)));
       return k({
         loc: final_loc,
         counter: final_counter,
