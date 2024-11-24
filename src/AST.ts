@@ -38,6 +38,7 @@ export type list_tag =
   | "empty_statement"
   | "array"
   | "member_expression"
+  | "parenthesized_expression"
   | "slice"
   | "ERROR";
 
@@ -55,6 +56,7 @@ export const list_tags: { [k in list_tag]: list_tag } = {
   slice: "slice",
   array: "array",
   member_expression: "member_expression",
+  parenthesized_expression: "parenthesized_expression",
   ERROR: "ERROR",
 };
 

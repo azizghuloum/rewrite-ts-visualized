@@ -286,6 +286,7 @@ const list_handlers_table: { [tag in list_tag]: "descend" | "stop" } = {
   empty_statement: "descend",
   formal_parameters: "stop",
   program: "stop",
+  parenthesized_expression: "descend",
   ERROR: "stop",
 };
 
