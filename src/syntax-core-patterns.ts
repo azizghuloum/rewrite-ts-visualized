@@ -1,7 +1,7 @@
 import { assert } from "./assert";
 import { AST, id_tags } from "./AST";
-import { LL, llappend, llmap, llreduce, ll_to_array } from "./llhelpers";
-import { debug, syntax_error } from "./step";
+import { LL, llappend, llmap, llreduce, llreverse, ll_to_array } from "./llhelpers";
+import { syntax_error } from "./step";
 import {
   bound_id_equal,
   extend_context,
@@ -126,10 +126,15 @@ const merge_unification: (
   return { loc: u1.loc, subst: s };
 };
 
-const unify_left: (pat: LL<STX>, code: LL<STX>) => subst | null = (pat, code) => {
+const unify_left: (pat: LL<STX>, code: LL<STX>, unit: CompilationUnit) => subst | null = (
+  pat,
+  code,
+  unit,
+) => {
   if (pat === null && code === null) return [];
-  console.log({ pat, code });
-  throw new Error("unify_left");
+  return unify_right(llreverse(pat), llreverse(code), unit);
+  //console.log({ pat, code });
+  //throw new Error("unify_left");
 };
 
 const is_id: (x: STX) => boolean = (x) => x.type === "atom" && id_tags[x.tag];
@@ -204,7 +209,7 @@ const unify_paths: (kwd: Path, loc: Loc, unit: CompilationUnit) => unification |
   const p = loc.p;
   if (kwd.type === "node" && p.type === "node") {
     if (kwd.tag !== p.tag) return null;
-    const s1 = unify_left(kwd.l, p.l);
+    const s1 = unify_left(kwd.l, p.l, unit);
     if (!s1) return null;
     const s2 = unify_right(kwd.r, p.r, unit);
     if (!s2) return null;
@@ -417,7 +422,6 @@ function search_and_replace(stx: STX, subst: subst, loc: Loc): LL<STX> {
         },
         null,
       ];
-      throw new Error("not yet in search_and_replace");
     default:
       const invalid: never = stx;
       throw invalid;

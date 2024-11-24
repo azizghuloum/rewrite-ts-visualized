@@ -30,3 +30,12 @@ export function ll_to_array<X>(a: LL<X>): X[] {
   }
   return ls;
 }
+
+export function llreverse<X>(a: LL<X>): LL<X> {
+  let ll: LL<X> = null;
+  while (a !== null) {
+    ll = [a[0], ll];
+    a = a[1];
+  }
+  return ll;
+}
