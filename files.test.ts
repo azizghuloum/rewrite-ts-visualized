@@ -11,6 +11,7 @@ import { pprint } from "./src/pprint";
 import { Step } from "./src/step";
 
 const test_dir = __dirname + "/tests";
+const md_dir = __dirname + "/examples";
 
 async function compile_script(filename: string, test_name: string, parser: Parser) {
   const code = await readFile(filename, { encoding: "utf-8" });
@@ -60,9 +61,9 @@ suite("files in tests dir", async () => {
   });
   test_files.forEach((x) =>
     test(`expanding file ${x}`, async () => {
-      const test_file = `${test_dir}/${x}`;
-      await expect(await compile_script(test_file, x, parser)).toMatchFileSnapshot(
-        `${test_file}.md`,
+      const test_path = `${test_dir}/${x}`;
+      await expect(await compile_script(test_path, x, parser)).toMatchFileSnapshot(
+        `${md_dir}/${x}.md`,
       );
     }),
   );
