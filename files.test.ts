@@ -12,7 +12,7 @@ import { Step } from "./src/step";
 
 const test_dir = __dirname + "/tests";
 
-async function compile_script(filename: string, parser: Parser) {
+async function compile_script(filename: string, test_name: string, parser: Parser) {
   const code = await readFile(filename, { encoding: "utf-8" });
   const parse = (code: string) => parse_with(parser, code);
   const patterns = core_patterns(parse);
@@ -29,12 +29,25 @@ async function compile_script(filename: string, parser: Parser) {
       }
     }
   }
+  function ts(code: string): string {
+    return "```typescript\n" + code + "```\n\n";
+  }
+  function qq(code: string): string {
+    return "```\n" + code + "```\n\n";
+  }
+  function q(str: string): string {
+    return "`" + str + "`";
+  }
   const prog = await pprint(step.loc);
   const out =
-    prog +
-    "================================\n" +
-    `${step.name}\n` +
-    (step.error ? `${step.error}\n` : "");
+    `## ${q(test_name)}\n\n` +
+    `### status: ${q(step.name)}\n\n` +
+    (step.error ? `${qq(step.error)}\n` : "") +
+    `### input\n\n` +
+    ts(code) +
+    `### output\n\n` +
+    ts(prog) +
+    "";
   return out;
 }
 
@@ -48,8 +61,8 @@ suite("files in tests dir", async () => {
   test_files.forEach((x) =>
     test(`expanding file ${x}`, async () => {
       const test_file = `${test_dir}/${x}`;
-      await expect(await compile_script(test_file, parser)).toMatchFileSnapshot(
-        `${test_file}.expanded`,
+      await expect(await compile_script(test_file, x, parser)).toMatchFileSnapshot(
+        `${test_file}.md`,
       );
     }),
   );
