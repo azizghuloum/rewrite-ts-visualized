@@ -1,4 +1,0 @@
-const /*>>>*/ x /*<<<*/ = 13;
-================================
-SyntaxError
-x is already defined in normal_env
