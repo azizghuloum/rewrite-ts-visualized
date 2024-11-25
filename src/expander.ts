@@ -225,7 +225,7 @@ function preexpand_body_curly(step: {
   return in_isolation<goodies>(
     step.loc,
     (loc, k) => preexpand_forms({ ...step, loc, k: (gs) => k(gs.loc, gs) }),
-    (loc, { rib, context, counter }) => {
+    (loc, { rib, context, counter, unit }) => {
       if (loc.t.tag === "slice") {
         const subforms = stx_list_content(loc.t);
         const new_loc = change_splicing(
@@ -238,7 +238,7 @@ function preexpand_body_curly(step: {
       }
       return go_right(
         loc,
-        (loc) => preexpand_body_curly({ loc, rib, counter, context, unit: step.unit, k: step.k }),
+        (loc) => preexpand_body_curly({ loc, rib, counter, context, unit, k: step.k }),
         (loc) => syntax_error(loc, "no right"),
       );
     },
