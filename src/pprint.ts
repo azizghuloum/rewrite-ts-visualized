@@ -43,6 +43,14 @@ function loc_to_ns(loc: Loc): ns {
     }
   }
 
+  function strip_trailing_newline(x: ns): ns {
+    if (Array.isArray(x) && x.length == 2 && x[1] === "\n") {
+      return x[0];
+    } else {
+      return x;
+    }
+  }
+
   function ns_list(tag: list_tag, ls: ns[]): ns {
     switch (tag) {
       case "arrow_function":
@@ -53,9 +61,13 @@ function loc_to_ns(loc: Loc): ns {
       case "program":
       case "statement_block":
       case "slice":
-        return ls.map((x) => [x, "\n\n"]);
+        return [
+          ls.map(strip_trailing_newline).map((x, i) => (i === ls.length - 1 ? x : [x, "\n"])),
+          "\n",
+        ];
+      default:
+        return ls;
     }
-    return ls;
   }
 
   const lp = "/*>>>*/";
