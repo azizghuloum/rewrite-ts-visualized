@@ -75,6 +75,12 @@ function absurdly(node: Parser.SyntaxNode): AST {
           return { type: "list", tag: "required_parameter", content: array_to_ll(ls) };
         }
       }
+      case "union_type": {
+        return { type: "list", tag: "binary_expression", content: array_to_ll(ls) };
+      }
+      case "object_type": {
+        return { type: "list", tag: "object", content: array_to_ll(ls) };
+      }
       case "arrow_function": {
         if (ls.length === 3) {
           const fmls = ls[0];

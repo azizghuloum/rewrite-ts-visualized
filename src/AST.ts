@@ -49,12 +49,10 @@ export type list_tag =
   | "predefined_type"
   | "literal_type"
   | "tuple_type"
-  | "object_type"
   | "pair"
   | "object"
   | "array_pattern"
   | "object_pattern"
-  | "union_type"
   | "slice"
   | "ERROR";
 
@@ -83,12 +81,10 @@ export const list_tags: { [k in list_tag]: list_tag } = {
   predefined_type: "predefined_type",
   literal_type: "literal_type",
   tuple_type: "tuple_type",
-  object_type: "object_type",
   pair: "pair",
   object: "object",
   object_pattern: "object_pattern",
   array_pattern: "array_pattern",
-  union_type: "union_type",
   ERROR: "ERROR",
 };
 

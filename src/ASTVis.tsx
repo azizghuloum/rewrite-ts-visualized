@@ -14,7 +14,7 @@ const colormap: { [k in AST.atom_tag]: string } = {
   number: "magenta",
   type_identifier: "orange",
   jsx_text: "teal",
-  string_fragment: "cyan",
+  string: "cyan",
   regex_pattern: "magenta",
   other: "grey",
   ERROR: "red",

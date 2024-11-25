@@ -454,7 +454,7 @@ function find_form(loc: Loc): ffrv {
         const { tag } = loc.t;
         const action = list_handlers_table[tag];
         if (action === undefined) {
-          throw new Error(`no stop_table entry for ${tag}`);
+          debug(loc, `no stop_table entry for ${tag}`);
         }
         switch (action) {
           case "descend":
