@@ -9,17 +9,7 @@ import {
   extend_context_lexical,
   CorePatterns,
 } from "./STX";
-import {
-  change,
-  change_splicing,
-  go_down,
-  go_next,
-  go_right,
-  go_up,
-  mkzipper,
-  stx_list_content,
-  wrap_loc,
-} from "./zipper";
+import { change, go_down, go_next, go_right, go_up, mkzipper, wrap_loc } from "./zipper";
 import { apply_syntax_rules, core_handlers } from "./syntax-core-patterns";
 import { debug, DONE, inspect, in_isolation, Step, syntax_error } from "./step";
 
@@ -176,13 +166,6 @@ function expand_program(step: {
   });
 }
 
-const empty_statement: STX = {
-  type: "list",
-  tag: "empty_statement",
-  wrap: undefined,
-  content: null,
-};
-
 function preexpand_body(step: {
   loc: Loc;
   rib: Rib;
@@ -226,16 +209,6 @@ function preexpand_body_curly(step: {
     step.loc,
     (loc, k) => preexpand_forms({ ...step, loc, k: (gs) => k(gs.loc, gs) }),
     (loc, { rib, context, counter, unit }) => {
-      if (loc.t.tag === "slice") {
-        const subforms = stx_list_content(loc.t);
-        const new_loc = change_splicing(
-          loc,
-          subforms === null ? [empty_statement, null] : subforms,
-        );
-        return inspect(new_loc, "spliced", () => {
-          preexpand_body_curly({ loc: new_loc, rib, unit: step.unit, context, counter, k: step.k });
-        });
-      }
       return go_right(
         loc,
         (loc) => preexpand_body_curly({ loc, rib, counter, context, unit, k: step.k }),
@@ -275,6 +248,7 @@ const atom_handlers_table: { [tag in atom_tag]: "next" | "stop" } = {
 const list_handlers_table: { [tag in list_tag]: "descend" | "stop" } = {
   lexical_declaration: "stop",
   variable_declarator: "stop",
+  export_statement: "stop",
   slice: "descend",
   arrow_function: "stop",
   statement_block: "stop",
