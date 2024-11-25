@@ -42,6 +42,10 @@ export type list_tag =
   | "member_expression"
   | "parenthesized_expression"
   | "ternary_expression"
+  | "type_alias_declaration"
+  | "predefined_type"
+  | "literal_type"
+  | "union_type"
   | "slice"
   | "ERROR";
 
@@ -63,6 +67,10 @@ export const list_tags: { [k in list_tag]: list_tag } = {
   member_expression: "member_expression",
   parenthesized_expression: "parenthesized_expression",
   ternary_expression: "ternary_expression",
+  type_alias_declaration: "type_alias_declaration",
+  predefined_type: "predefined_type",
+  literal_type: "literal_type",
+  union_type: "union_type",
   ERROR: "ERROR",
 };
 

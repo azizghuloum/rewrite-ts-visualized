@@ -89,7 +89,7 @@ function absurdly(node: Parser.SyntaxNode): AST {
       }
     }
     const tag = (list_tags as { [k: string]: list_tag })[node.type];
-    if (!tag) throw new Error(`unsupported tag '${node.type}'`);
+    if (!tag) throw new Error(`unsupported tag '${node.type}', children: ${JSON.stringify(ls)}`);
     return {
       type: "list",
       tag,
