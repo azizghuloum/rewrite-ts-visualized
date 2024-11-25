@@ -1,12 +1,12 @@
 ## `arrow-function-2.ts`
 
-### status: `SyntaxError`
+### Status: `SyntaxError`
 
 ```
-x is already defined in normal_env```
+x is already defined in normal_env
+```
 
-
-### input
+### Input Program
 
 ```typescript
 const foo = (x) => {
@@ -15,7 +15,7 @@ const foo = (x) => {
 };
 ```
 
-### output
+### Output Program
 
 ```typescript
 const /*>>>*/ x /*<<<*/ = 13;

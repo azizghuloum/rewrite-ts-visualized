@@ -1,8 +1,8 @@
 ## `macro-generating-macro-1.ts`
 
-### status: `DONE`
+### Status: `DONE`
 
-### input
+### Input Program
 
 ```typescript
 using_syntax_rules(
@@ -12,7 +12,7 @@ using_syntax_rules(
 ).rewrite((x) => capture(x, t, (x) => x + t))
 ```
 
-### output
+### Output Program
 
 ```typescript
 (x_5) => (x_11) => x_11 + x_5;

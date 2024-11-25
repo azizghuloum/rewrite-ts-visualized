@@ -1,8 +1,8 @@
 ## `left-matching-1.ts`
 
-### status: `DONE`
+### Status: `DONE`
 
-### input
+### Input Program
 
 ```typescript
 using_syntax_rules(
@@ -10,7 +10,7 @@ using_syntax_rules(
 ).rewrite(12(1,foo,3))
 ```
 
-### output
+### Output Program
 
 ```typescript
 12 - 1 + 3;

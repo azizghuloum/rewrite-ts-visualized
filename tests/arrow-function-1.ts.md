@@ -1,8 +1,8 @@
 ## `arrow-function-1.ts`
 
-### status: `DONE`
+### Status: `DONE`
 
-### input
+### Input Program
 
 ```typescript
 const f = (x) => x;
@@ -10,7 +10,7 @@ const g = (x) => f(x);
 const h = (x) => x((x) => f(x));
 ```
 
-### output
+### Output Program
 
 ```typescript
 const f_3 = (x_9) => x_9;

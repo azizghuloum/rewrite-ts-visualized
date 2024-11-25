@@ -1,8 +1,8 @@
 ## `left-matching-2.ts`
 
-### status: `DONE`
+### Status: `DONE`
 
-### input
+### Input Program
 
 ```typescript
 using_syntax_rules(
@@ -10,7 +10,7 @@ using_syntax_rules(
 ).rewrite([7,8,9](1,2,3,foo,4,5,6)(10,11,12))
 ```
 
-### output
+### Output Program
 
 ```typescript
 [

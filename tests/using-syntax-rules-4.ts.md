@@ -1,8 +1,8 @@
 ## `using-syntax-rules-4.ts`
 
-### status: `DONE`
+### Status: `DONE`
 
-### input
+### Input Program
 
 ```typescript
 using_syntax_rules(
@@ -13,7 +13,7 @@ using_syntax_rules(
 const x = 12;
 ```
 
-### output
+### Output Program
 
 ```typescript
 x_7 + ((foo_9, foo_11) => foo_11 + foo_9);

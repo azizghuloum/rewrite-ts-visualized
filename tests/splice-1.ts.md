@@ -1,8 +1,8 @@
 ## `splice-1.ts`
 
-### status: `DONE`
+### Status: `DONE`
 
-### input
+### Input Program
 
 ```typescript
 const t = 13;
@@ -13,7 +13,7 @@ splice(() => {
 const q = t + x;
 ```
 
-### output
+### Output Program
 
 ```typescript
 const t_3 = 13;

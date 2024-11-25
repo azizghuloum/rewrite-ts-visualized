@@ -41,11 +41,11 @@ async function compile_script(filename: string, test_name: string, parser: Parse
   const prog = await pprint(step.loc);
   const out =
     `## ${q(test_name)}\n\n` +
-    `### status: ${q(step.name)}\n\n` +
-    (step.error ? `${qq(step.error)}\n` : "") +
-    `### input\n\n` +
+    `### Status: ${q(step.name)}\n\n` +
+    (step.error ? qq(`${step.error}\n`) : "") +
+    `### Input Program\n\n` +
     ts(code) +
-    `### output\n\n` +
+    `### Output Program\n\n` +
     ts(prog) +
     "";
   return out;

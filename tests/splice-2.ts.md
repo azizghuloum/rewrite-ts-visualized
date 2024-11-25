@@ -1,8 +1,8 @@
 ## `splice-2.ts`
 
-### status: `DONE`
+### Status: `DONE`
 
-### input
+### Input Program
 
 ```typescript
 const foo = (x) => {
@@ -13,7 +13,7 @@ const foo = (x) => {
 }
 ```
 
-### output
+### Output Program
 
 ```typescript
 const foo_3 = (x_5) => {

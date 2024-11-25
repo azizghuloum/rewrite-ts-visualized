@@ -1,8 +1,8 @@
 ## `not-test-1.ts`
 
-### status: `DONE`
+### Status: `DONE`
 
-### input
+### Input Program
 
 ```typescript
 using_syntax_rules(
@@ -12,7 +12,7 @@ using_syntax_rules(
 ).rewrite(not(not(not(1))) ? not : not(3))
 ```
 
-### output
+### Output Program
 
 ```typescript
 1 ? !3 : (x_10) => !x_10;
