@@ -52,7 +52,8 @@ function loc_to_ns(loc: Loc): ns {
         return ["(", ls, ")"];
       case "program":
       case "statement_block":
-        return ls.map((x) => [x, "\n"]);
+      case "slice":
+        return ls.map((x) => [x, "\n\n"]);
     }
     return ls;
   }
@@ -104,6 +105,6 @@ export async function pprint(loc: Loc) {
     });
     return pretty;
   } catch (err) {
-    return src;
+    return `/* !!not pretty!! */\n${src}`;
   }
 }
