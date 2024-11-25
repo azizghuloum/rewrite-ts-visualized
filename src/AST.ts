@@ -39,12 +39,21 @@ export type list_tag =
   | "statement_block"
   | "empty_statement"
   | "array"
+  | "string"
   | "member_expression"
   | "parenthesized_expression"
   | "ternary_expression"
   | "type_alias_declaration"
+  | "type_annotation"
+  | "property_signature"
   | "predefined_type"
   | "literal_type"
+  | "tuple_type"
+  | "object_type"
+  | "pair"
+  | "object"
+  | "array_pattern"
+  | "object_pattern"
   | "union_type"
   | "slice"
   | "ERROR";
@@ -64,12 +73,21 @@ export const list_tags: { [k in list_tag]: list_tag } = {
   empty_statement: "empty_statement",
   slice: "slice",
   array: "array",
+  string: "string",
   member_expression: "member_expression",
   parenthesized_expression: "parenthesized_expression",
   ternary_expression: "ternary_expression",
   type_alias_declaration: "type_alias_declaration",
+  type_annotation: "type_annotation",
+  property_signature: "property_signature",
   predefined_type: "predefined_type",
   literal_type: "literal_type",
+  tuple_type: "tuple_type",
+  object_type: "object_type",
+  pair: "pair",
+  object: "object",
+  object_pattern: "object_pattern",
+  array_pattern: "array_pattern",
   union_type: "union_type",
   ERROR: "ERROR",
 };

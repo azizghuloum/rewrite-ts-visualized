@@ -37,6 +37,7 @@ function absurdly(node: Parser.SyntaxNode): AST {
       case "type_identifier":
       case "shorthand_property_identifier":
       case "property_identifier":
+      case "string_fragment":
       case "ERROR": {
         return { type: "atom", tag: node.type, content: node.text };
       }
