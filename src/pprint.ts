@@ -1,12 +1,10 @@
 import { AST } from "./serialize";
 import { llmap, llreverse, ll_to_array } from "./llhelpers";
-import { Loc, STX } from "./syntax-structures";
-import { go_up, reconvert, stx_list_content } from "./zipper";
+import { Loc } from "./syntax-structures";
 import { list_tag } from "./AST";
 import * as prettier from "prettier/standalone";
 import * as prettier_ts from "prettier/plugins/typescript";
 import * as prettier_estree from "prettier/plugins/estree";
-import node from "tree-sitter-typescript/bindings/node";
 
 type ns = string | ns[];
 
@@ -35,7 +33,7 @@ function loc_to_ns(loc: Loc): ns {
           case "shorthand_property_identifier":
           case "type_identifier":
           case "jsx_text":
-          case "string_fragment":
+          case "string":
           case "regex_pattern":
           case "other":
             return stx.content;
