@@ -25,7 +25,13 @@ function absurdly(node: Parser.SyntaxNode): AST {
   const children = node.children;
   if (children.length === 0) {
     switch (node.type) {
-      case "number":
+      case "number": {
+        return {
+          type: "atom",
+          tag: node.text === "number" ? "other" : "number",
+          content: node.text,
+        };
+      }
       case "regex_pattern":
       case "identifier":
       case "type_identifier":
