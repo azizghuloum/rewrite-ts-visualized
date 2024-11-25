@@ -6,6 +6,7 @@ import { list_tag } from "./AST";
 import * as prettier from "prettier/standalone";
 import * as prettier_ts from "prettier/plugins/typescript";
 import * as prettier_estree from "prettier/plugins/estree";
+import node from "tree-sitter-typescript/bindings/node";
 
 type ns = string | ns[];
 
@@ -19,7 +20,7 @@ function loc_to_ns(loc: Loc): ns {
   /* */
 
   function stx_to_ns(stx: AST, semi: boolean): ns {
-    if (semi && stx.tag !== "other") return [stx_to_ns(stx, false), [";\n"]];
+    if (semi && stx.tag !== "other") return [stx_to_ns(stx, false), ";"];
     switch (stx.type) {
       case "list": {
         const semi = children_need_semi[stx.tag] ?? false;
@@ -94,7 +95,10 @@ function loc_to_ns(loc: Loc): ns {
     }
   }
 
-  return strip_top(path_to_ns(loc.p, mark_top(stx_to_ns(loc.t, false))));
+  {
+    const semi = loc.p.type === "node" && (children_need_semi[loc.p.tag] ?? false);
+    return strip_top(path_to_ns(loc.p, mark_top(stx_to_ns(loc.t, semi))));
+  }
 }
 
 function ns_to_string(main_ns: ns) {
