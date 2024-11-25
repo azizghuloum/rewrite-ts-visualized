@@ -8,7 +8,7 @@ export type atom_tag =
   | "regex_pattern"
   | "type_identifier"
   | "jsx_text"
-  | "string_fragment"
+  | "string"
   | "ERROR"
   | "other";
 
@@ -19,9 +19,9 @@ export const id_tags: { [k in atom_tag]: boolean } = {
   shorthand_property_identifier: true,
   jsx_text: false,
   number: false,
+  string: false,
   other: false,
   regex_pattern: false,
-  string_fragment: false,
   ERROR: false,
 };
 
@@ -39,7 +39,7 @@ export type list_tag =
   | "statement_block"
   | "empty_statement"
   | "array"
-  | "string"
+  | "required_parameter"
   | "member_expression"
   | "parenthesized_expression"
   | "ternary_expression"
@@ -73,7 +73,7 @@ export const list_tags: { [k in list_tag]: list_tag } = {
   empty_statement: "empty_statement",
   slice: "slice",
   array: "array",
-  string: "string",
+  required_parameter: "required_parameter",
   member_expression: "member_expression",
   parenthesized_expression: "parenthesized_expression",
   ternary_expression: "ternary_expression",

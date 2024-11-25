@@ -37,7 +37,6 @@ function absurdly(node: Parser.SyntaxNode): AST {
       case "type_identifier":
       case "shorthand_property_identifier":
       case "property_identifier":
-      case "string_fragment":
       case "ERROR": {
         return { type: "atom", tag: node.type, content: node.text };
       }
@@ -52,6 +51,9 @@ function absurdly(node: Parser.SyntaxNode): AST {
       }
     }
   } else {
+    if (node.type === "string") {
+      return { type: "atom", tag: "string", content: node.text };
+    }
     const ls = children.filter((x) => x.type !== "comment").map(absurdly);
     switch (node.type) {
       case "expression_statement": {
@@ -67,9 +69,11 @@ function absurdly(node: Parser.SyntaxNode): AST {
         }
       }
       case "required_parameter": {
-        assert(ls.length === 1);
-        const x = ls[0];
-        return x;
+        if (ls.length === 1) {
+          return ls[0];
+        } else {
+          return { type: "list", tag: "required_parameter", content: array_to_ll(ls) };
+        }
       }
       case "arrow_function": {
         if (ls.length === 3) {
