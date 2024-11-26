@@ -14,16 +14,10 @@ import { change, go_down, go_next, go_right, go_up, mkzipper, wrap_loc } from ".
 import { apply_syntax_rules, core_handlers } from "./syntax-core-patterns";
 import { debug, DONE, inspect, in_isolation, Step, syntax_error } from "./step";
 
-class SInitial extends Step {
-  constructor(loc: Loc, unit: CompilationUnit, context: Context, counter: number) {
-    super("ExpandProgram", loc, undefined, () => expand_program({ loc, unit, context, counter }));
-  }
-}
-
 export function initial_step(ast: AST, patterns: CorePatterns): Step {
   const { stx, counter, unit, context } = init_top_level(ast, patterns);
   const loc: Loc = mkzipper(stx);
-  return new SInitial(loc, unit, context, counter);
+  return new Step("Start", loc, undefined, () => expand_program({ loc, unit, context, counter }));
 }
 
 type goodies = { loc: Loc; rib: Rib; context: Context; counter: number; unit: CompilationUnit };
@@ -274,6 +268,7 @@ const list_handlers_table: { [tag in list_tag]: "descend" | "stop" | "todo" } = 
   import_clause: "todo",
   import_specifier: "todo",
   import_statement: "todo",
+  namespace_import: "todo",
   named_imports: "todo",
   instantiation_expression: "todo",
   literal_type: "todo",

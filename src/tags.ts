@@ -53,6 +53,7 @@ export type list_tag =
   | "named_imports"
   | "import_clause"
   | "import_statement"
+  | "namespace_import"
   | "type_annotation"
   | "property_signature"
   | "literal_type"
@@ -97,6 +98,7 @@ export const list_tags: { [k in list_tag]: list_tag } = {
   named_imports: "named_imports",
   import_clause: "import_clause",
   import_statement: "import_statement",
+  namespace_import: "namespace_import",
   type_annotation: "type_annotation",
   property_signature: "property_signature",
   literal_type: "literal_type",
