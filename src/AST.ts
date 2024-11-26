@@ -30,6 +30,8 @@ export type list_tag =
   | "lexical_declaration"
   | "variable_declarator"
   | "export_statement"
+  | "export_specifier"
+  | "export_clause"
   | "binary_expression"
   | "unary_expression"
   | "call_expression"
@@ -67,6 +69,8 @@ export const list_tags: { [k in list_tag]: list_tag } = {
   lexical_declaration: "lexical_declaration",
   variable_declarator: "variable_declarator",
   export_statement: "export_statement",
+  export_specifier: "export_specifier",
+  export_clause: "export_clause",
   binary_expression: "binary_expression",
   unary_expression: "unary_expression",
   call_expression: "call_expression",

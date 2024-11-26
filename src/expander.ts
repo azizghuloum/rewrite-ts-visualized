@@ -250,6 +250,8 @@ const list_handlers_table: { [tag in list_tag]: "descend" | "stop" | "todo" } = 
   lexical_declaration: "stop",
   variable_declarator: "stop",
   export_statement: "descend",
+  export_specifier: "todo",
+  export_clause: "todo",
   slice: "descend",
   arrow_function: "stop",
   statement_block: "stop",
