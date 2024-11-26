@@ -49,6 +49,10 @@ export type list_tag =
   | "instantiation_expression"
   | "type_query"
   | "import"
+  | "import_specifier"
+  | "named_imports"
+  | "import_clause"
+  | "import_statement"
   | "type_annotation"
   | "property_signature"
   | "literal_type"
@@ -89,6 +93,10 @@ export const list_tags: { [k in list_tag]: list_tag } = {
   type_query: "type_query",
   constraint: "constraint",
   import: "import",
+  import_specifier: "import_specifier",
+  named_imports: "named_imports",
+  import_clause: "import_clause",
+  import_statement: "import_statement",
   type_annotation: "type_annotation",
   property_signature: "property_signature",
   literal_type: "literal_type",
