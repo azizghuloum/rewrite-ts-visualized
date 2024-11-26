@@ -10,7 +10,7 @@ on:
     branches: [ "main" ]
 
 jobs:
-  build:
+  test:
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -24,6 +24,19 @@ jobs:
         cache: 'npm'
     - run: npm ci
     - run: npm test
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node-version: [22.x]
+    steps:
+    - uses: actions/checkout@v4
+    - name: Use Node.js ${{ matrix.node-version }}
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ matrix.node-version }}
+        cache: 'npm'
+    - run: npm ci
     - run: npm run build
     - uses: actions/upload-pages-artifact@v3
       with:
@@ -32,7 +45,7 @@ jobs:
         retention-days: 90
   deploy:
     if: github.ref == 'refs/heads/main'
-    needs: build
+    needs: [test, build]
     permissions:
       pages: write      # to deploy to Pages
       id-token: write   # to verify the deployment originates from an appropriate source
