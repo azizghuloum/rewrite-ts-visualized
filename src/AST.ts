@@ -44,6 +44,13 @@ export type list_tag =
   | "parenthesized_expression"
   | "ternary_expression"
   | "type_alias_declaration"
+  | "type_parameters"
+  | "type_parameter"
+  | "constraint"
+  | "type_arguments"
+  | "instantiation_expression"
+  | "type_query"
+  | "import"
   | "type_annotation"
   | "property_signature"
   | "literal_type"
@@ -75,6 +82,13 @@ export const list_tags: { [k in list_tag]: list_tag } = {
   parenthesized_expression: "parenthesized_expression",
   ternary_expression: "ternary_expression",
   type_alias_declaration: "type_alias_declaration",
+  type_parameters: "type_parameters",
+  type_parameter: "type_parameter",
+  type_arguments: "type_arguments",
+  instantiation_expression: "instantiation_expression",
+  type_query: "type_query",
+  constraint: "constraint",
+  import: "import",
   type_annotation: "type_annotation",
   property_signature: "property_signature",
   literal_type: "literal_type",
