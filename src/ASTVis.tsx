@@ -10,7 +10,6 @@ type STX =
 const colormap: { [k in AST.atom_tag]: string } = {
   identifier: "yellow",
   property_identifier: "lime",
-  shorthand_property_identifier: "lime",
   number: "magenta",
   type_identifier: "orange",
   jsx_text: "teal",

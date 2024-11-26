@@ -236,7 +236,6 @@ const atom_handlers_table: { [tag in atom_tag]: "next" | "stop" } = {
   identifier: "stop",
   type_identifier: "stop",
   property_identifier: "stop",
-  shorthand_property_identifier: "stop",
   number: "next",
   jsx_text: "next",
   string: "next",

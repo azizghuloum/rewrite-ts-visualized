@@ -30,7 +30,6 @@ function loc_to_ns(loc: Loc): ns {
           case "number":
           case "identifier":
           case "property_identifier":
-          case "shorthand_property_identifier":
           case "type_identifier":
           case "jsx_text":
           case "string":
