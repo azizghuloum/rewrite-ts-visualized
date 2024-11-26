@@ -239,16 +239,19 @@ const atom_handlers_table: { [tag in atom_tag]: "next" | "stop" } = {
   shorthand_property_identifier: "stop",
   number: "next",
   jsx_text: "next",
-  string_fragment: "next",
+  string: "next",
   regex_pattern: "next",
   ERROR: "stop",
   other: "next",
 };
 
-const list_handlers_table: { [tag in list_tag]: "descend" | "stop" } = {
+const list_handlers_table: { [tag in list_tag]: "descend" | "stop" | "todo" } = {
+  ERROR: "stop",
   lexical_declaration: "stop",
   variable_declarator: "stop",
-  export_statement: "stop",
+  export_statement: "descend",
+  export_specifier: "todo",
+  export_clause: "todo",
   slice: "descend",
   arrow_function: "stop",
   statement_block: "stop",
@@ -263,7 +266,23 @@ const list_handlers_table: { [tag in list_tag]: "descend" | "stop" } = {
   program: "stop",
   parenthesized_expression: "descend",
   ternary_expression: "descend",
-  ERROR: "stop",
+  object: "descend",
+  pair: "descend",
+  array_pattern: "todo",
+  constraint: "todo",
+  import: "todo",
+  instantiation_expression: "todo",
+  literal_type: "todo",
+  object_pattern: "todo",
+  property_signature: "todo",
+  required_parameter: "todo",
+  tuple_type: "todo",
+  type_alias_declaration: "todo",
+  type_annotation: "todo",
+  type_arguments: "todo",
+  type_parameter: "todo",
+  type_parameters: "todo",
+  type_query: "todo",
 };
 
 function preexpand_block(step: {
@@ -404,7 +423,6 @@ function preexpand_forms(step: {
             const goodies = extract_lexical_declaration_bindings({ ...step, loc });
             return go_next(
               goodies.loc,
-              //(loc) => syntax_error(loc, "unexpected token after lexical"),
               (loc) => preexpand_forms({ ...goodies, loc, k: step.k }),
               (loc) => step.k({ ...goodies, loc }),
             );
@@ -412,6 +430,9 @@ function preexpand_forms(step: {
           case "arrow_function":
             return next(loc);
           default: {
+            if (list_handlers_table[loc.t.tag] === "todo") {
+              debug(loc, `todo list handler for '${loc.t.tag}'`);
+            }
             assert(list_handlers_table[loc.t.tag] === "descend", `non descend tag '${loc.t.tag}'`);
             return next(loc);
           }
@@ -454,7 +475,7 @@ function find_form(loc: Loc): ffrv {
         const { tag } = loc.t;
         const action = list_handlers_table[tag];
         if (action === undefined) {
-          throw new Error(`no stop_table entry for ${tag}`);
+          debug(loc, `no stop_table entry for ${tag}`);
         }
         switch (action) {
           case "descend":
@@ -464,6 +485,8 @@ function find_form(loc: Loc): ffrv {
               type: "list",
               loc,
             };
+          case "todo":
+            debug(loc, `todo ${tag}`);
           default:
             const invalid: never = action;
             throw invalid;

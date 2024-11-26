@@ -1,4 +1,4 @@
-import CodeMirror from "@uiw/react-codemirror";
+import CodeMirror, { EditorView } from "@uiw/react-codemirror";
 import { javascript } from "@codemirror/lang-javascript";
 import { abcdef } from "@uiw/codemirror-theme-abcdef";
 import { useEffect, useState } from "react";
@@ -9,7 +9,7 @@ export function Editor({ code, onChange }: EditorProps) {
   return (
     <CodeMirror
       value={code}
-      extensions={[javascript({ jsx: true, typescript: true })]}
+      extensions={[javascript({ jsx: true, typescript: true }), EditorView.lineWrapping]}
       onChange={onChange}
       readOnly={!onChange}
       theme={abcdef}

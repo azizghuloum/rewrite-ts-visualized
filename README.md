@@ -1,5 +1,20 @@
 # Term Rewrite System for TypeScript
 
+# Goals
+
+## Ability to define pattern matching
+
+```typescript
+type T = { type: "num"; num: number } | { type: "str"; str: string };
+
+const x: T = { type: "num", num: 17 };
+
+match(x, [
+  [{ type: "num", num: n }, n + n],
+  [{ type: "str", str: s }, s.length],
+]);
+```
+
 # Progress
 
 ## basic expressions, statements, and declarations

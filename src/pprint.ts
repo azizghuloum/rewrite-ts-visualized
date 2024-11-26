@@ -1,7 +1,6 @@
 import { AST } from "./serialize";
-import { ll_to_array } from "./llhelpers";
+import { llmap, llreverse, ll_to_array } from "./llhelpers";
 import { Loc } from "./syntax-structures";
-import { reconvert } from "./zipper";
 import { list_tag } from "./AST";
 import * as prettier from "prettier/standalone";
 import * as prettier_ts from "prettier/plugins/typescript";
@@ -9,13 +8,21 @@ import * as prettier_estree from "prettier/plugins/estree";
 
 type ns = string | ns[];
 
+const children_need_semi: { [k in list_tag]?: boolean } = {
+  program: true,
+  statement_block: true,
+  slice: true,
+};
+
 function loc_to_ns(loc: Loc): ns {
   /* */
 
-  function stx_to_ns(stx: AST): ns {
+  function stx_to_ns(stx: AST, semi: boolean): ns {
+    if (semi && stx.tag !== "other") return [stx_to_ns(stx, false), ";"];
     switch (stx.type) {
       case "list": {
-        const ls = ll_to_array(stx.content).map(stx_to_ns);
+        const semi = children_need_semi[stx.tag] ?? false;
+        const ls = ll_to_array(stx.content).map((x) => stx_to_ns(x, semi));
         return ns_list(stx.tag, ls);
       }
       case "atom": {
@@ -26,7 +33,7 @@ function loc_to_ns(loc: Loc): ns {
           case "shorthand_property_identifier":
           case "type_identifier":
           case "jsx_text":
-          case "string_fragment":
+          case "string":
           case "regex_pattern":
           case "other":
             return stx.content;
@@ -43,14 +50,6 @@ function loc_to_ns(loc: Loc): ns {
     }
   }
 
-  function strip_trailing_newline(x: ns): ns {
-    if (Array.isArray(x) && x.length == 2 && x[1] === "\n") {
-      return x[0];
-    } else {
-      return x;
-    }
-  }
-
   function ns_list(tag: list_tag, ls: ns[]): ns {
     switch (tag) {
       case "arrow_function":
@@ -58,13 +57,6 @@ function loc_to_ns(loc: Loc): ns {
       case "unary_expression":
       case "ternary_expression":
         return ["(", ls, ")"];
-      case "program":
-      case "statement_block":
-      case "slice":
-        return [
-          ls.map(strip_trailing_newline).map((x, i) => (i === ls.length - 1 ? x : [x, "\n"])),
-          "\n",
-        ];
       default:
         return ls;
     }
@@ -73,8 +65,24 @@ function loc_to_ns(loc: Loc): ns {
   const lp = "/*>>>*/";
   const rp = "/*<<<*/";
 
-  function loc_to_ns(loc: Loc): ns {
-    return reconvert(loc, (x) => [lp, x, rp], stx_to_ns, ns_list);
+  function path_to_ns(path: Loc["p"], ns: ns): ns {
+    switch (path.type) {
+      case "top":
+        return ns;
+      case "node": {
+        const { tag, l, p, r } = path;
+        const csemi = children_need_semi[tag] ?? false;
+        return path_to_ns(p, [
+          ll_to_array(llreverse(llmap(l, (x) => stx_to_ns(x, csemi)))),
+          ns,
+          ll_to_array(llmap(r, (x) => stx_to_ns(x, csemi))),
+        ]);
+      }
+    }
+  }
+
+  function mark_top(ns: ns): ns {
+    return [lp, ns, rp];
   }
 
   function strip_top(ns: ns): ns {
@@ -85,7 +93,10 @@ function loc_to_ns(loc: Loc): ns {
     }
   }
 
-  return strip_top(loc_to_ns(loc));
+  {
+    const semi = loc.p.type === "node" && (children_need_semi[loc.p.tag] ?? false);
+    return strip_top(path_to_ns(loc.p, mark_top(stx_to_ns(loc.t, semi))));
+  }
 }
 
 function ns_to_string(main_ns: ns) {
@@ -117,6 +128,6 @@ export async function pprint(loc: Loc) {
     });
     return pretty;
   } catch (err) {
-    return `/* !!not pretty!! */\n${src}`;
+    return `/* !!not pretty!! */\n${src}\n`;
   }
 }
