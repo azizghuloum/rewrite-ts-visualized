@@ -35,11 +35,12 @@ function absurdly(node: Parser.SyntaxNode): AST {
       case "regex_pattern":
       case "identifier":
       case "type_identifier":
-      case "shorthand_property_identifier":
       case "property_identifier":
       case "ERROR": {
         return { type: "atom", tag: node.type, content: node.text };
       }
+      case "shorthand_property_identifier":
+        return { type: "atom", tag: "identifier", content: node.text };
       case node.text: {
         return { type: "atom", tag: "other", content: node.text };
       }

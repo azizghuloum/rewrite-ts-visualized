@@ -3,7 +3,6 @@ import { LL } from "./llhelpers";
 export type atom_tag =
   | "identifier"
   | "property_identifier"
-  | "shorthand_property_identifier"
   | "number"
   | "regex_pattern"
   | "type_identifier"
@@ -16,7 +15,6 @@ export const id_tags: { [k in atom_tag]: boolean } = {
   identifier: true,
   type_identifier: true,
   property_identifier: true,
-  shorthand_property_identifier: true,
   jsx_text: false,
   number: false,
   string: false,
