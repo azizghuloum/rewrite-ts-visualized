@@ -3,7 +3,7 @@ import { assert } from "./assert";
 import { LL, llappend, llmap } from "./llhelpers";
 import { STX, Loc, Wrap } from "./syntax-structures";
 import { push_wrap } from "./STX";
-import { list_tag } from "./AST";
+import { list_tag } from "./tags";
 
 export function wrap_loc(loc: Loc, wrap: Wrap): Loc {
   return Zipper.change(loc, push_wrap(wrap)(loc.t));

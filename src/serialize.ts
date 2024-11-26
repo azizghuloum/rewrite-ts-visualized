@@ -1,4 +1,4 @@
-import { atom_tag, list_tag } from "./AST";
+import { atom_tag, list_tag } from "./tags";
 import { LL, ll_to_array } from "./llhelpers";
 
 export type AST =

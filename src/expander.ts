@@ -1,5 +1,6 @@
 import { assert } from "./assert";
-import { AST, atom_tag, list_tag } from "./AST";
+import { AST } from "./AST";
+import { atom_tag, list_tag } from "./tags";
 import { CompilationUnit, Context, new_rib_id, Rib, Loc, Wrap, STX } from "./syntax-structures";
 import {
   extend_unit,

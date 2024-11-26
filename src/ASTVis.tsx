@@ -1,13 +1,13 @@
 import React from "react";
 import { LL } from "./llhelpers";
-import * as AST from "./AST";
 import { Wrap } from "./syntax-structures";
+import { atom_tag } from "./tags";
 
 type STX =
   | { type: "atom"; tag: string; wrap?: Wrap; content: string }
   | { type: "list"; tag: string; wrap?: Wrap; content: LL<STX> };
 
-const colormap: { [k in AST.atom_tag]: string } = {
+const colormap: { [k in atom_tag]: string } = {
   identifier: "yellow",
   property_identifier: "lime",
   number: "magenta",

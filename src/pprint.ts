@@ -1,7 +1,7 @@
 import { AST } from "./serialize";
 import { llmap, llreverse, ll_to_array } from "./llhelpers";
 import { Loc } from "./syntax-structures";
-import { list_tag } from "./AST";
+import { list_tag } from "./tags";
 import * as prettier from "prettier/standalone";
 import * as prettier_ts from "prettier/plugins/typescript";
 import * as prettier_estree from "prettier/plugins/estree";

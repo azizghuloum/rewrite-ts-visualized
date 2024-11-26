@@ -1,5 +1,6 @@
 import { assert } from "./assert";
-import { AST, id_tags } from "./AST";
+import { AST } from "./AST";
+import { id_tags } from "./tags";
 import { LL, llappend } from "./llhelpers";
 import { core_handlers } from "./syntax-core-patterns";
 import {

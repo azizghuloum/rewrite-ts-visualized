@@ -1,5 +1,6 @@
 import { TaggedReconstructiveZipper } from "zipper";
-import { AST, atom_tag, list_tag } from "./AST";
+import { AST } from "./AST";
+import { atom_tag, list_tag } from "./tags";
 import { LL } from "./llhelpers";
 
 export type TopMark = "top";

@@ -1,6 +1,6 @@
 import Parser from "web-tree-sitter";
-import { assert } from "./assert";
-import { AST, list_tag, list_tags } from "./AST";
+import { AST } from "./AST";
+import { list_tag, list_tags } from "./tags";
 import { array_to_ll } from "./llhelpers";
 
 export const load_parser = async (files: { parser_url: string; lang_url: string }) =>

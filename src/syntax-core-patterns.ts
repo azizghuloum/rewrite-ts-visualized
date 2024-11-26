@@ -1,5 +1,6 @@
 import { assert } from "./assert";
-import { AST, id_tags } from "./AST";
+import { AST } from "./AST";
+import { id_tags } from "./tags";
 import { LL, llappend, llmap, llreduce, llreverse, ll_to_array } from "./llhelpers";
 import { syntax_error } from "./step";
 import {
