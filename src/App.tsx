@@ -205,7 +205,7 @@ function Expander() {
 
 const router = createBrowserRouter([
   {
-    path: "/",
+    path: "/rewrite-ts-visualized",
     element: <Expander />,
   },
 ]);
