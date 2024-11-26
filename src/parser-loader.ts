@@ -63,16 +63,22 @@ function absurdly(node: Parser.SyntaxNode): AST {
           return {
             type: "list",
             tag: "ERROR",
-            wrap: undefined,
             content: array_to_ll(ls),
           };
+        }
+      }
+      case "predefined_type": {
+        if (ls.length === 1) {
+          return ls[0];
+        } else {
+          throw new Error("predefined_type with more/less than one form");
         }
       }
       case "required_parameter": {
         if (ls.length === 1) {
           return ls[0];
         } else {
-          return { type: "list", tag: "required_parameter", content: array_to_ll(ls) };
+          return { type: "list", tag: node.type, content: array_to_ll(ls) };
         }
       }
       case "union_type": {
@@ -83,18 +89,20 @@ function absurdly(node: Parser.SyntaxNode): AST {
       }
       case "arrow_function": {
         if (ls.length === 3) {
-          const fmls = ls[0];
-          if (fmls.type === "atom" && fmls.tag === "identifier") {
-            // const lparen: AST = { type: "atom", tag: "other", content: "(" };
-            // const rparen: AST = { type: "atom", tag: "other", content: ")" };
-            const rfmls: AST = {
-              type: "list",
-              tag: "formal_parameters",
-              content: array_to_ll([fmls]),
-            };
-            ls[0] = rfmls;
-          }
-          assert(ls[0].type === "list");
+          const [fmls, arrow, body] = ls;
+          const new_fmls: AST =
+            fmls.type === "atom" && fmls.tag === "identifier"
+              ? {
+                  type: "list",
+                  tag: "formal_parameters",
+                  content: array_to_ll([fmls]),
+                }
+              : fmls;
+          return {
+            type: "list",
+            tag: "arrow_function",
+            content: [new_fmls, [arrow, [body, null]]],
+          };
         } else {
           return {
             type: "list",

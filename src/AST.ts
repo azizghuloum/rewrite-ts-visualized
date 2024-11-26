@@ -46,7 +46,6 @@ export type list_tag =
   | "type_alias_declaration"
   | "type_annotation"
   | "property_signature"
-  | "predefined_type"
   | "literal_type"
   | "tuple_type"
   | "pair"
@@ -78,7 +77,6 @@ export const list_tags: { [k in list_tag]: list_tag } = {
   type_alias_declaration: "type_alias_declaration",
   type_annotation: "type_annotation",
   property_signature: "property_signature",
-  predefined_type: "predefined_type",
   literal_type: "literal_type",
   tuple_type: "tuple_type",
   pair: "pair",
