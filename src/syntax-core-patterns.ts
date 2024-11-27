@@ -1,5 +1,5 @@
 import { assert } from "./assert";
-import { AST } from "./AST";
+import { AST } from "./ast";
 import { id_tags } from "./tags";
 import { LL, llappend, llmap, llreduce, llreverse, ll_to_array } from "./llhelpers";
 import { syntax_error } from "./step";
@@ -10,7 +10,7 @@ import {
   extend_unit,
   free_id_equal,
   push_wrap,
-} from "./STX";
+} from "./stx";
 import {
   antimark,
   CompilationUnit,

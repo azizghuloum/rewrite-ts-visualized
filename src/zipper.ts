@@ -2,7 +2,7 @@ import * as Zipper from "zipper/src/tagged-constructive-zipper";
 import { assert } from "./assert";
 import { LL, llappend, llmap } from "./llhelpers";
 import { STX, Loc, Wrap } from "./syntax-structures";
-import { push_wrap } from "./STX";
+import { push_wrap } from "./stx";
 import { list_tag } from "./tags";
 
 export function wrap_loc(loc: Loc, wrap: Wrap): Loc {

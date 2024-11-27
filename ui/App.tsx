@@ -3,13 +3,13 @@ import { useEffect, useMemo, useState } from "react";
 import { createBrowserRouter, RouterProvider } from "react-router-dom";
 import { ASTExpr, ASTHighlight, ASTList } from "./ASTVis";
 import { Editor, EditorP } from "./Editor";
-import * as Zipper from "./zipper";
-import { initial_step, next_step } from "./expander";
-import { Loc } from "./syntax-structures";
-import { core_patterns } from "./syntax-core-patterns";
-import { parse } from "./parse";
-import { pprint } from "./pprint";
-import { Step } from "./step";
+import * as Zipper from "../src/zipper";
+import { initial_step, next_step } from "../src/expander";
+import { Loc } from "../src/syntax-structures";
+import { core_patterns } from "../src/syntax-core-patterns";
+import { parse } from "../src/parse";
+import { pprint } from "../src/pprint";
+import { Step } from "../src/step";
 
 type ExampleProps = {
   code: string;
