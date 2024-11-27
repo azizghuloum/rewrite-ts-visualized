@@ -1,5 +1,5 @@
 import { TaggedReconstructiveZipper } from "zipper";
-import { AST } from "./AST";
+import { AST } from "./ast";
 import { atom_tag, list_tag } from "./tags";
 import { LL } from "./llhelpers";
 

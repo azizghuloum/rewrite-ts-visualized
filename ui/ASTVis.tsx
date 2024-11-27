@@ -1,7 +1,7 @@
 import React from "react";
-import { LL } from "./llhelpers";
-import { Wrap } from "./syntax-structures";
-import { atom_tag } from "./tags";
+import { LL } from "../src/llhelpers";
+import { Wrap } from "../src/syntax-structures";
+import { atom_tag } from "../src/tags";
 
 type STX =
   | { type: "atom"; tag: string; wrap?: Wrap; content: string }

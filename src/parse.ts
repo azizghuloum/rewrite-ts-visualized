@@ -1,4 +1,4 @@
-import { AST } from "./AST";
+import { AST } from "./ast";
 import { list_tag } from "./tags";
 import { array_to_ll, llappend } from "./llhelpers";
 import TS, { SyntaxKind } from "typescript";

@@ -1,5 +1,5 @@
 import { assert } from "./assert";
-import { AST } from "./AST";
+import { AST } from "./ast";
 import { atom_tag, list_tag } from "./tags";
 import { CompilationUnit, Context, new_rib_id, Rib, Loc, Wrap, STX } from "./syntax-structures";
 import {
@@ -9,7 +9,7 @@ import {
   extend_rib,
   extend_context_lexical,
   CorePatterns,
-} from "./STX";
+} from "./stx";
 import { change, go_down, go_next, go_right, go_up, mkzipper, wrap_loc } from "./zipper";
 import { apply_syntax_rules, core_handlers } from "./syntax-core-patterns";
 import { debug, DONE, inspect, in_isolation, Step, syntax_error } from "./step";
