@@ -15,5 +15,5 @@
     "jsx": "react-jsx",
     "skipLibCheck": true
   },
-  "exclude": ["./tests"]
+  "exclude": ["./tests", "./scribblings"]
 }
