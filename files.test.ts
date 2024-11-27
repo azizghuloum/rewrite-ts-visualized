@@ -1,7 +1,7 @@
 import { readdirSync } from "fs";
 import { readFile } from "fs/promises";
 import { expect, test, suite } from "vitest";
-import { parse } from "./src/parser-loader";
+import { parse } from "./src/parse";
 import { core_patterns } from "./src/syntax-core-patterns";
 import { initial_step } from "./src/expander";
 import { pprint } from "./src/pprint";
