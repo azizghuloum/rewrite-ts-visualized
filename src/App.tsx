@@ -1,7 +1,4 @@
 import "./App.css";
-import Parser from "web-tree-sitter";
-import treesitter_wasm_url from "web-tree-sitter/tree-sitter.wasm?url";
-import tsx_url from "tree-sitter-typescript/tree-sitter-tsx.wasm?url";
 import { useEffect, useMemo, useState } from "react";
 import { createBrowserRouter, RouterProvider } from "react-router-dom";
 import { ASTExpr, ASTHighlight, ASTList } from "./ASTVis";
@@ -10,12 +7,11 @@ import * as Zipper from "./zipper";
 import { initial_step, next_step } from "./expander";
 import { Loc } from "./syntax-structures";
 import { core_patterns } from "./syntax-core-patterns";
-import { load_parser, parse_with } from "./parser-loader";
+import { parse } from "./parser-loader";
 import { pprint } from "./pprint";
 import { Step } from "./step";
 
 type ExampleProps = {
-  parser: Parser;
   code: string;
   onChange?: (code: string) => void;
 };
@@ -88,9 +84,8 @@ function timeout(delay: number, f: () => void): () => void {
   }
 }
 
-function Example({ parser, code, onChange }: ExampleProps) {
+function Example({ code, onChange }: ExampleProps) {
   function init_state(): State {
-    const parse = (code: string) => parse_with(parser, code);
     const patterns = core_patterns(parse);
     return initial_state(initial_step(parse(code), patterns));
   }
@@ -176,19 +171,9 @@ function Example({ parser, code, onChange }: ExampleProps) {
 }
 
 function Expander() {
-  const [parser, set_parser] = useState<Parser | null>(null);
   const [sample, setSample] = useState(
     localStorage.getItem("sample_program") ?? "const foo = (x) => x;\nfoo(12);\n",
   );
-  useEffect(() => {
-    load_parser({
-      parser_url: treesitter_wasm_url,
-      lang_url: tsx_url,
-    }).then(set_parser);
-    return undefined;
-  }, []);
-  if (!parser) return <div>loading ...</div>;
-
   return (
     <>
       <Example
@@ -197,7 +182,6 @@ function Expander() {
           setSample(code);
           localStorage.setItem("sample_program", code);
         }}
-        parser={parser}
       />
     </>
   );

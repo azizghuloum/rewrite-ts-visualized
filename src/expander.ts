@@ -89,7 +89,7 @@ function extract_lexical_declaration_bindings({
         ls,
         (loc) => {
           const goodies = gen_lexical({ loc, rib, counter, context, unit });
-          return go_next(
+          return go_right(
             ls,
             (loc) => after_vars({ ...goodies, loc }),
             (loc) => ({ ...goodies, loc }),
@@ -282,6 +282,7 @@ const list_handlers_table: { [tag in list_tag]: "descend" | "stop" | "todo" } = 
   type_parameter: "todo",
   type_parameters: "todo",
   type_query: "todo",
+  syntax_list: "descend",
 };
 
 function preexpand_block(step: {

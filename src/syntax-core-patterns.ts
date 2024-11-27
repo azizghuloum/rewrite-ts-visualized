@@ -486,7 +486,7 @@ export const core_patterns = (parse: (code: string) => AST) => {
     assert(ast.type === "list" && ast.tag === "program");
     const bodies = ast.content;
     assert(bodies !== null);
-    assert(bodies[1] === null);
+    assert(bodies[1] === null, bodies);
     return bodies[0];
   };
   return {

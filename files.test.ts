@@ -1,21 +1,17 @@
 import { readdirSync } from "fs";
 import { readFile } from "fs/promises";
 import { expect, test, suite } from "vitest";
-import { load_parser, parse_with } from "./src/parser-loader";
-import treesitter_wasm_url from "web-tree-sitter/tree-sitter.wasm?url";
-import tsx_url from "tree-sitter-typescript/tree-sitter-tsx.wasm?url";
+import { parse } from "./src/parser-loader";
 import { core_patterns } from "./src/syntax-core-patterns";
 import { initial_step } from "./src/expander";
-import Parser from "web-tree-sitter";
 import { pprint } from "./src/pprint";
 import { Step } from "./src/step";
 
 const test_dir = __dirname + "/tests";
 const md_dir = __dirname + "/examples";
 
-async function compile_script(filename: string, test_name: string, parser: Parser) {
+async function compile_script(filename: string, test_name: string) {
   const code = await readFile(filename, { encoding: "utf-8" });
-  const parse = (code: string) => parse_with(parser, code);
   const patterns = core_patterns(parse);
   let step = initial_step(parse(code), patterns);
   while (step.next) {
@@ -54,17 +50,10 @@ async function compile_script(filename: string, test_name: string, parser: Parse
 
 suite("files in tests dir", async () => {
   const test_files = readdirSync(test_dir).filter((x) => x.match(/\.ts$/));
-  console.log(treesitter_wasm_url);
-  const parser = await load_parser({
-    parser_url: `./${treesitter_wasm_url}`,
-    lang_url: `./${tsx_url}`,
-  });
   test_files.forEach((x) =>
     test(`expanding file ${x}`, async () => {
       const test_path = `${test_dir}/${x}`;
-      await expect(await compile_script(test_path, x, parser)).toMatchFileSnapshot(
-        `${md_dir}/${x}.md`,
-      );
+      await expect(await compile_script(test_path, x)).toMatchFileSnapshot(`${md_dir}/${x}.md`);
     }),
   );
 });

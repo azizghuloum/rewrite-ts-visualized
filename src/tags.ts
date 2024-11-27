@@ -63,6 +63,7 @@ export type list_tag =
   | "array_pattern"
   | "object_pattern"
   | "slice"
+  | "syntax_list"
   | "ERROR";
 
 export const list_tags: { [k in list_tag]: list_tag } = {
@@ -107,5 +108,6 @@ export const list_tags: { [k in list_tag]: list_tag } = {
   object: "object",
   object_pattern: "object_pattern",
   array_pattern: "array_pattern",
+  syntax_list: "syntax_list",
   ERROR: "ERROR",
 };
