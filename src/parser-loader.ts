@@ -1,12 +1,30 @@
 import { AST } from "./AST";
-import { list_tag, list_tags } from "./tags";
+import { list_tag } from "./tags";
 import { array_to_ll, llappend } from "./llhelpers";
 import TS, { SyntaxKind } from "typescript";
 import { assert } from "./assert";
 
+const pass_through: { [k in SyntaxKind]?: list_tag } = {
+  [SyntaxKind.CallExpression]: "call_expression",
+  [SyntaxKind.ParenthesizedExpression]: "parenthesized_expression",
+  [SyntaxKind.BinaryExpression]: "binary_expression",
+  [SyntaxKind.PrefixUnaryExpression]: "unary_expression",
+  [SyntaxKind.PropertyAccessExpression]: "member_expression",
+  [SyntaxKind.PropertyAssignment]: "pair",
+  [SyntaxKind.ConditionalExpression]: "ternary_expression",
+  [SyntaxKind.VariableDeclaration]: "variable_declarator",
+  [SyntaxKind.SyntaxList]: "syntax_list",
+};
+
+const splice_middle: { [k in SyntaxKind]?: list_tag } = {
+  [SyntaxKind.ObjectLiteralExpression]: "object",
+  [SyntaxKind.ArrayLiteralExpression]: "array",
+  [SyntaxKind.Block]: "statement_block",
+};
+
 function absurdly(node: TS.Node, src: TS.SourceFile): AST {
   const children = node.getChildren(src);
-  if (children.length === 0) {
+  if (children.length === 0 && node.kind !== SyntaxKind.SyntaxList) {
     const content = node.getText(src);
     switch (node.kind) {
       case SyntaxKind.NumericLiteral:
@@ -38,8 +56,6 @@ function absurdly(node: TS.Node, src: TS.SourceFile): AST {
         return { type: "atom", tag: "other", content };
       case SyntaxKind.EndOfFileToken:
         return { type: "atom", tag: "other", content };
-      case SyntaxKind.SyntaxList:
-        return { type: "list", tag: "syntax_list", content: null };
       default: {
         throw new Error(`unknown atom '${TS.SyntaxKind[node.kind]}':'${node.getText(src)}'`);
       }
@@ -47,6 +63,22 @@ function absurdly(node: TS.Node, src: TS.SourceFile): AST {
   } else {
     const ls = children.filter((x) => x.kind !== null).map((x) => absurdly(x, src));
     const content = array_to_ll(ls);
+    {
+      const tag = pass_through[node.kind];
+      if (tag) return { type: "list", tag, content };
+    }
+    {
+      const tag = splice_middle[node.kind];
+      if (tag) {
+        assert(ls.length === 3, ls);
+        assert(ls[1].tag === "syntax_list");
+        return {
+          type: "list",
+          tag,
+          content: [ls[0], llappend(ls[1].content, [ls[2], null])],
+        };
+      }
+    }
     switch (node.kind) {
       case SyntaxKind.VariableStatement:
       case SyntaxKind.ExpressionStatement: {
@@ -70,17 +102,6 @@ function absurdly(node: TS.Node, src: TS.SourceFile): AST {
           return { type: "list", tag: "ERROR", content };
         }
       }
-      case SyntaxKind.SyntaxList:
-        return { type: "list", tag: "syntax_list", content };
-      case SyntaxKind.Block: {
-        assert(ls.length === 3, ls);
-        assert(ls[1].tag === "syntax_list");
-        return {
-          type: "list",
-          tag: "statement_block",
-          content: [ls[0], llappend(ls[1].content, [ls[2], null])],
-        };
-      }
       case SyntaxKind.ArrowFunction: {
         assert(ls.length === 5, ls);
         const [lt, fmls, rt, ar, body] = ls;
@@ -92,22 +113,10 @@ function absurdly(node: TS.Node, src: TS.SourceFile): AST {
         };
         return { type: "list", tag: "arrow_function", content: [args, [ar, [body, null]]] };
       }
-      case SyntaxKind.CallExpression:
-        return { type: "list", tag: "call_expression", content };
-      case SyntaxKind.ParenthesizedExpression:
-        return { type: "list", tag: "parenthesized_expression", content };
-      case SyntaxKind.BinaryExpression:
-        return { type: "list", tag: "binary_expression", content };
-      case SyntaxKind.PrefixUnaryExpression:
-        return { type: "list", tag: "unary_expression", content };
-      case SyntaxKind.PropertyAccessExpression:
-        return { type: "list", tag: "member_expression", content };
       case SyntaxKind.ShorthandPropertyAssignment: {
         assert(ls.length === 1, ls);
         return ls[0];
       }
-      case SyntaxKind.ConditionalExpression:
-        return { type: "list", tag: "ternary_expression", content };
       case SyntaxKind.SourceFile: {
         assert(ls.length === 2, ls);
         assert(ls[1].content === "", ls[1]);
@@ -115,17 +124,6 @@ function absurdly(node: TS.Node, src: TS.SourceFile): AST {
         assert(fst.tag === "syntax_list", fst);
         return { type: "list", tag: "program", content: fst.content };
       }
-      case SyntaxKind.ArrayLiteralExpression: {
-        assert(ls.length === 3, ls);
-        assert(ls[1].tag === "syntax_list");
-        return {
-          type: "list",
-          tag: "array",
-          content: [ls[0], llappend(ls[1].content, [ls[2], null])],
-        };
-      }
-      case SyntaxKind.VariableDeclaration:
-        return { type: "list", tag: "variable_declarator", content };
       case SyntaxKind.VariableDeclarationList: {
         assert(ls.length === 2, ls);
         const [kwd, decls] = ls;
@@ -139,30 +137,11 @@ function absurdly(node: TS.Node, src: TS.SourceFile): AST {
           return { type: "list", tag: "required_parameter", content };
         }
       }
-      case SyntaxKind.PropertyAssignment: {
-        assert(ls.length === 3 && ls[1].content === ":", ls);
-        return { type: "list", tag: "pair", content };
-      }
-      case SyntaxKind.ObjectLiteralExpression: {
-        assert(ls.length === 3 && ls[0].content === "{" && ls[2].content === "}", ls);
-        assert(ls[1].tag === "syntax_list");
-        return {
-          type: "list",
-          tag: "object",
-          content: [ls[0], llappend(ls[1].content, [ls[2], null])],
-        };
-      }
+      default:
+        throw new Error(
+          `unsupported tag '${SyntaxKind[node.kind]}', children: ${JSON.stringify(ls)}`,
+        );
     }
-    const tag = (list_tags as { [k: string]: list_tag })[node.kind];
-    if (!tag)
-      throw new Error(
-        `unsupported tag '${SyntaxKind[node.kind]}', children: ${JSON.stringify(ls)}`,
-      );
-    return {
-      type: "list",
-      tag,
-      content: array_to_ll(ls),
-    };
   }
 }
 
