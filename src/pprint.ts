@@ -118,15 +118,20 @@ function ns_to_string(main_ns: ns) {
   return ac;
 }
 
-export async function pprint(loc: Loc) {
-  const src = ns_to_string(loc_to_ns(loc)).join("");
+export async function pretty_print(code: string) {
   try {
-    const pretty = await prettier.format(src, {
+    const pretty = await prettier.format(code, {
       parser: "typescript",
       plugins: [prettier_ts, prettier_estree],
+      printWidth: 100,
     });
     return pretty;
   } catch (err) {
-    return `/* !!not pretty!! */\n${src}\n`;
+    return `/* !!not pretty!! */\n${code}\n`;
   }
+}
+
+export async function pprint(loc: Loc) {
+  const src = ns_to_string(loc_to_ns(loc)).join("");
+  return await pretty_print(src);
 }
