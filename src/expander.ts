@@ -14,8 +14,8 @@ import { change, go_down, go_next, go_right, go_up, mkzipper, wrap_loc } from ".
 import { apply_syntax_rules, core_handlers } from "./syntax-core-patterns";
 import { debug, DONE, inspect, in_isolation, Step, syntax_error } from "./step";
 
-export function initial_step(ast: AST, patterns: CorePatterns): Step {
-  const { stx, counter, unit, context } = init_top_level(ast, patterns);
+export function initial_step(ast: AST, cu_id: string, patterns: CorePatterns): Step {
+  const { stx, counter, unit, context } = init_top_level(ast, cu_id, patterns);
   const loc: Loc = mkzipper(stx);
   return new Step("Start", loc, undefined, () => expand_program({ loc, unit, context, counter }));
 }
@@ -135,7 +135,7 @@ function expand_program(step: {
     normal_env: {},
   };
   const [rib_id, counter] = new_rib_id(step.counter);
-  const wrap: Wrap = { marks: null, subst: [{ rib_id }, null] };
+  const wrap: Wrap = { marks: null, subst: [{ rib_id, cu_id: step.unit.cu_id }, null] };
   const loc = go_down(
     wrap_loc(step.loc, wrap),
     (x) => x,
@@ -650,7 +650,7 @@ function expand_arrow_function({
         body,
         (body, k) => {
           const [rib_id, new_counter] = new_rib_id(pgs.counter);
-          const wrap: Wrap = { marks: null, subst: [{ rib_id }, null] };
+          const wrap: Wrap = { marks: null, subst: [{ rib_id, cu_id: unit.cu_id }, null] };
           const loc = wrap_loc(body, wrap);
           const new_unit = extend_unit(pgs.unit, rib_id, pgs.rib); // params are in rib
           return expand_concise_body({

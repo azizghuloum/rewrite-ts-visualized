@@ -13,7 +13,7 @@ const md_dir = __dirname + "/examples";
 async function compile_script(filename: string, test_name: string) {
   const code = await readFile(filename, { encoding: "utf-8" });
   const patterns = core_patterns(parse);
-  let step = initial_step(parse(code), patterns);
+  let step = initial_step(parse(code), test_name, patterns);
   while (step.next) {
     try {
       step.next();

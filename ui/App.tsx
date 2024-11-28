@@ -87,7 +87,7 @@ function timeout(delay: number, f: () => void): () => void {
 function Example({ code, onChange }: ExampleProps) {
   function init_state(): State {
     const patterns = core_patterns(parse);
-    return initial_state(initial_step(parse(code), patterns));
+    return initial_state(initial_step(parse(code), "example", patterns));
   }
   const [state, setState] = useState(init_state());
   useEffect(() => setState(init_state()), [next_step, code]);

@@ -49,12 +49,13 @@ export const new_rib_id = label_generator("r");
 export const new_mark = label_generator("m");
 
 export type CompilationUnit = {
+  cu_id: string;
   store: { [rib_id: string]: Rib };
 };
 
 export type Marks = LL<Mark>;
 
-export type RibRef = { rib_id: string };
+export type RibRef = { rib_id: string; cu_id: string };
 
 export type Subst = LL<Shift | RibRef>;
 

@@ -352,7 +352,7 @@ const using_syntax_rules: handler = (orig_loc, orig_context, orig_unit, orig_cou
         (x, y) => bound_id_equal(x, y),
       );
       const [rib_id, new_counter] = new_rib_id(orig_counter);
-      const do_wrap = push_wrap({ marks: null, subst: [{ rib_id }, null] });
+      const do_wrap = push_wrap({ marks: null, subst: [{ rib_id, cu_id: orig_unit.cu_id }, null] });
       const [new_rib, final_counter, final_context] = clauses.reduce(
         (ac: [Rib, number, Context], [lhs, rhs]) => {
           assert(lhs.type === "atom" && lhs.wrap !== undefined);

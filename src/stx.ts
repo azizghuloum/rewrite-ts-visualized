@@ -43,7 +43,8 @@ function id_to_label(
     if (marks === null) throw new Error("missing marks");
     if (subst === null) return undefined; // unbound
     if (subst[0] === shift) return loop(marks[1], subst[1]);
-    const env = (({ rib_id }) => {
+    const env = (({ rib_id, cu_id }) => {
+      assert(cu_id === unit.cu_id, "unhandled imported rib?");
       const rib = unit.store[rib_id];
       if (rib === undefined) {
         throw new Error(`missing rib '${rib_id}', unit:${Object.keys(unit.store).join(",")}`);
@@ -218,6 +219,7 @@ export type CorePatterns = { [k: string]: AST };
 
 export function init_top_level(
   ast: AST,
+  cu_id: string,
   patterns: CorePatterns,
 ): {
   stx: STX;
@@ -226,11 +228,12 @@ export function init_top_level(
   context: Context;
 } {
   const [rib_id, counter] = new_rib_id(0);
-  const top_wrap: Wrap = { marks: top_marks, subst: [{ rib_id }, null] };
+  const top_wrap: Wrap = { marks: top_marks, subst: [{ rib_id, cu_id }, null] };
   function wrap(ast: AST): STX {
     return { ...ast, wrap: top_wrap };
   }
   const unit: CompilationUnit = {
+    cu_id,
     store: {
       [rib_id]: {
         type: "rib",
@@ -251,6 +254,7 @@ export function init_top_level(
 
 export function extend_unit(unit: CompilationUnit, rib_id: string, rib: Rib): CompilationUnit {
   return {
+    cu_id: unit.cu_id,
     store: { ...unit.store, [rib_id]: rib },
   };
 }
