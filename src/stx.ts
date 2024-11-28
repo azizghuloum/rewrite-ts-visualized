@@ -18,6 +18,7 @@ import {
   top_marks,
   Wrap,
 } from "./syntax-structures";
+import { stdlibs } from "./generated-stdlibs";
 
 function is_top_marked(wrap: Wrap): boolean {
   function loop_marks(marks: Marks): boolean {
@@ -206,16 +207,40 @@ export function push_wrap(outerwrap: Wrap): (stx: AST | STX) => STX {
   };
 }
 
-function init_global_context(patterns: CorePatterns, wrap: (ast: AST) => STX): Context {
-  const binding_entries = Object.entries(patterns).map(([name, pattern]) => [
+function init_global_context(
+  patterns: CorePatterns,
+  wrap: (ast: AST) => STX,
+  globals: string[],
+): Context {
+  type entry = [string, Binding];
+  const syntax_entries: entry[] = Object.entries(patterns).map(([name, pattern]) => [
     `global.${name}`,
     { type: "core_syntax", name, pattern: wrap(pattern) },
   ]);
-  const context: Context = Object.fromEntries(binding_entries);
+  const global_entries: entry[] = globals.map((name) => [`global.${name}`, { type: "ts", name }]);
+  const context: Context = Object.fromEntries([...syntax_entries, ...global_entries]);
   return context;
 }
 
 export type CorePatterns = { [k: string]: AST };
+
+function get_globals(lib: string) {
+  const globals: { [k: string]: string } = {};
+  function intern(names: string[] | undefined) {
+    names?.forEach((x) => (globals[x] = x));
+  }
+  function process(lib: string) {
+    const x = stdlibs[lib];
+    intern(x.class);
+    intern(x.interface);
+    intern(x.module);
+    intern(x.value);
+    intern(x.type);
+    x.include?.forEach(process);
+  }
+  process(lib);
+  return Object.keys(globals);
+}
 
 export function init_top_level(
   ast: AST,
@@ -232,15 +257,17 @@ export function init_top_level(
   function wrap(ast: AST): STX {
     return { ...ast, wrap: top_wrap };
   }
+  const globals = get_globals("es2024.full");
   const unit: CompilationUnit = {
     cu_id,
     store: {
       [rib_id]: {
         type: "rib",
         types_env: {},
-        normal_env: Object.fromEntries(
-          Object.keys(core_handlers).map((name) => [name, [[top_marks, `global.${name}`]]]),
-        ),
+        normal_env: Object.fromEntries([
+          ...Object.keys(core_handlers).map((name) => [name, [[top_marks, `global.${name}`]]]),
+          ...globals.map((name) => [name, [[top_marks, `global.${name}`]]]),
+        ]),
       },
     },
   };
@@ -248,7 +275,7 @@ export function init_top_level(
     stx: wrap(ast),
     counter,
     unit,
-    context: init_global_context(patterns, wrap),
+    context: init_global_context(patterns, wrap, globals),
   };
 }
 

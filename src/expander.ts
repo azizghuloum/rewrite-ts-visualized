@@ -254,7 +254,7 @@ const list_handlers_table: { [tag in list_tag]: "descend" | "stop" | "todo" } = 
   binary_expression: "descend",
   unary_expression: "descend",
   array: "descend",
-  member_expression: "descend",
+  member_expression: "stop",
   empty_statement: "descend",
   formal_parameters: "stop",
   program: "stop",
@@ -356,6 +356,9 @@ function preexpand_forms(step: {
   function next(loc: Loc): never {
     return go_next(loc, (loc) => h(find_form(loc)), done);
   }
+  function descend(loc: Loc): never {
+    return go_down(loc, (loc) => h(find_form(loc)), syntax_error);
+  }
   function h(ffrv: ffrv): never {
     const loc = ffrv.loc;
     switch (ffrv.type) {
@@ -376,6 +379,7 @@ function preexpand_forms(step: {
             const binding = resolution.binding;
             switch (binding.type) {
               case "lexical":
+              case "ts":
                 return next(loc);
               case "core_syntax": {
                 const { name, pattern } = binding;
@@ -429,6 +433,8 @@ function preexpand_forms(step: {
           }
           case "arrow_function":
             return next(loc);
+          case "member_expression":
+            return descend(loc);
           default: {
             if (list_handlers_table[loc.t.tag] === "todo") {
               debug(loc, `todo list handler for '${loc.t.tag}'`);
@@ -688,6 +694,15 @@ function postexpand_body(step: {
   function descend(loc: Loc): never {
     return go_down(loc, (loc) => h(find_form(loc)), cont);
   }
+  function rename(loc: Loc, new_name: string): Loc {
+    const new_id: STX = {
+      type: "atom",
+      tag: "identifier",
+      wrap: { marks: null, subst: null },
+      content: new_name,
+    };
+    return change(loc, { type: "loc", t: new_id, p: { type: "top" } });
+  }
   function h(ffrv: ffrv): never {
     const loc = ffrv.loc;
     switch (ffrv.type) {
@@ -703,20 +718,12 @@ function postexpand_body(step: {
               case "bound": {
                 const { binding } = resolution;
                 switch (binding.type) {
+                  case "ts":
                   case "lexical": {
-                    const new_id: STX = {
-                      type: "atom",
-                      tag: "identifier",
-                      wrap: { marks: null, subst: null },
-                      content: binding.name,
-                    };
-                    return cont(
-                      change(loc, {
-                        type: "loc",
-                        t: new_id,
-                        p: { type: "top" },
-                      }),
-                    );
+                    return cont(rename(loc, binding.name));
+                  }
+                  default: {
+                    debug(loc, `unhandled ${binding.type}`);
                   }
                 }
               }
@@ -745,6 +752,37 @@ function postexpand_body(step: {
           }
           case "slice": {
             return syntax_error(loc, "invalid slice");
+          }
+          case "member_expression": {
+            return go_down(
+              loc,
+              (loc) =>
+                in_isolation(
+                  loc,
+                  (loc, k) => postexpand_body({ ...step, loc, k: (loc) => k(loc, undefined) }),
+                  (loc, gs) =>
+                    go_right(
+                      loc,
+                      (loc) => {
+                        assert(loc.t.content === ".");
+                        return go_right(
+                          loc,
+                          (loc) => {
+                            if (loc.t.tag === "identifier") {
+                              // rename to identifier name itself
+                              return cont(rename(loc, loc.t.content));
+                            } else {
+                              return syntax_error(loc, "not an identifier");
+                            }
+                          },
+                          syntax_error,
+                        );
+                      },
+                      syntax_error,
+                    ),
+                ),
+              syntax_error,
+            );
           }
           default: {
             if (list_handlers_table[loc.t.tag] !== "descend") {
