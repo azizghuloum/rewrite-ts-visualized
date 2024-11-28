@@ -4,9 +4,9 @@
 //
 import TS from "typescript";
 
-//const src = TS.createSourceFile("test.ts", "hello world", {
-//  languageVersion: TS.ScriptTarget.ESNext,
-//});
+const src = TS.createSourceFile("test.ts", "const foo = null;", {
+  languageVersion: TS.ScriptTarget.ESNext,
+});
 
 const t1 = TS.factory.createTypeAliasDeclaration(
   [TS.factory.createToken(TS.SyntaxKind.ExportKeyword)],
@@ -37,7 +37,7 @@ TS.setSourceMapRange(finalsrc, { pos: 5, end: 20, source: src1 });
 finalsrc.fileName = "mysrc.ts";
 
 const printer = TS.createPrinter();
-console.log(printer.printFile(finalsrc));
+console.log(printer.printFile(src));
 
 //const ac: string[] = [];
 //
@@ -101,13 +101,81 @@ console.log(printer.printFile(finalsrc));
 //console.log({ ep });
 ////console.log(printer.printNode(TS.EmitHint.SourceFile, finalsrc, finalsrc));
 
+const host1: TS.CompilerHost = TS.createCompilerHost({});
+
+const files = {
+  "foo.rts":
+    "import * as b from './bar.r'; export const t = 18;\nconst foobar2: string | null = 'hello';",
+  "/Users/aghuloum/Projects/rewrite-ts-visualized/bar.r.ts": "export const t = 18;\n",
+};
+
+const host: TS.CompilerHost = {
+  getSourceFile(fileName, languageVersionOrOptions) {
+    console.log(`getSourceFile ${fileName}`);
+    if (files[fileName] === undefined)
+      return host1.getSourceFile(fileName, languageVersionOrOptions);
+    if (fileName === "foo.r.ts") {
+      //prog.getSourceFile("bar.r.ts");
+    }
+    const src = TS.createSourceFile(
+      fileName,
+      files[fileName],
+      languageVersionOrOptions,
+      undefined,
+      TS.ScriptKind.TSX,
+    );
+    return src;
+  },
+  getDefaultLibFileName(options) {
+    return host1.getDefaultLibFileName(options);
+  },
+  fileExists(fileName) {
+    console.log(`fileexists ${fileName}`);
+    if (files[fileName]) return true;
+    return host1.fileExists(fileName);
+  },
+  writeFile(filename, text, writebom, onerror, sourcefiles, data) {
+    throw new Error("writefile");
+  },
+  getCurrentDirectory() {
+    return host1.getCurrentDirectory();
+  },
+  getCanonicalFileName(fileName) {
+    if (files[fileName]) return fileName;
+    return host1.getCanonicalFileName(fileName);
+  },
+  getNewLine() {
+    throw new Error("getNewLine");
+  },
+  readFile(fileName) {
+    if (files[fileName]) {
+      return files[fileName];
+    } else {
+      return host1.readFile(fileName);
+    }
+  },
+  useCaseSensitiveFileNames() {
+    return host1.useCaseSensitiveFileNames();
+  },
+};
+
 const prog = TS.createProgram({
-  options: { sourceMap: true, declaration: true, noCheck: true, checkJs: false },
-  rootNames: [],
+  options: {
+    sourceMap: true,
+    declaration: true,
+    declarationMap: true,
+    //allowArbitraryExtensions: true,
+    target: TS.ScriptTarget.ES2020,
+  },
+  rootNames: ["foo.r"],
+  host,
 });
 
+const foo = prog.getSourceFile("foo.r.ts");
+//console.log(foo);
+
 const results = prog.emit(
-  finalsrc,
+  undefined,
   (name, text) => {
     console.log({ name, text });
   },
@@ -116,3 +184,18 @@ const results = prog.emit(
   {},
 );
 console.log(results);
+const diags = prog.getSemanticDiagnostics(foo);
+diags.forEach((diag) => {
+  const start = diag.start || 0;
+  const length = diag.length || 10;
+  const text = diag.file?.getFullText().substring(start, start + length);
+  console.log({ message: diag.messageText, text, file: diag.file?.fileName });
+});
+
+console.log({
+  global: prog.getGlobalDiagnostics(),
+  options: prog.getOptionsDiagnostics(),
+  semantic: prog.getSemanticDiagnostics(),
+  syntactic: prog.getSyntacticDiagnostics(),
+  declaration: prog.getDeclarationDiagnostics(),
+});
