@@ -5,7 +5,6 @@ import TS, { SyntaxKind } from "typescript";
 import { assert } from "./assert";
 
 const pass_through: { [k in SyntaxKind]?: list_tag } = {
-  [SyntaxKind.CallExpression]: "call_expression",
   [SyntaxKind.ParenthesizedExpression]: "parenthesized_expression",
   [SyntaxKind.BinaryExpression]: "binary_expression",
   [SyntaxKind.PrefixUnaryExpression]: "unary_expression",
@@ -101,6 +100,15 @@ function absurdly(node: TS.Node, src: TS.SourceFile): AST {
         } else {
           return { type: "list", tag: "ERROR", content };
         }
+      }
+      case SyntaxKind.CallExpression: {
+        assert(ls.length === 4, ls);
+        assert(ls[2].tag === "syntax_list");
+        return {
+          type: "list",
+          tag: "call_expression",
+          content: [ls[0], [ls[1], llappend(ls[2].content, [ls[3], null])]],
+        };
       }
       case SyntaxKind.ArrowFunction: {
         assert(ls.length === 5, ls);
