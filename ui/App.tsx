@@ -170,9 +170,23 @@ function Example({ code, onChange }: ExampleProps) {
   );
 }
 
+const sample_program = `
+/* c is for curry */
+using_syntax_rules(
+  [c, c(() => {body}),   (() => {body})()],
+  [c, c(() => expr),     expr],
+  [c, c((a, rest) => e), (a) => c((rest) => e)],
+  [c, c((a) => e),       (a) => e],
+).rewrite(c((a, b, c, d) => a + b + c + d));
+`;
+
 function Expander() {
   const [sample, setSample] = useState(
-    localStorage.getItem("sample_program") ?? "const foo = (x) => x;\nfoo(12);\n",
+    localStorage.getItem("sample_program") ??
+      sample_program
+        .split("\n")
+        .filter((x) => x)
+        .join("\n"),
   );
   return (
     <>
