@@ -1,6 +1,6 @@
 import { AST } from "./ast";
 import { list_tag } from "./tags";
-import { array_to_ll, llappend } from "./llhelpers";
+import { array_to_ll, LL, llappend } from "./llhelpers";
 import TS, { SyntaxKind } from "typescript";
 import { assert } from "./assert";
 
@@ -21,6 +21,26 @@ const splice_middle: { [k in SyntaxKind]?: list_tag } = {
   [SyntaxKind.ArrayLiteralExpression]: "array",
   [SyntaxKind.Block]: "statement_block",
 };
+
+function left_associate(op: string, [head, tail]: [AST, LL<AST>]): AST {
+  function f(head: AST, tail: LL<AST>): AST {
+    if (tail === null) {
+      return head;
+    } else {
+      const [t0, t1] = tail;
+      assert(t0.content === op);
+      assert(t1 !== null);
+      const [t2, t3] = t1;
+      return f({ type: "list", tag: "binary_expression", content: [head, [t0, [t2, null]]] }, t3);
+    }
+  }
+  if (head.content === op) {
+    assert(tail !== null);
+    return f(tail[0], tail[1]);
+  } else {
+    return f(head, tail);
+  }
+}
 
 function absurdly(node: TS.Node, src: TS.SourceFile): AST {
   const children = node.getChildren(src);
@@ -127,7 +147,8 @@ function absurdly(node: TS.Node, src: TS.SourceFile): AST {
         };
         return { type: "list", tag: "arrow_function", content: [args, [ar, [body, null]]] };
       }
-      case SyntaxKind.ShorthandPropertyAssignment: {
+      case SyntaxKind.ShorthandPropertyAssignment:
+      case SyntaxKind.LiteralType: {
         assert(ls.length === 1, ls);
         return ls[0];
       }
@@ -150,6 +171,20 @@ function absurdly(node: TS.Node, src: TS.SourceFile): AST {
         } else {
           return { type: "list", tag: "required_parameter", content };
         }
+      }
+      case SyntaxKind.UnionType: {
+        assert(ls.length === 1);
+        const x = ls[0];
+        assert(x.tag === "syntax_list");
+        assert(x.content !== null);
+        return left_associate("|", x.content);
+      }
+      case SyntaxKind.IntersectionType: {
+        assert(ls.length === 1);
+        const x = ls[0];
+        assert(x.tag === "syntax_list");
+        assert(x.content !== null);
+        return left_associate("&", x.content);
       }
       default:
         throw new Error(
