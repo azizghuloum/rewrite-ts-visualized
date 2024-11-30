@@ -12,6 +12,7 @@ const pass_through: { [k in SyntaxKind]?: list_tag } = {
   [SyntaxKind.PropertyAssignment]: "pair",
   [SyntaxKind.ConditionalExpression]: "ternary_expression",
   [SyntaxKind.VariableDeclaration]: "variable_declarator",
+  [SyntaxKind.TypeAliasDeclaration]: "type_alias_declaration",
   [SyntaxKind.SyntaxList]: "syntax_list",
 };
 
@@ -48,10 +49,15 @@ function absurdly(node: TS.Node, src: TS.SourceFile): AST {
       case SyntaxKind.PlusToken:
       case SyntaxKind.MinusToken:
       case SyntaxKind.EqualsToken:
+      case SyntaxKind.BarToken:
+      case SyntaxKind.AmpersandToken:
       case SyntaxKind.SemicolonToken:
       case SyntaxKind.ImportKeyword:
       case SyntaxKind.ExportKeyword:
       case SyntaxKind.ConstKeyword:
+      case SyntaxKind.TypeKeyword:
+      case SyntaxKind.StringKeyword:
+      case SyntaxKind.NumberKeyword:
         return { type: "atom", tag: "other", content };
       case SyntaxKind.EndOfFileToken:
         return { type: "atom", tag: "other", content };

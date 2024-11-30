@@ -56,6 +56,40 @@ function gen_lexical({
   );
 }
 
+function gen_type_alias({
+  loc,
+  rib,
+  counter,
+  context,
+  unit,
+}: goodies): Omit<goodies, "loc"> & { name: string } {
+  const stx = loc.t;
+  assert(stx.type === "atom" && stx.tag === "identifier");
+  return extend_rib(
+    rib,
+    stx.content,
+    stx.wrap.marks,
+    counter,
+    "types_env",
+    ({ rib, counter, label }) =>
+      extend_context_lexical(
+        context,
+        counter,
+        label,
+        "type_alias",
+        stx.content,
+        ({ context, counter, name }) => ({
+          rib,
+          context,
+          counter,
+          name,
+          unit,
+        }),
+      ),
+    (reason) => syntax_error(loc, reason),
+  );
+}
+
 function extract_lexical_declaration_bindings({
   loc,
   rib,
@@ -117,6 +151,31 @@ function extract_lexical_declaration_bindings({
       } else {
         syntax_error(loc, "expected keyword const or let");
       }
+    },
+    syntax_error,
+  );
+}
+
+function extract_type_alias_declaration_bindings({
+  loc,
+  rib,
+  context,
+  counter,
+  unit,
+}: goodies): goodies {
+  return go_down(
+    loc,
+    (loc) => {
+      assert(loc.t.content === "type", "expected 'type' keyword");
+      return go_right(
+        loc,
+        (loc) => {
+          assert(loc.t.type === "atom" && loc.t.tag === "identifier", "expected an identifier");
+          const gs = gen_type_alias({ loc, rib, counter, context, unit });
+          return { ...gs, loc: go_up(loc) };
+        },
+        syntax_error,
+      );
     },
     syntax_error,
   );
@@ -276,7 +335,7 @@ const list_handlers_table: { [tag in list_tag]: "descend" | "stop" | "todo" } = 
   property_signature: "todo",
   required_parameter: "todo",
   tuple_type: "todo",
-  type_alias_declaration: "todo",
+  type_alias_declaration: "stop",
   type_annotation: "todo",
   type_arguments: "todo",
   type_parameter: "todo",
@@ -379,6 +438,7 @@ function preexpand_forms(step: {
             const binding = resolution.binding;
             switch (binding.type) {
               case "lexical":
+              case "type_alias":
               case "ts":
                 return next(loc);
               case "core_syntax": {
@@ -425,6 +485,14 @@ function preexpand_forms(step: {
         switch (loc.t.tag) {
           case "lexical_declaration": {
             const goodies = extract_lexical_declaration_bindings({ ...step, loc });
+            return go_next(
+              goodies.loc,
+              (loc) => preexpand_forms({ ...goodies, loc, k: step.k }),
+              (loc) => step.k({ ...goodies, loc }),
+            );
+          }
+          case "type_alias_declaration": {
+            const goodies = extract_type_alias_declaration_bindings({ ...step, loc });
             return go_next(
               goodies.loc,
               (loc) => preexpand_forms({ ...goodies, loc, k: step.k }),
@@ -678,6 +746,71 @@ function expand_arrow_function({
   );
 }
 
+function postexpand_type_alias_declaration(
+  loc: Loc,
+  unit: CompilationUnit,
+  counter: number,
+  context: Context,
+  k: (loc: Loc) => never,
+): never {
+  return go_down(loc, (loc) => {
+    assert(loc.t.content === "type");
+    return go_right(loc, (loc) => {
+      assert(loc.t.tag === "identifier");
+      const { content, wrap } = loc.t;
+      const resolution = resolve(content, wrap, context, unit, "types_env");
+      assert(resolution.type === "bound");
+      assert(resolution.binding.type === "type_alias");
+      const new_name = resolution.binding.name;
+      return go_right(rename(loc, new_name), (loc) => {
+        assert(loc.t.content === "=");
+        return go_right(loc, (loc) => {
+          return in_isolation(
+            loc,
+            (loc, isolation_k) => {
+              const rib: Rib = { type: "rib", types_env: {}, normal_env: {} };
+              return preexpand_forms({
+                loc,
+                rib,
+                unit,
+                counter,
+                context,
+                k: ({ loc, rib, unit, counter, context }) =>
+                  postexpand_body({
+                    loc,
+                    counter,
+                    context,
+                    unit,
+                    k: (loc) => isolation_k(loc, undefined),
+                  }),
+              });
+            },
+            (loc, _gs) =>
+              go_right(
+                loc,
+                (loc) => {
+                  assert(loc.t.content === ";");
+                  return go_right(loc, syntax_error, (loc) => k(go_up(loc)));
+                },
+                (loc) => k(go_up(loc)),
+              ),
+          );
+        });
+      });
+    });
+  });
+}
+
+function rename(loc: Loc, new_name: string): Loc {
+  const new_id: STX = {
+    type: "atom",
+    tag: "identifier",
+    wrap: { marks: null, subst: null },
+    content: new_name,
+  };
+  return change(loc, { type: "loc", t: new_id, p: { type: "top" } });
+}
+
 function postexpand_body(step: {
   loc: Loc;
   unit: CompilationUnit;
@@ -693,15 +826,6 @@ function postexpand_body(step: {
   }
   function descend(loc: Loc): never {
     return go_down(loc, (loc) => h(find_form(loc)), cont);
-  }
-  function rename(loc: Loc, new_name: string): Loc {
-    const new_id: STX = {
-      type: "atom",
-      tag: "identifier",
-      wrap: { marks: null, subst: null },
-      content: new_name,
-    };
-    return change(loc, { type: "loc", t: new_id, p: { type: "top" } });
   }
   function h(ffrv: ffrv): never {
     const loc = ffrv.loc;
@@ -742,7 +866,7 @@ function postexpand_body(step: {
           case "lexical_declaration":
             return descend(loc);
           case "variable_declarator":
-            return descend(loc);
+            return descend(loc); // looks wrong
           case "arrow_function": {
             return in_isolation(
               loc,
@@ -753,35 +877,33 @@ function postexpand_body(step: {
           case "slice": {
             return syntax_error(loc, "invalid slice");
           }
-          case "member_expression": {
-            return go_down(
+          case "type_alias_declaration": {
+            return postexpand_type_alias_declaration(
               loc,
-              (loc) =>
-                in_isolation(
-                  loc,
-                  (loc, k) => postexpand_body({ ...step, loc, k: (loc) => k(loc, undefined) }),
-                  (loc, gs) =>
-                    go_right(
-                      loc,
-                      (loc) => {
-                        assert(loc.t.content === ".");
-                        return go_right(
-                          loc,
-                          (loc) => {
-                            if (loc.t.tag === "identifier") {
-                              // rename to identifier name itself
-                              return cont(rename(loc, loc.t.content));
-                            } else {
-                              return syntax_error(loc, "not an identifier");
-                            }
-                          },
-                          syntax_error,
-                        );
-                      },
-                      syntax_error,
-                    ),
-                ),
-              syntax_error,
+              step.unit,
+              step.counter,
+              step.context,
+              cont,
+            );
+          }
+          case "member_expression": {
+            return go_down(loc, (loc) =>
+              in_isolation(
+                loc,
+                (loc, k) => postexpand_body({ ...step, loc, k: (loc) => k(loc, undefined) }),
+                (loc, _gs) =>
+                  go_right(loc, (loc) => {
+                    assert(loc.t.content === ".");
+                    return go_right(loc, (loc) => {
+                      if (loc.t.tag === "identifier") {
+                        // rename to identifier name itself
+                        return cont(rename(loc, loc.t.content));
+                      } else {
+                        return syntax_error(loc, "not an identifier");
+                      }
+                    });
+                  }),
+              ),
             );
           }
           default: {

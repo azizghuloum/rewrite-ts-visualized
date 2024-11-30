@@ -4,6 +4,7 @@ import { LL, llappend, llmap } from "./llhelpers";
 import { STX, Loc, Wrap } from "./syntax-structures";
 import { push_wrap } from "./stx";
 import { list_tag } from "./tags";
+import { syntax_error } from "./step";
 
 export function wrap_loc(loc: Loc, wrap: Wrap): Loc {
   return Zipper.change(loc, push_wrap(wrap)(loc.t));
@@ -31,10 +32,14 @@ export function stx_list_content(t: STX): LL<STX> {
   }
 }
 
-export function go_down<S>(loc: Loc, k: (loc: Loc) => S, fk: (loc: Loc) => S): S {
+export function go_down<S>(loc: Loc, k: (loc: Loc) => S, fk?: (loc: Loc) => S): S {
   if (loc.t.type === "list") {
     if (loc.t.content === null) {
-      return fk(loc);
+      if (fk) {
+        return fk(loc);
+      } else {
+        return syntax_error(loc, "missing");
+      }
     }
   }
   return k(
@@ -101,10 +106,14 @@ export function go_next<S>(loc: Loc, sk: (loc: Loc) => S, fk: (loc: Loc) => S): 
   }
 }
 
-export function go_right<S>(loc: Loc, sk: (loc: Loc) => S, fk: (loc: Loc) => S): S {
+export function go_right<S>(loc: Loc, sk: (loc: Loc) => S, fk?: (loc: Loc) => S): S {
   if (loc.p.type === "node" && loc.p.r === null) {
     // no right of me
-    return fk(loc);
+    if (fk) {
+      return fk(loc);
+    } else {
+      return syntax_error(loc, "missing");
+    }
   } else {
     return sk(Zipper.go_right(loc));
   }
