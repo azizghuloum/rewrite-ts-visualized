@@ -263,7 +263,9 @@ export function init_top_level(
     store: {
       [rib_id]: {
         type: "rib",
-        types_env: {},
+        types_env: Object.fromEntries([
+          ...Object.keys(core_handlers).map((name) => [name, [[top_marks, `global.${name}`]]]),
+        ]),
         normal_env: Object.fromEntries([
           ...Object.keys(core_handlers).map((name) => [name, [[top_marks, `global.${name}`]]]),
           ...globals.map((name) => [name, [[top_marks, `global.${name}`]]]),

@@ -78,6 +78,7 @@ function absurdly(node: TS.Node, src: TS.SourceFile): AST {
       case SyntaxKind.ConstKeyword:
       case SyntaxKind.TypeKeyword:
       case SyntaxKind.ExtendsKeyword:
+      case SyntaxKind.AsKeyword:
       case SyntaxKind.NullKeyword:
       case SyntaxKind.StringKeyword:
       case SyntaxKind.NumberKeyword:
@@ -196,6 +197,10 @@ function absurdly(node: TS.Node, src: TS.SourceFile): AST {
         assert(x.tag === "syntax_list");
         assert(x.content !== null);
         return left_associate("&", x.content);
+      }
+      case SyntaxKind.AsExpression: {
+        assert(ls.length === 3);
+        return { type: "list", tag: "binary_expression", content };
       }
       default:
         throw new Error(
