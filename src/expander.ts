@@ -206,6 +206,7 @@ function expand_program(step: {
     unit: extend_unit(step.unit, rib_id, rib), // rib is empty
     context: step.context,
     counter,
+    sort: "value",
     k: ({ loc, rib, counter, context, unit }) => {
       // rib is filled
       // context is filled also
@@ -226,6 +227,7 @@ function preexpand_body(step: {
   unit: CompilationUnit;
   context: Context;
   counter: number;
+  sort: "type" | "value";
   k: (props: goodies) => never;
 }): never {
   return in_isolation<goodies>(
@@ -234,7 +236,7 @@ function preexpand_body(step: {
     (loc, { rib, context, counter, unit }) =>
       go_next(
         loc,
-        (loc) => preexpand_body({ loc, rib, counter, context, unit, k: step.k }),
+        (loc) => preexpand_body({ loc, rib, counter, context, unit, k: step.k, sort: step.sort }),
         (loc) => step.k({ loc, rib, context, counter, unit }),
       ),
   );
@@ -246,6 +248,7 @@ function preexpand_body_curly(step: {
   unit: CompilationUnit;
   context: Context;
   counter: number;
+  sort: "type" | "value";
   k: (props: goodies) => never;
 }): never {
   if (step.loc.t.type === "atom" && step.loc.t.tag === "other" && step.loc.t.content === "}") {
@@ -261,11 +264,12 @@ function preexpand_body_curly(step: {
   }
   return in_isolation<goodies>(
     step.loc,
-    (loc, k) => preexpand_forms({ ...step, loc, k: (gs) => k(gs.loc, gs) }),
+    (loc, k) => preexpand_forms({ ...step, loc, sort: step.sort, k: (gs) => k(gs.loc, gs) }),
     (loc, { rib, context, counter, unit }) => {
       return go_right(
         loc,
-        (loc) => preexpand_body_curly({ loc, rib, counter, context, unit, k: step.k }),
+        (loc) =>
+          preexpand_body_curly({ loc, rib, counter, context, unit, sort: step.sort, k: step.k }),
         (loc) => syntax_error(loc, "no right"),
       );
     },
@@ -350,6 +354,7 @@ function preexpand_block(step: {
   counter: number;
   unit: CompilationUnit;
   context: Context;
+  sort: "type" | "value";
   k: (goodies: goodies) => never;
 }): never {
   const loc = step.loc;
@@ -375,12 +380,13 @@ function expand_concise_body(step: {
   counter: number;
   unit: CompilationUnit;
   context: Context;
+  sort: "type" | "value";
   k: (loc: Loc) => never;
 }): never {
   const loc = step.loc;
   const k: (gs: goodies) => never = (gs: goodies) => {
     const new_unit = extend_unit(gs.unit, step.rib_id, gs.rib);
-    return postexpand_body({ ...gs, unit: new_unit, k: step.k });
+    return postexpand_body({ ...gs, unit: new_unit, k: step.k, sort: step.sort });
   };
   return loc.t.type === "list" && loc.t.tag === "statement_block"
     ? preexpand_block({
@@ -401,6 +407,7 @@ function preexpand_forms(step: {
   counter: number;
   unit: CompilationUnit;
   context: Context;
+  sort: "type" | "value";
   k: (goodies: goodies) => never;
 }): never {
   function done(loc: Loc): never {
@@ -430,7 +437,7 @@ function preexpand_forms(step: {
           loc.t,
         );
         const { content, wrap } = loc.t;
-        const resolution = resolve(content, wrap, step.context, step.unit, "normal_env");
+        const resolution = resolve(content, wrap, step.context, step.unit, sort_env[step.sort]);
         switch (resolution.type) {
           case "unbound":
             return next(loc);
@@ -452,7 +459,15 @@ function preexpand_forms(step: {
                     step.counter,
                     ({ loc, counter, unit, context }) =>
                       inspect(loc, `core output`, () =>
-                        preexpand_forms({ loc, rib: step.rib, counter, unit, context, k: step.k }),
+                        preexpand_forms({
+                          loc,
+                          rib: step.rib,
+                          counter,
+                          unit,
+                          context,
+                          sort: step.sort,
+                          k: step.k,
+                        }),
                       ),
                     pattern,
                   ),
@@ -487,7 +502,7 @@ function preexpand_forms(step: {
             const goodies = extract_lexical_declaration_bindings({ ...step, loc });
             return go_next(
               goodies.loc,
-              (loc) => preexpand_forms({ ...goodies, loc, k: step.k }),
+              (loc) => preexpand_forms({ ...goodies, loc, k: step.k, sort: step.sort }),
               (loc) => step.k({ ...goodies, loc }),
             );
           }
@@ -495,7 +510,7 @@ function preexpand_forms(step: {
             const goodies = extract_type_alias_declaration_bindings({ ...step, loc });
             return go_next(
               goodies.loc,
-              (loc) => preexpand_forms({ ...goodies, loc, k: step.k }),
+              (loc) => preexpand_forms({ ...goodies, loc, k: step.k, sort: step.sort }),
               (loc) => step.k({ ...goodies, loc }),
             );
           }
@@ -591,6 +606,7 @@ function postexpand_program(step: {
         unit: step.unit,
         counter: step.counter,
         context: step.context,
+        sort: "value",
         k: step.k,
       }),
     (loc) => step.k(loc),
@@ -734,6 +750,7 @@ function expand_arrow_function({
             context: pgs.context,
             counter: new_counter,
             unit: new_unit,
+            sort: "value",
             k: (loc) => k(loc, undefined),
           });
         },
@@ -776,6 +793,26 @@ function expand_type_parameters(
     switch (loc.t.tag) {
       case "identifier":
         return post_after_var({ loc, rib, counter, unit, context });
+      case "type_parameter":
+        return go_down(loc, (loc) => {
+          assert(loc.t.tag === "identifier");
+          return go_right(loc, (loc) => {
+            if (loc.t.content !== "extends") syntax_error(loc, "expected 'extends'");
+            return go_right(loc, (loc) =>
+              expand_expr({
+                loc: wrap_loc(loc, { marks: null, subst: [{ rib_id, cu_id: unit.cu_id }, null] }),
+                counter,
+                unit,
+                context,
+                sort: "type",
+                k: ({ loc, counter, unit, context }) =>
+                  go_right(loc, syntax_error, () =>
+                    post_after_var({ loc: go_up(loc), rib, counter, unit, context }),
+                  ),
+              }),
+            );
+          });
+        });
       default:
         syntax_error(loc);
     }
@@ -794,7 +831,10 @@ function expand_type_parameters(
           },
         );
       },
-      (loc) => go_down(go_up(loc), (loc) => post_var({ loc, rib, counter, unit, context })),
+      (loc) =>
+        go_down(go_up(loc), (loc) =>
+          post_var({ loc, rib, counter, unit: extend_unit(unit, rib_id, rib), context }),
+        ),
     );
   }
 
@@ -803,6 +843,12 @@ function expand_type_parameters(
       case "identifier":
         const { name, ...gs } = gen_type_alias({ loc, rib, counter, context, unit });
         return pre_after_var({ ...gs, loc: rename(loc, name) });
+      case "type_parameter":
+        return go_down(loc, (loc) => {
+          if (loc.t.tag !== "identifier") syntax_error(loc, "expected an identifier");
+          const { name, ...gs } = gen_type_alias({ loc, rib, counter, context, unit });
+          return pre_after_var({ ...gs, loc: go_up(rename(loc, name)) });
+        });
       default:
         syntax_error(loc);
     }
@@ -836,6 +882,47 @@ function expand_type_parameters(
   );
 }
 
+function expand_expr({
+  loc,
+  counter,
+  unit,
+  context,
+  sort,
+  k,
+}: {
+  loc: Loc;
+  unit: CompilationUnit;
+  counter: number;
+  context: Context;
+  sort: "type" | "value";
+  k: (gs: Omit<goodies, "rib">) => never;
+}): never {
+  return in_isolation<Omit<goodies, "rib" | "loc">>(
+    loc,
+    (loc, isolation_k) => {
+      const rib: Rib = { type: "rib", types_env: {}, normal_env: {} };
+      return preexpand_forms({
+        loc,
+        rib,
+        unit,
+        counter,
+        context,
+        sort,
+        k: ({ loc, rib: _rib, unit, counter, context }) =>
+          postexpand_body({
+            loc,
+            counter,
+            context,
+            unit,
+            sort,
+            k: (loc) => isolation_k(loc, { unit, counter, context }),
+          }),
+      });
+    },
+    (loc, { unit, counter, context }) => k({ loc, unit, counter, context }),
+  );
+}
+
 function postexpand_type_alias_declaration(
   loc: Loc,
   unit: CompilationUnit,
@@ -854,36 +941,23 @@ function postexpand_type_alias_declaration(
       const new_name = resolution.binding.name;
       return go_right(rename(loc, new_name), (loc) => {
         function do_after_equal({ loc, counter, unit, context }: Omit<goodies, "rib">): never {
-          return in_isolation(
+          return expand_expr({
             loc,
-            (loc, isolation_k) => {
-              const rib: Rib = { type: "rib", types_env: {}, normal_env: {} };
-              return preexpand_forms({
-                loc,
-                rib,
-                unit,
-                counter,
-                context,
-                k: ({ loc, rib: _rib, unit, counter, context }) =>
-                  postexpand_body({
-                    loc,
-                    counter,
-                    context,
-                    unit,
-                    k: (loc) => isolation_k(loc, undefined),
-                  }),
-              });
-            },
-            (loc, _gs) =>
-              go_right(
+            counter,
+            unit,
+            context,
+            sort: "type",
+            k: ({ loc, unit, counter, context }) => {
+              return go_right(
                 loc,
                 (loc) => {
                   assert(loc.t.content === ";");
                   return go_right(loc, syntax_error, (loc) => k(go_up(loc)));
                 },
                 (loc) => k(go_up(loc)),
-              ),
-          );
+              );
+            },
+          });
         }
         switch (loc.t.content) {
           case "=":
@@ -894,7 +968,7 @@ function postexpand_type_alias_declaration(
               unit,
               counter,
               context,
-              ({ loc, counter, unit, context, rib, rib_id }) => {
+              ({ loc, counter, unit, context, rib: _rib, rib_id }) => {
                 assert(loc.t.content === ">");
                 return go_right(loc, (loc) => {
                   if (loc.t.content !== "=") syntax_error(loc, "expected '='");
@@ -930,11 +1004,14 @@ function rename(loc: Loc, new_name: string): Loc {
   return change(loc, { type: "loc", t: new_id, p: { type: "top" } });
 }
 
+const sort_env = { type: "types_env" as const, value: "normal_env" as const };
+
 function postexpand_body(step: {
   loc: Loc;
   unit: CompilationUnit;
   counter: number;
   context: Context;
+  sort: "type" | "value";
   k: (loc: Loc) => never;
 }): never {
   function done(loc: Loc): never {
@@ -956,12 +1033,13 @@ function postexpand_body(step: {
         const { tag, content, wrap } = loc.t;
         switch (tag) {
           case "identifier": {
-            const resolution = resolve(content, wrap, step.context, step.unit, "normal_env");
+            const resolution = resolve(content, wrap, step.context, step.unit, sort_env[step.sort]);
             switch (resolution.type) {
               case "bound": {
                 const { binding } = resolution;
                 switch (binding.type) {
                   case "ts":
+                  case "type_alias":
                   case "lexical": {
                     return cont(rename(loc, binding.name));
                   }
