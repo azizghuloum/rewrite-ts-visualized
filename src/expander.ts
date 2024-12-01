@@ -746,6 +746,96 @@ function expand_arrow_function({
   );
 }
 
+function expand_type_parameters(
+  loc: Loc,
+  unit: CompilationUnit,
+  orig_counter: number,
+  context: Context,
+  k: (goodies: goodies & { rib_id: string }) => never,
+): never {
+  const [rib_id, counter] = new_rib_id(orig_counter);
+
+  function post_after_var({ loc, rib, counter, unit, context }: goodies): never {
+    return go_right(
+      loc,
+      (loc) => {
+        assert(loc.t.content === ",");
+        return go_right(
+          loc,
+          (loc) => post_var({ loc, rib, counter, unit, context }),
+          (loc) => {
+            debug(loc, "cant go past commma2?");
+          },
+        );
+      },
+      (loc) => end({ loc: go_up(loc), rib, unit, counter, context }),
+    );
+  }
+
+  function post_var({ loc, rib, counter, unit, context }: goodies): never {
+    switch (loc.t.tag) {
+      case "identifier":
+        return post_after_var({ loc, rib, counter, unit, context });
+      default:
+        syntax_error(loc);
+    }
+  }
+
+  function pre_after_var({ loc, rib, counter, unit, context }: goodies): never {
+    return go_right(
+      loc,
+      (loc) => {
+        if (loc.t.content !== ",") syntax_error(loc, "expected a comma ','");
+        return go_right(
+          loc,
+          (loc) => pre_var({ loc, rib, counter, unit, context }),
+          (loc) => {
+            debug(loc, "cant go past commma?");
+          },
+        );
+      },
+      (loc) => go_down(go_up(loc), (loc) => post_var({ loc, rib, counter, unit, context })),
+    );
+  }
+
+  function pre_var({ loc, rib, counter, unit, context }: goodies): never {
+    switch (loc.t.tag) {
+      case "identifier":
+        const { name, ...gs } = gen_type_alias({ loc, rib, counter, context, unit });
+        return pre_after_var({ ...gs, loc: rename(loc, name) });
+      default:
+        syntax_error(loc);
+    }
+  }
+
+  function start(loc: Loc, rib: Rib): never {
+    assert(loc.t.tag === "syntax_list");
+    return go_down(
+      loc,
+      (loc) => pre_var({ loc, rib, unit, counter, context }),
+      (loc) => end({ loc, unit, rib, context, counter }),
+    );
+  }
+
+  function end({ loc, rib, unit, context, counter }: goodies): never {
+    return go_right(
+      loc,
+      (loc) => {
+        assert(loc.t.content === ">");
+        return k({ loc, rib, unit, counter, context, rib_id });
+      },
+      syntax_error,
+    );
+  }
+
+  assert(loc.t.content === "<");
+  return go_right(
+    loc,
+    (loc) => start(loc, { type: "rib", normal_env: {}, types_env: {} }),
+    syntax_error,
+  );
+}
+
 function postexpand_type_alias_declaration(
   loc: Loc,
   unit: CompilationUnit,
@@ -763,8 +853,7 @@ function postexpand_type_alias_declaration(
       assert(resolution.binding.type === "type_alias");
       const new_name = resolution.binding.name;
       return go_right(rename(loc, new_name), (loc) => {
-        assert(loc.t.content === "=");
-        return go_right(loc, (loc) => {
+        function do_after_equal({ loc, counter, unit, context }: Omit<goodies, "rib">): never {
           return in_isolation(
             loc,
             (loc, isolation_k) => {
@@ -775,7 +864,7 @@ function postexpand_type_alias_declaration(
                 unit,
                 counter,
                 context,
-                k: ({ loc, rib, unit, counter, context }) =>
+                k: ({ loc, rib: _rib, unit, counter, context }) =>
                   postexpand_body({
                     loc,
                     counter,
@@ -795,7 +884,37 @@ function postexpand_type_alias_declaration(
                 (loc) => k(go_up(loc)),
               ),
           );
-        });
+        }
+        switch (loc.t.content) {
+          case "=":
+            return go_right(loc, (loc) => do_after_equal({ loc, counter, unit, context }));
+          case "<":
+            return expand_type_parameters(
+              loc,
+              unit,
+              counter,
+              context,
+              ({ loc, counter, unit, context, rib, rib_id }) => {
+                assert(loc.t.content === ">");
+                return go_right(loc, (loc) => {
+                  if (loc.t.content !== "=") syntax_error(loc, "expected '='");
+                  return go_right(loc, (loc) =>
+                    do_after_equal({
+                      loc: wrap_loc(loc, {
+                        marks: null,
+                        subst: [{ rib_id, cu_id: unit.cu_id }, null],
+                      }),
+                      counter,
+                      unit,
+                      context,
+                    }),
+                  );
+                });
+              },
+            );
+          default:
+            return syntax_error(loc);
+        }
       });
     });
   });

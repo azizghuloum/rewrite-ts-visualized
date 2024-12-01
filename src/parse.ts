@@ -68,14 +68,17 @@ function absurdly(node: TS.Node, src: TS.SourceFile): AST {
       case SyntaxKind.ColonToken:
       case SyntaxKind.PlusToken:
       case SyntaxKind.MinusToken:
+      case SyntaxKind.LessThanToken:
+      case SyntaxKind.GreaterThanToken:
       case SyntaxKind.EqualsToken:
       case SyntaxKind.BarToken:
       case SyntaxKind.AmpersandToken:
-      case SyntaxKind.SemicolonToken:
       case SyntaxKind.ImportKeyword:
       case SyntaxKind.ExportKeyword:
       case SyntaxKind.ConstKeyword:
       case SyntaxKind.TypeKeyword:
+      case SyntaxKind.ExtendsKeyword:
+      case SyntaxKind.NullKeyword:
       case SyntaxKind.StringKeyword:
       case SyntaxKind.NumberKeyword:
         return { type: "atom", tag: "other", content };
@@ -148,9 +151,17 @@ function absurdly(node: TS.Node, src: TS.SourceFile): AST {
         return { type: "list", tag: "arrow_function", content: [args, [ar, [body, null]]] };
       }
       case SyntaxKind.ShorthandPropertyAssignment:
-      case SyntaxKind.LiteralType: {
-        assert(ls.length === 1, ls);
+      case SyntaxKind.LiteralType:
+      case SyntaxKind.TypeReference: {
+        assert(ls.length === 1, { kind: SyntaxKind[node.kind], ls });
         return ls[0];
+      }
+      case SyntaxKind.TypeParameter: {
+        if (ls.length === 1) {
+          return ls[0];
+        } else {
+          return { type: "list", tag: "type_parameter", content };
+        }
       }
       case SyntaxKind.SourceFile: {
         assert(ls.length === 2, ls);
