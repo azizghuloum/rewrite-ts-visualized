@@ -28,9 +28,8 @@ type handler = (
   context: Context,
   unit: CompilationUnit,
   counter: number,
-  k: (gs: { loc: Loc; counter: number; unit: CompilationUnit; context: Context }) => never,
   pattern: STX,
-) => never;
+) => Promise<{ loc: Loc; counter: number; unit: CompilationUnit; context: Context }>;
 
 const zipper_find: (loc: Loc, pred: (x: STX) => boolean) => Loc | null = (loc, pred) => {
   const t = loc.t;
@@ -232,18 +231,17 @@ export const core_pattern_match: (
   context: Context,
   unit: CompilationUnit,
   name: keyof ReturnType<typeof core_patterns>,
-  k: (result: unification | null) => never,
-) => never = (loc, context, unit, name, k) => {
+) => Promise<unification | null> = async (loc, context, unit, name) => {
   const binding = context[`global.${name}`];
   assert(binding && binding.type === "core_syntax", `core pattern for ${name} is undefined`);
   const pattern = binding.pattern;
   const kwd = find_identifier_by_name(mkzipper(pattern), name);
   assert(kwd !== null, `keyword ${name} does not include itself in its pattern`);
   const unification = unify_paths(kwd.p, loc, unit);
-  return k(unification);
+  return unification;
 };
 
-const splice: handler = (loc, context, unit, counter, k, pattern) => {
+const splice: handler = async (loc, context, unit, counter, pattern) => {
   const kwd = find_identifier_by_name(mkzipper(pattern), "splice");
   assert(kwd !== null);
   const unification = unify_paths(kwd.p, loc, unit);
@@ -258,7 +256,7 @@ const splice: handler = (loc, context, unit, counter, k, pattern) => {
     wrap: undefined,
     content: body_code,
   };
-  return k({ loc: change(unification.loc, mkzipper(result)), counter, unit, context });
+  return { loc: change(unification.loc, mkzipper(result)), counter, unit, context };
 };
 
 function literal_binding(name: string, subst: subst, unit: CompilationUnit): boolean {
@@ -323,69 +321,67 @@ function group_by<K, V>(ls: [K, V][], eq: (a: K, b: K) => boolean): [K, V[]][] {
   return ac;
 }
 
-const using_syntax_rules: handler = (orig_loc, orig_context, orig_unit, orig_counter, k) => {
-  return core_pattern_match(
+const using_syntax_rules: handler = async (orig_loc, orig_context, orig_unit, orig_counter) => {
+  const unification = await core_pattern_match(
     orig_loc,
     orig_context,
     orig_unit,
     "using_syntax_rules",
-    (unification) => {
-      if (!unification) syntax_error(orig_loc);
-      const { subst, loc } = unification;
-      if (!literal_binding("rewrite", subst, orig_unit)) syntax_error(loc, ".rewrite expected");
-      const expression_binding = subst.find(([lhs]) => lhs.content === "expression");
-      const clauses_binding = subst.find(([lhs]) => lhs.content === "clauses");
-      assert(expression_binding !== undefined);
-      assert(clauses_binding !== undefined);
-      const expression_list = ll_to_array(expression_binding[1]);
-      if (expression_list.length === 0) syntax_error(loc, "missing expression in .rewrite()");
-      if (expression_list.length > 1) syntax_error(loc, "too many expressions in .rewrite()");
-      const expression = expression_list[0];
-      const clauses = group_by(
-        ll_to_array(clauses_binding[1])
-          .filter((x) => x.content !== ",")
-          .map((x) => parse_syntax_rules_clause(x, loc)),
-        (x, y) => bound_id_equal(x, y),
-      );
-      const [rib_id, new_counter] = new_rib_id(orig_counter);
-      const do_wrap = push_wrap({ marks: null, subst: [{ rib_id, cu_id: orig_unit.cu_id }, null] });
-      const [new_rib, final_counter, final_context] = clauses.reduce(
-        (ac: [Rib, number, Context], [lhs, rhs]) => {
-          assert(lhs.type === "atom" && lhs.wrap !== undefined);
-          return extend_rib(
-            ac[0],
-            lhs.content,
-            lhs.wrap.marks,
-            ac[1],
-            "normal_env",
-            ({ rib, counter, label }) => [
-              rib,
-              counter,
-              extend_context(ac[2], label, {
-                type: "syntax_rules_transformer",
-                clauses: rhs.map(({ pattern, template }) => ({
-                  pattern,
-                  template: do_wrap(template),
-                })),
-              }),
-            ],
-            (reason) => {
-              throw new Error(`"${reason}" shouldnt happen if things are partitioned properly`);
-            },
-          );
-        },
-        [{ type: "rib", normal_env: {}, types_env: {} }, new_counter, orig_context],
-      );
-      const final_unit = extend_unit(orig_unit, rib_id, new_rib);
-      const final_loc = change(loc, mkzipper(do_wrap(expression)));
-      return k({
-        loc: final_loc,
-        counter: final_counter,
-        unit: final_unit,
-        context: final_context,
-      });
-    },
   );
+  if (!unification) syntax_error(orig_loc);
+  const { subst, loc } = unification;
+  if (!literal_binding("rewrite", subst, orig_unit)) syntax_error(loc, ".rewrite expected");
+  const expression_binding = subst.find(([lhs]) => lhs.content === "expression");
+  const clauses_binding = subst.find(([lhs]) => lhs.content === "clauses");
+  assert(expression_binding !== undefined);
+  assert(clauses_binding !== undefined);
+  const expression_list = ll_to_array(expression_binding[1]);
+  if (expression_list.length === 0) syntax_error(loc, "missing expression in .rewrite()");
+  if (expression_list.length > 1) syntax_error(loc, "too many expressions in .rewrite()");
+  const expression = expression_list[0];
+  const clauses = group_by(
+    ll_to_array(clauses_binding[1])
+      .filter((x) => x.content !== ",")
+      .map((x) => parse_syntax_rules_clause(x, loc)),
+    (x, y) => bound_id_equal(x, y),
+  );
+  const [rib_id, new_counter] = new_rib_id(orig_counter);
+  const do_wrap = push_wrap({ marks: null, subst: [{ rib_id, cu_id: orig_unit.cu_id }, null] });
+  const [new_rib, final_counter, final_context] = clauses.reduce(
+    (ac: [Rib, number, Context], [lhs, rhs]) => {
+      assert(lhs.type === "atom" && lhs.wrap !== undefined);
+      return extend_rib(
+        ac[0],
+        lhs.content,
+        lhs.wrap.marks,
+        ac[1],
+        "normal_env",
+        ({ rib, counter, label }) => [
+          rib,
+          counter,
+          extend_context(ac[2], label, {
+            type: "syntax_rules_transformer",
+            clauses: rhs.map(({ pattern, template }) => ({
+              pattern,
+              template: do_wrap(template),
+            })),
+          }),
+        ],
+        (reason) => {
+          throw new Error(`"${reason}" shouldnt happen if things are partitioned properly`);
+        },
+      );
+    },
+    [{ type: "rib", normal_env: {}, types_env: {} }, new_counter, orig_context],
+  );
+  const final_unit = extend_unit(orig_unit, rib_id, new_rib);
+  const final_loc = change(loc, mkzipper(do_wrap(expression)));
+  return {
+    loc: final_loc,
+    counter: final_counter,
+    unit: final_unit,
+    context: final_context,
+  };
 };
 
 function find_clause(
@@ -431,13 +427,12 @@ function search_and_replace(stx: STX, subst: subst, loc: Loc): LL<STX> {
   }
 }
 
-export function apply_syntax_rules(
+export async function apply_syntax_rules(
   orig_loc: Loc,
   clauses: syntax_rules_clause[],
   unit: CompilationUnit,
   orig_counter: number,
-  k: (loc: Loc, counter: number) => never,
-): never {
+): Promise<{ loc: Loc; counter: number }> {
   const do_antimark = push_wrap({ marks: [antimark, null], subst: [shift, null] });
   const { loc, subst, template } = find_clause(orig_loc, clauses, unit);
   const antimarked_subst: subst = subst.map(([lhs, rhs]) => [lhs, llmap(rhs, do_antimark)]);
@@ -448,7 +443,7 @@ export function apply_syntax_rules(
   const [mark, new_counter] = new_mark(orig_counter);
   const do_mark = push_wrap({ marks: [mark, null], subst: [shift, null] });
   const new_loc = change(loc, mkzipper(do_mark(expression)));
-  return k(new_loc, new_counter);
+  return { loc: new_loc, counter: new_counter };
 }
 
 //export const pattern_match: <S>(

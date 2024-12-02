@@ -3,9 +3,8 @@ import { readFile } from "fs/promises";
 import { expect, test, suite } from "vitest";
 import { parse } from "./src/parse";
 import { core_patterns } from "./src/syntax-core-patterns";
-import { initial_step } from "./src/expander";
+import { initial_step, next_step } from "./src/expander";
 import { pprint } from "./src/pprint";
-import { Step } from "./src/step";
 
 const test_dir = __dirname + "/tests";
 const md_dir = __dirname + "/examples";
@@ -15,16 +14,7 @@ async function compile_script(filename: string, test_name: string) {
   const patterns = core_patterns(parse);
   let step = initial_step(parse(code), test_name, patterns);
   while (step.next) {
-    try {
-      step.next();
-      throw new Error("unexpected return");
-    } catch (x) {
-      if (x instanceof Step && !step.error) {
-        step = x;
-      } else {
-        throw x;
-      }
-    }
+    step = await next_step(step);
   }
   function ts(code: string): string {
     return "```typescript\n" + code + "```\n\n";

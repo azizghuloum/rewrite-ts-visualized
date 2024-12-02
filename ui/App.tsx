@@ -93,28 +93,25 @@ function Example({ code, onChange }: ExampleProps) {
   useEffect(() => setState(init_state()), [next_step, code]);
   useEffect(() => {
     const cancel = timeout(0, () => {
-      setState((state) => {
-        if (state.error !== null || state.step_number === max_fuel || !state.last_step.next)
-          return state;
-        const next_state = (() => {
-          try {
-            const step = next_step(state.last_step);
-            const next_state: State = {
-              prev_steps: [...state.prev_steps, state.last_step],
-              last_step: step,
-              step_number: state.step_number + 1,
-              error: step.error ? `${step.name}: ${step.error}` : null,
-              pointer: state.pointer,
-            };
-            return next_state;
-          } catch (err) {
-            console.error(err);
-            const next_state: State = { ...state, error: String(err) };
-            return next_state;
-          }
-        })();
-        return next_state;
-      });
+      if (state.error !== null || state.step_number === max_fuel || !state.last_step.next) return;
+      const next_state = (async () => {
+        try {
+          const step = await next_step(state.last_step);
+          const next_state: State = {
+            prev_steps: [...state.prev_steps, state.last_step],
+            last_step: step,
+            step_number: state.step_number + 1,
+            error: step.error ? `${step.name}: ${step.error}` : null,
+            pointer: state.pointer,
+          };
+          return next_state;
+        } catch (err) {
+          console.error(err);
+          const next_state: State = { ...state, error: String(err) };
+          return next_state;
+        }
+      })();
+      next_state.then((new_state) => setState((s) => new_state));
     });
     return cancel;
   }, [state]);
