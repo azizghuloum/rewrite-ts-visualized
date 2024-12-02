@@ -26,11 +26,9 @@ export function debug(loc: Loc, msg: string, info?: any): never {
   throw new Step("DEBUG", loc, msg, undefined, info);
 }
 
-export const inspect: <T>(loc: Loc, reason: string, k: () => Promise<T>) => Promise<T> = (
-  loc,
-  reason,
-  k,
-) => {
+export type inspect = <T>(loc: Loc, reason: string, k: () => Promise<T>) => Promise<T>;
+
+const inspect: inspect = (loc, reason, k) => {
   return k();
   //throw new Step("Inspect", loc, undefined, k, reason);
 };

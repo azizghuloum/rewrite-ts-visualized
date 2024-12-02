@@ -4,12 +4,13 @@ import { createBrowserRouter, RouterProvider } from "react-router-dom";
 import { ASTExpr, ASTHighlight, ASTList } from "./ASTVis";
 import { Editor, EditorP } from "./Editor";
 import * as Zipper from "../src/zipper";
-import { initial_step, next_step } from "../src/expander";
+import { initial_step } from "../src/expander";
 import { Loc } from "../src/syntax-structures";
 import { core_patterns } from "../src/syntax-core-patterns";
 import { parse } from "../src/parse";
 import { pprint } from "../src/pprint";
-import { Step } from "../src/step";
+import { inspect, Step } from "../src/step";
+import { assert } from "../src/assert";
 
 type ExampleProps = {
   code: string;
@@ -25,6 +26,8 @@ function zipper_to_view(zipper: Loc): React.ReactElement {
   );
 }
 
+type expand = (inspect: inspect) => Promise<Step>;
+
 type State = {
   prev_steps: Step[];
   last_step: Step;
@@ -33,12 +36,10 @@ type State = {
   pointer: number | null;
 };
 
-const max_fuel = 100;
-
-function initial_state(step: Step): State {
+function initial_state(loc: Loc): State {
   return {
     prev_steps: [],
-    last_step: step,
+    last_step: { loc, name: "Initial State" },
     step_number: 0,
     error: null,
     pointer: null,
@@ -74,47 +75,36 @@ function StepperView({ step, step_number }: { step: Step; step_number: number })
   );
 }
 
-function timeout(delay: number, f: () => void): () => void {
-  if (delay <= 0) {
-    const handle = requestAnimationFrame(f);
-    return () => cancelAnimationFrame(handle);
-  } else {
-    const handle = setTimeout(f, delay);
-    return () => clearTimeout(handle);
-  }
-}
-
 function Example({ code, onChange }: ExampleProps) {
-  function init_state(): State {
+  function init_state(code: string): [State, expand] {
     const patterns = core_patterns(parse);
-    return initial_state(initial_step(parse(code), "example", patterns));
+    const [loc, expand] = initial_step(parse(code), "example", patterns);
+    return [initial_state(loc), expand];
   }
-  const [state, setState] = useState(init_state());
-  useEffect(() => setState(init_state()), [next_step, code]);
+  const [state, setState] = useState(init_state(code)[0]);
   useEffect(() => {
-    const cancel = timeout(0, () => {
-      if (state.error !== null || state.step_number === max_fuel || !state.last_step.next) return;
-      const next_state = (async () => {
-        try {
-          const step = await next_step(state.last_step);
-          const next_state: State = {
-            prev_steps: [...state.prev_steps, state.last_step],
-            last_step: step,
-            step_number: state.step_number + 1,
-            error: step.error ? `${step.name}: ${step.error}` : null,
-            pointer: state.pointer,
-          };
-          return next_state;
-        } catch (err) {
-          console.error(err);
-          const next_state: State = { ...state, error: String(err) };
-          return next_state;
-        }
-      })();
-      next_state.then((new_state) => setState((s) => new_state));
+    const [state, expand] = init_state(code);
+    setState(state);
+    function record(step: Step) {
+      setState((state) => {
+        return {
+          ...state,
+          prev_steps: [...state.prev_steps, state.last_step],
+          last_step: step,
+          step_number: state.step_number + 1,
+          error: step.error ? `${step.name}: ${step.error}` : null,
+          pointer: state.pointer,
+        };
+      });
+    }
+    const inspect: inspect = (loc, reason, k) => {
+      record(new Step("Inspect", loc, undefined, undefined, reason));
+      return k();
+    };
+    expand(inspect).then((step) => {
+      record(step);
     });
-    return cancel;
-  }, [state]);
+  }, [code]);
   const max = state.step_number;
   const [display_step, display_number] =
     state.pointer === null || state.pointer >= state.prev_steps.length

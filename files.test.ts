@@ -3,7 +3,7 @@ import { readFile } from "fs/promises";
 import { expect, test, suite } from "vitest";
 import { parse } from "./src/parse";
 import { core_patterns } from "./src/syntax-core-patterns";
-import { initial_step, next_step } from "./src/expander";
+import { initial_step } from "./src/expander";
 import { pprint } from "./src/pprint";
 
 const test_dir = __dirname + "/tests";
@@ -12,10 +12,8 @@ const md_dir = __dirname + "/examples";
 async function compile_script(filename: string, test_name: string) {
   const code = await readFile(filename, { encoding: "utf-8" });
   const patterns = core_patterns(parse);
-  let step = initial_step(parse(code), test_name, patterns);
-  while (step.next) {
-    step = await next_step(step);
-  }
+  const [init_step, expand] = initial_step(parse(code), test_name, patterns);
+  const step = await expand((loc, reason, k) => k());
   function ts(code: string): string {
     return "```typescript\n" + code + "```\n\n";
   }
