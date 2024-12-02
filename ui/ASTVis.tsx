@@ -9,9 +9,7 @@ type STX =
 
 const colormap: { [k in atom_tag]: string } = {
   identifier: "yellow",
-  property_identifier: "lime",
   number: "magenta",
-  type_identifier: "orange",
   jsx_text: "teal",
   string: "cyan",
   regex_pattern: "magenta",

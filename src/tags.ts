@@ -1,25 +1,11 @@
 export type atom_tag =
   | "identifier"
-  | "property_identifier"
   | "number"
   | "regex_pattern"
-  | "type_identifier"
   | "jsx_text"
   | "string"
   | "ERROR"
   | "other";
-
-export const id_tags: { [k in atom_tag]: boolean } = {
-  identifier: true,
-  type_identifier: true,
-  property_identifier: true,
-  jsx_text: false,
-  number: false,
-  string: false,
-  other: false,
-  regex_pattern: false,
-  ERROR: false,
-};
 
 export type list_tag =
   | "program"

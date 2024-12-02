@@ -1,6 +1,5 @@
 import { assert } from "./assert";
 import { AST } from "./ast";
-import { id_tags } from "./tags";
 import { LL, llappend, llmap, llreduce, llreverse, ll_to_array } from "./llhelpers";
 import { syntax_error } from "./step";
 import {
@@ -64,10 +63,7 @@ const find_identifier_by_name: (loc: Loc, name: string) => Loc | null = (loc, na
   zipper_find(loc, (x) => is_id(x) && x.content === name);
 
 const find_bound_identifer: (loc: Loc, name: STX) => Loc | null = (loc, name) => {
-  return zipper_find(
-    loc,
-    (x: STX) => x.type === "atom" && id_tags[x.tag] && bound_id_equal(x, name),
-  );
+  return zipper_find(loc, (x: STX) => x.tag === "identifier" && bound_id_equal(x, name));
 };
 
 export type Path = Loc["p"];
@@ -138,7 +134,7 @@ const unify_left: (pat: LL<STX>, code: LL<STX>, unit: CompilationUnit) => subst 
   //throw new Error("unify_left");
 };
 
-const is_id: (x: STX) => boolean = (x) => x.type === "atom" && id_tags[x.tag];
+const is_id: (x: STX) => boolean = (x) => x.tag === "identifier";
 
 const count_ids: (ls: LL<STX>) => number = (ls) =>
   ls === null ? 0 : (is_id(ls[0]) ? 1 : 0) + count_ids(ls[1]);

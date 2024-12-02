@@ -1,6 +1,5 @@
 import { assert } from "./assert";
 import { AST } from "./ast";
-import { id_tags } from "./tags";
 import { LL, llappend } from "./llhelpers";
 import { core_handlers } from "./syntax-core-patterns";
 import {
@@ -103,8 +102,8 @@ export function free_id_equal(
 }
 
 export function bound_id_equal(id1: STX, id2: STX): boolean {
-  assert(id1.type === "atom" && id_tags[id1.tag]);
-  assert(id2.type === "atom" && id_tags[id2.tag]);
+  assert(id1.type === "atom" && id1.tag === "identifier");
+  assert(id2.type === "atom" && id2.tag === "identifier");
   return id1.content === id2.content && same_marks(id1.wrap.marks, id2.wrap.marks);
 }
 

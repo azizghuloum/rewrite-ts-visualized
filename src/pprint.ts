@@ -29,8 +29,6 @@ function loc_to_ns(loc: Loc): ns {
         switch (stx.tag) {
           case "number":
           case "identifier":
-          case "property_identifier":
-          case "type_identifier":
           case "jsx_text":
           case "string":
           case "regex_pattern":

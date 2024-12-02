@@ -292,8 +292,6 @@ function handle_core_syntax(
 
 const atom_handlers_table: { [tag in atom_tag]: "next" | "stop" } = {
   identifier: "stop",
-  type_identifier: "stop",
-  property_identifier: "stop",
   number: "next",
   jsx_text: "next",
   string: "next",
@@ -431,11 +429,7 @@ function preexpand_forms(step: {
       case "done":
         return done(loc);
       case "identifier": {
-        assert(
-          (loc.t.type === "atom" && loc.t.tag === "identifier") ||
-            loc.t.tag === "property_identifier",
-          loc.t,
-        );
+        assert(loc.t.type === "atom" && loc.t.tag === "identifier", loc.t);
         const { content, wrap } = loc.t;
         const resolution = resolve(content, wrap, step.context, step.unit, sort_env[step.sort]);
         switch (resolution.type) {
@@ -947,7 +941,7 @@ function postexpand_type_alias_declaration(
             unit,
             context,
             sort: "type",
-            k: ({ loc, unit, counter, context }) => {
+            k: ({ loc, unit: _unit, counter: _counter, context: _context }) => {
               return go_right(
                 loc,
                 (loc) => {
