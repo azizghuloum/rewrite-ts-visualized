@@ -15,7 +15,7 @@
   "dependencies": {
     "@codemirror/lang-javascript": "^6.2.2",
     "@types/json-stable-stringify": "^1.1.0",
-    "@types/node": "^22.10.0",
+    "@types/node": "^22.10.1",
     "@uiw/codemirror-theme-abcdef": "^4.23.6",
     "@uiw/react-codemirror": "^4.23.6",
     "json-stable-stringify": "^1.1.1",
