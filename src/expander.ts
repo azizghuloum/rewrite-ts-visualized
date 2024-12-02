@@ -22,13 +22,14 @@ export function initial_step(ast: AST, cu_id: string, patterns: CorePatterns): S
 
 type goodies = { loc: Loc; rib: Rib; context: Context; counter: number; unit: CompilationUnit };
 
-function gen_lexical({
+function gen_binding({
   loc,
   rib,
   counter,
   context,
   unit,
-}: goodies): Omit<goodies, "loc"> & { name: string } {
+  sort,
+}: goodies & { sort: "type" | "value" }): Omit<goodies, "loc"> & { name: string } {
   const stx = loc.t;
   assert(stx.type === "atom" && stx.tag === "identifier");
   return extend_rib(
@@ -36,47 +37,13 @@ function gen_lexical({
     stx.content,
     stx.wrap.marks,
     counter,
-    "normal_env",
+    { type: "types_env" as const, value: "normal_env" as const }[sort],
     ({ rib, counter, label }) =>
       extend_context_lexical(
         context,
         counter,
         label,
-        "lexical",
-        stx.content,
-        ({ context, counter, name }) => ({
-          rib,
-          context,
-          counter,
-          name,
-          unit,
-        }),
-      ),
-    (reason) => syntax_error(loc, reason),
-  );
-}
-
-function gen_type_binding({
-  loc,
-  rib,
-  counter,
-  context,
-  unit,
-}: goodies): Omit<goodies, "loc"> & { name: string } {
-  const stx = loc.t;
-  assert(stx.type === "atom" && stx.tag === "identifier");
-  return extend_rib(
-    rib,
-    stx.content,
-    stx.wrap.marks,
-    counter,
-    "types_env",
-    ({ rib, counter, label }) =>
-      extend_context_lexical(
-        context,
-        counter,
-        label,
-        "type",
+        { type: "type" as const, value: "lexical" as const }[sort],
         stx.content,
         ({ context, counter, name }) => ({
           rib,
@@ -122,7 +89,7 @@ function extract_lexical_declaration_bindings({
       return go_down(
         ls,
         (loc) => {
-          const goodies = gen_lexical({ loc, rib, counter, context, unit });
+          const goodies = gen_binding({ loc, rib, counter, context, unit, sort: "value" });
           return go_right(
             ls,
             (loc) => after_vars({ ...goodies, loc }),
@@ -171,7 +138,7 @@ function extract_type_alias_declaration_bindings({
         loc,
         (loc) => {
           assert(loc.t.type === "atom" && loc.t.tag === "identifier", "expected an identifier");
-          const gs = gen_type_binding({ loc, rib, counter, context, unit });
+          const gs = gen_binding({ loc, rib, counter, context, unit, sort: "type" });
           return { ...gs, loc: go_up(loc) };
         },
         syntax_error,
@@ -646,7 +613,7 @@ function extract_parameters(goodies: goodies): goodies {
   function identifier(goodies: goodies): goodies {
     const id = goodies.loc.t;
     assert(id.type === "atom" && id.tag === "identifier");
-    const { name, ...gs } = gen_lexical(goodies);
+    const { name, ...gs } = gen_binding({ ...goodies, sort: "value" });
     return { ...gs, loc: rename(goodies.loc, name) };
   }
 
@@ -790,9 +757,7 @@ function expand_type_parameters(
         return go_right(
           loc,
           (loc) => pre_var({ loc, rib, counter, unit, context }),
-          (loc) => {
-            debug(loc, "cant go past commma?");
-          },
+          (loc) => debug(loc, "cant go past commma?"),
         );
       },
       (loc) =>
@@ -805,12 +770,12 @@ function expand_type_parameters(
   function pre_var({ loc, rib, counter, unit, context }: goodies): T {
     switch (loc.t.tag) {
       case "identifier":
-        const { name, ...gs } = gen_type_binding({ loc, rib, counter, context, unit });
+        const { name, ...gs } = gen_binding({ loc, rib, counter, context, unit, sort: "type" });
         return pre_after_var({ ...gs, loc: rename(loc, name) });
       case "type_parameter":
         return go_down(loc, (loc) => {
           if (loc.t.tag !== "identifier") syntax_error(loc, "expected an identifier");
-          const { name, ...gs } = gen_type_binding({ loc, rib, counter, context, unit });
+          const { name, ...gs } = gen_binding({ loc, rib, counter, context, unit, sort: "type" });
           return pre_after_var({ ...gs, loc: go_up(rename(loc, name)) });
         });
       default:
