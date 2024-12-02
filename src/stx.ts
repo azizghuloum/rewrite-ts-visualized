@@ -138,7 +138,7 @@ export function extend_context_lexical<S>(
   context: Context,
   counter: number,
   label: string,
-  binding_type: "lexical" | "type_alias",
+  binding_type: "lexical" | "type",
   original_name: string,
   k: (args: { context: Context; name: string; counter: number }) => S,
 ): S {

@@ -56,7 +56,7 @@ function gen_lexical({
   );
 }
 
-function gen_type_alias({
+function gen_type_binding({
   loc,
   rib,
   counter,
@@ -76,7 +76,7 @@ function gen_type_alias({
         context,
         counter,
         label,
-        "type_alias",
+        "type",
         stx.content,
         ({ context, counter, name }) => ({
           rib,
@@ -171,7 +171,7 @@ function extract_type_alias_declaration_bindings({
         loc,
         (loc) => {
           assert(loc.t.type === "atom" && loc.t.tag === "identifier", "expected an identifier");
-          const gs = gen_type_alias({ loc, rib, counter, context, unit });
+          const gs = gen_type_binding({ loc, rib, counter, context, unit });
           return { ...gs, loc: go_up(loc) };
         },
         syntax_error,
@@ -439,7 +439,7 @@ function preexpand_forms(step: {
             const binding = resolution.binding;
             switch (binding.type) {
               case "lexical":
-              case "type_alias":
+              case "type":
               case "ts":
                 return next(loc);
               case "core_syntax": {
@@ -835,12 +835,12 @@ function expand_type_parameters(
   function pre_var({ loc, rib, counter, unit, context }: goodies): never {
     switch (loc.t.tag) {
       case "identifier":
-        const { name, ...gs } = gen_type_alias({ loc, rib, counter, context, unit });
+        const { name, ...gs } = gen_type_binding({ loc, rib, counter, context, unit });
         return pre_after_var({ ...gs, loc: rename(loc, name) });
       case "type_parameter":
         return go_down(loc, (loc) => {
           if (loc.t.tag !== "identifier") syntax_error(loc, "expected an identifier");
-          const { name, ...gs } = gen_type_alias({ loc, rib, counter, context, unit });
+          const { name, ...gs } = gen_type_binding({ loc, rib, counter, context, unit });
           return pre_after_var({ ...gs, loc: go_up(rename(loc, name)) });
         });
       default:
@@ -931,7 +931,7 @@ function postexpand_type_alias_declaration(
       const { content, wrap } = loc.t;
       const resolution = resolve(content, wrap, context, unit, "types_env");
       assert(resolution.type === "bound");
-      assert(resolution.binding.type === "type_alias");
+      assert(resolution.binding.type === "type");
       const new_name = resolution.binding.name;
       return go_right(rename(loc, new_name), (loc) => {
         function do_after_equal({ loc, counter, unit, context }: Omit<goodies, "rib">): never {
@@ -1033,7 +1033,7 @@ function postexpand_body(step: {
                 const { binding } = resolution;
                 switch (binding.type) {
                   case "ts":
-                  case "type_alias":
+                  case "type":
                   case "lexical": {
                     return cont(rename(loc, binding.name));
                   }
