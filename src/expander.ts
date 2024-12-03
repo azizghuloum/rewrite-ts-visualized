@@ -23,15 +23,15 @@ export function initial_step(
   const initial_loc: Loc = mkzipper(stx);
   async function expand(inspect: inspect): Promise<Step> {
     try {
-      const { loc } = await expand_program({
-        loc: initial_loc,
+      const { loc } = await expand_program(
+        initial_loc,
         unit,
         context,
         counter,
+        inspect,
         rib,
         rib_id,
-        inspect,
-      });
+      );
       return new Step("DONE", loc);
     } catch (error) {
       if (error instanceof Step) {
@@ -172,31 +172,29 @@ function extract_type_alias_declaration_bindings({
   );
 }
 
-async function expand_program(step: {
-  loc: Loc;
-  unit: CompilationUnit;
-  context: Context;
-  counter: number;
-  inspect: inspect;
-  rib: Rib;
-  rib_id: string;
-}): Promise<{ loc: Loc }> {
-  assert(step.loc.t.tag === "program");
-  const { rib, rib_id, counter } = step;
-  //const wrap: Wrap = { marks: null, subst: [{ rib_id, cu_id: step.unit.cu_id }, null] };
-  const loc = go_down(
-    step.loc,
+async function expand_program(
+  loc: Loc,
+  unit: CompilationUnit,
+  context: Context,
+  counter: number,
+  inspect: inspect,
+  rib: Rib,
+  rib_id: string,
+): Promise<{ loc: Loc }> {
+  assert(loc.t.tag === "program");
+  const fst = go_down(
+    loc,
     (x) => x,
     (loc) => syntax_error(loc, "empty program?"),
   );
   return preexpand_body({
-    loc,
+    loc: fst,
     rib,
-    unit: extend_unit(step.unit, rib_id, rib), // rib is empty
-    context: step.context,
+    unit,
+    context,
     counter,
     sort: "value",
-    inspect: step.inspect,
+    inspect,
   }).then(({ loc, rib, counter, context, unit }) => {
     // rib is filled
     // context is filled also
@@ -205,7 +203,7 @@ async function expand_program(step: {
       counter,
       context,
       unit: extend_unit(unit, rib_id, rib),
-      inspect: step.inspect,
+      inspect,
     });
   });
 }
