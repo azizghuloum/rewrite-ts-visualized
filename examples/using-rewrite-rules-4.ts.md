@@ -1,4 +1,4 @@
-## `using-syntax-rules-4.ts`
+## `using-rewrite-rules-4.ts`
 
 ### Status: `DONE`
 
