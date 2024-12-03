@@ -82,9 +82,8 @@ export function Indented({ tag, items }: { tag: React.ReactElement; items: React
   );
 }
 
-export function ASTList({ tag, items }: { tag: string; items: React.ReactElement[] }) {
-  const tag_element = <div style={{ fontStyle: "italic" }}>{tag}:</div>;
-  return <Indented tag={tag_element} items={items} />;
+export function ASTList({ tag, items }: { tag: React.ReactElement; items: React.ReactElement[] }) {
+  return <Indented tag={tag} items={items} />;
 }
 
 function map_to_array<X, Y>(ll: LL<X>, f: (x: X, i: number) => Y): Y[] {
@@ -98,28 +97,39 @@ function map_to_array<X, Y>(ll: LL<X>, f: (x: X, i: number) => Y): Y[] {
   return ys;
 }
 
+function ASTWrap({ wrap, children }: { wrap: Wrap | undefined; children: React.ReactElement }) {
+  if (!wrap || (wrap.marks === null && wrap.subst === null)) return children;
+  return (
+    <div style={{ display: "flex", flexDirection: "row", justifyContent: "space-between" }}>
+      <div>{children}</div>
+      <div style={{ fontSize: ".6em", fontWeight: "bold", marginLeft: "1em", marginRight: "1em" }}>
+        <div>{map_to_array(wrap.marks, (x) => x).join(",")}</div>
+        <div>{map_to_array(wrap.subst, (x) => (x === "shift" ? "shift" : x.rib_id)).join(",")}</div>
+      </div>
+    </div>
+  );
+}
+
+export function ASTListTag({ tag }: { tag: string }) {
+  return <div style={{ fontStyle: "italic" }}>{tag}:</div>;
+}
+
 export function ASTExpr({ ast }: { ast: STX }) {
-  if (ast.wrap) {
-    const tag = (
-      <>
-        <div style={{ fontWeight: "bold" }}>
-          marks: {map_to_array(ast.wrap.marks, (x) => x).join(",")}
-        </div>
-        <div style={{ fontWeight: "bold" }}>
-          subst:{" "}
-          {map_to_array(ast.wrap.subst, (x) => (x === "shift" ? "shift" : x.rib_id)).join(",")}
-        </div>
-      </>
-    );
-    return <Indented tag={tag} items={[<ASTExpr ast={{ ...ast, wrap: undefined }} />]} />;
-  }
   switch (ast.type) {
     case "atom":
-      return <ASTToken token_type={ast.tag} token_content={ast.content} />;
+      return (
+        <ASTWrap wrap={ast.tag === "identifier" ? ast.wrap : undefined}>
+          <ASTToken token_type={ast.tag} token_content={ast.content} />
+        </ASTWrap>
+      );
     case "list":
       return (
         <ASTList
-          tag={ast.tag}
+          tag={
+            <ASTWrap wrap={ast.wrap}>
+              <ASTListTag tag={ast.tag} />
+            </ASTWrap>
+          }
           items={map_to_array(ast.content, (x, i) => (
             <ASTExpr key={i} ast={x} />
           ))}

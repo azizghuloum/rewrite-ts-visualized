@@ -1,7 +1,7 @@
 import "./App.css";
 import { useEffect, useMemo, useState } from "react";
 import { createBrowserRouter, RouterProvider } from "react-router-dom";
-import { ASTExpr, ASTHighlight, ASTList } from "./ASTVis";
+import { ASTExpr, ASTHighlight, ASTList, ASTListTag } from "./ASTVis";
 import { Editor, EditorP } from "./Editor";
 import * as Zipper from "../src/zipper";
 import { initial_step } from "../src/expander";
@@ -10,7 +10,6 @@ import { core_patterns } from "../src/syntax-core-patterns";
 import { parse } from "../src/parse";
 import { pprint } from "../src/pprint";
 import { inspect, Step } from "../src/step";
-import { assert } from "../src/assert";
 
 type ExampleProps = {
   code: string;
@@ -22,7 +21,7 @@ function zipper_to_view(zipper: Loc): React.ReactElement {
     zipper,
     (x) => <ASTHighlight>{x}</ASTHighlight>,
     (x) => <ASTExpr ast={x} />,
-    (tag, children) => <ASTList tag={tag} items={children} />,
+    (tag, children) => <ASTList tag={<ASTListTag tag={tag} />} items={children} />,
   );
 }
 
