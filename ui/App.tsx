@@ -33,7 +33,13 @@ type State = {
   step_number: number;
   error: string | null;
   pointer: number | null;
+  code_id: number;
 };
+
+const global_code_counter = (() => {
+  let counter = 0;
+  return () => ++counter;
+})();
 
 function initial_state(loc: Loc): State {
   return {
@@ -42,6 +48,7 @@ function initial_state(loc: Loc): State {
     step_number: 0,
     error: null,
     pointer: null,
+    code_id: global_code_counter(),
   };
 }
 
@@ -82,26 +89,27 @@ function Example({ code, onChange }: ExampleProps) {
   }
   const [state, setState] = useState(init_state(code)[0]);
   useEffect(() => {
-    const [state, expand] = init_state(code);
-    setState(state);
-    function record(step: Step) {
-      setState((state) => {
-        return {
-          ...state,
-          prev_steps: [...state.prev_steps, state.last_step],
-          last_step: step,
-          step_number: state.step_number + 1,
-          error: step.error ? `${step.name}: ${step.error}` : null,
-          pointer: state.pointer,
-        };
-      });
-    }
-    const inspect: inspect = (loc, reason, k) => {
-      record(new Step("Inspect", loc, undefined, undefined, reason));
-      return k();
-    };
-    expand(inspect).then((step) => {
-      record(step);
+    setState((old_state) => {
+      const [my_state, expand] = init_state(code);
+      function record(step: Step) {
+        setState((state) => {
+          if (state.code_id !== my_state.code_id) return state; // in case the code changed while we're still expanding
+          return {
+            ...state,
+            prev_steps: [...state.prev_steps, state.last_step],
+            last_step: step,
+            step_number: state.step_number + 1,
+            error: step.error ? `${step.name}: ${step.error}` : null,
+            pointer: state.pointer,
+          };
+        });
+      }
+      const inspect: inspect = (loc, reason, k) => {
+        record(new Step("Inspect", loc, undefined, undefined, reason));
+        return k();
+      };
+      setTimeout(() => expand(inspect).then(record), 0);
+      return my_state;
     });
   }, [code]);
   const max = state.step_number;
@@ -175,15 +183,13 @@ function Expander() {
         .join("\n"),
   );
   return (
-    <>
-      <Example
-        code={sample}
-        onChange={(code) => {
-          setSample(code);
-          localStorage.setItem("sample_program", code);
-        }}
-      />
-    </>
+    <Example
+      code={sample}
+      onChange={(code) => {
+        setSample((prev_code) => code);
+        localStorage.setItem("sample_program", code);
+      }}
+    />
   );
 }
 
