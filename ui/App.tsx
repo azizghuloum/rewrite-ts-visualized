@@ -166,7 +166,7 @@ function Example({ code, onChange }: ExampleProps) {
 
 const sample_program = `
 /* c is for curry */
-using_syntax_rules(
+using_rewrite_rules(
   [c, c(() => {body}),   (() => {body})()],
   [c, c(() => expr),     expr],
   [c, c((a, rest) => e), (a) => c((rest) => e)],

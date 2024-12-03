@@ -5,7 +5,7 @@
 ### Input Program
 
 ```typescript
-using_syntax_rules(
+using_rewrite_rules(
   [deftype, deftype(x as y), splice(() => {
     type x = y;
   })]

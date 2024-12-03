@@ -5,7 +5,7 @@
 ### Input Program
 
 ```typescript
-using_syntax_rules(
+using_rewrite_rules(
   [c, c(() => {body}), (() => {body})()],
   [c, c(() => expr),   expr],
   [c, c((a, as) => e), (a) => c((as) => e)],

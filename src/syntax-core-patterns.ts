@@ -320,7 +320,7 @@ function group_by<K, V>(ls: [K, V][], eq: (a: K, b: K) => boolean): [K, V[]][] {
   return ac;
 }
 
-const using_syntax_rules: handler = async (
+const using_rewrite_rules: handler = async (
   orig_loc,
   orig_context,
   orig_unit,
@@ -332,7 +332,7 @@ const using_syntax_rules: handler = async (
     orig_loc,
     orig_context,
     orig_unit,
-    "using_syntax_rules",
+    "using_rewrite_rules",
   );
   if (!unification) syntax_error(orig_loc);
   const { subst, loc } = unification;
@@ -535,7 +535,7 @@ const define_rewrite_rules: handler = async (
 
 export const core_handlers: { [k: string]: handler } = {
   splice,
-  using_syntax_rules,
+  using_rewrite_rules,
   define_rewrite_rules,
 };
 
@@ -550,7 +550,7 @@ export const core_patterns = (parse: (code: string) => AST) => {
   };
   return {
     splice: pattern("splice(() => {body});"),
-    using_syntax_rules: pattern("using_syntax_rules(clauses).rewrite(expression)"),
+    using_rewrite_rules: pattern("using_rewrite_rules(clauses).rewrite(expression)"),
     define_rewrite_rules: pattern("define_rewrite_rules(clauses)"),
     //arrow_function_single_param: pattern("arrow_function_single_param => _;"),
     //arrow_function_paren_params: pattern("(arrow_function_paren_params) => _;"),

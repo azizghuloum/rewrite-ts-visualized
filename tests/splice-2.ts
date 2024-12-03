@@ -1,5 +1,5 @@
 const foo = (x) => {
-  using_syntax_rules([t,t,x]).rewrite(splice(() => {
+  using_rewrite_rules([t,t,x]).rewrite(splice(() => {
     t;
     t;
   }));  

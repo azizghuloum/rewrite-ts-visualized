@@ -5,7 +5,7 @@
 ### Input Program
 
 ```typescript
-using_syntax_rules(
+using_rewrite_rules(
   [not, not(x) ? a : b, x ? b : a],
   [not, not(x), !x],
   [not, not, (x) => not(x)],

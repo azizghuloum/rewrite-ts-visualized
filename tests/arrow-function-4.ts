@@ -1,3 +1,3 @@
 const foo = (x) => {
-  using_syntax_rules([t,t,x]).rewrite(t);  
+  using_rewrite_rules([t,t,x]).rewrite(t);
 }
