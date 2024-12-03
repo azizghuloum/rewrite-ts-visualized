@@ -3,7 +3,7 @@
 ### Status: `SyntaxError`
 
 ```
-unbound identifier
+unbound identifier 'consoel'
 ```
 
 ### Input Program

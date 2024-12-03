@@ -39,10 +39,10 @@ function id_to_label(
   unit: CompilationUnit,
   resolution_type: "normal_env" | "types_env",
 ): string | undefined {
-  function loop(marks: Marks | null, subst: Subst): string | undefined {
+  function lookup(marks: Marks | null, subst: Subst): string | undefined {
     if (marks === null) throw new Error("missing marks");
     if (subst === null) return undefined; // unbound
-    if (subst[0] === shift) return loop(marks[1], subst[1]);
+    if (subst[0] === shift) return lookup(marks[1], subst[1]);
     const env = (({ rib_id, cu_id }) => {
       assert(cu_id === unit.cu_id, "unhandled imported rib?");
       const rib = unit.store[rib_id];
@@ -52,12 +52,11 @@ function id_to_label(
       return rib[resolution_type];
     })(subst[0]);
     const ls = env[name];
-    if (ls === undefined) return loop(marks, subst[1]);
-    const entry = ls.find(([ms, _]) => same_marks(ms, marks));
-    if (entry === undefined) return loop(marks, subst[1]);
+    const entry = ls?.find(([ms, _]) => same_marks(ms, marks));
+    if (entry === undefined) return lookup(marks, subst[1]);
     return entry[1];
   }
-  return loop(marks, subst);
+  return lookup(marks, subst);
 }
 
 export type Resolution =

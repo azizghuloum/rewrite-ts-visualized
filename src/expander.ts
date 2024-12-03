@@ -9,6 +9,7 @@ import {
   extend_rib,
   extend_context_lexical,
   CorePatterns,
+  push_wrap,
 } from "./stx";
 import { change, go_down, go_next, go_right, go_up, mkzipper, wrap_loc } from "./zipper";
 import { apply_syntax_rules, core_handlers } from "./syntax-core-patterns";
@@ -55,7 +56,7 @@ function gen_binding({
   sort,
 }: goodies & { sort: "type" | "value" }): Omit<goodies, "loc"> & { name: string } {
   const stx = loc.t;
-  assert(stx.type === "atom" && stx.tag === "identifier");
+  assert(stx.type === "atom" && stx.tag === "identifier", stx);
   return extend_rib(
     rib,
     stx.content,
@@ -191,7 +192,9 @@ async function expand_program(
     ({ loc, rib, counter, context, unit }) => {
       // rib is filled
       // context is filled also
-      return postexpand_program(loc, extend_unit(unit, rib_id, rib), counter, context, inspect);
+      return inspect(loc, "After preexpanding the program", () =>
+        postexpand_program(loc, extend_unit(unit, rib_id, rib), counter, context, inspect),
+      );
     },
   );
 }
@@ -374,6 +377,14 @@ async function expand_concise_body(
   return postexpand_body(gs.loc, new_unit, gs.counter, gs.context, sort, inspect);
 }
 
+function rewrap(loc: Loc, rib_id: string, cu_id: string): Loc {
+  return {
+    type: "loc",
+    t: push_wrap({ marks: null, subst: [{ rib_id, cu_id }, null] })(loc.t),
+    p: loc.p,
+  };
+}
+
 async function preexpand_forms(
   loc: Loc,
   rib: Rib,
@@ -432,11 +443,21 @@ async function preexpand_forms(
               case "syntax_rules_transformer": {
                 const { clauses } = binding;
                 return inspect(loc, `transformer form`, () =>
-                  apply_syntax_rules(loc, clauses, unit, counter).then(({ loc, counter }) =>
-                    inspect(loc, `transformer output`, () =>
-                      preexpand_forms(loc, rib, rib_id, counter, unit, context, sort, inspect),
-                    ),
-                  ),
+                  apply_syntax_rules(loc, clauses, unit, counter).then(({ loc, counter }) => {
+                    const rewrapped = rewrap(loc, rib_id, unit.cu_id);
+                    return inspect(rewrapped, `transformer output`, () =>
+                      preexpand_forms(
+                        rewrapped,
+                        rib,
+                        rib_id,
+                        counter,
+                        unit,
+                        context,
+                        sort,
+                        inspect,
+                      ),
+                    );
+                  }),
                 );
               }
               default:
@@ -1005,8 +1026,9 @@ async function postexpand_body(
                   }
                 }
               }
-              case "unbound":
-                syntax_error(loc, "unbound identifier");
+              case "unbound": {
+                syntax_error(loc, `unbound identifier '${content}'`);
+              }
             }
             debug(loc, "resolved", resolution);
           }
