@@ -193,7 +193,7 @@ async function expand_program(
       // rib is filled
       // context is filled also
       return inspect(loc, "After preexpanding the program", () =>
-        postexpand_program(loc, extend_unit(unit, rib_id, rib), counter, context, inspect),
+        postexpand_program(loc, extend_unit(unit, rib_id, rib), counter, context, rib_id, inspect),
       );
     },
   );
@@ -374,7 +374,7 @@ async function expand_concise_body(
       )
     : preexpand_forms(loc, rib, rib_id, counter, unit, context, sort, inspect));
   const new_unit = extend_unit(gs.unit, rib_id, gs.rib);
-  return postexpand_body(gs.loc, new_unit, gs.counter, gs.context, sort, inspect);
+  return postexpand_body(gs.loc, new_unit, gs.counter, gs.context, rib_id, sort, inspect);
 }
 
 function rewrap(loc: Loc, rib_id: string, cu_id: string): Loc {
@@ -603,10 +603,13 @@ function postexpand_program(
   unit: CompilationUnit,
   counter: number,
   context: Context,
+  rib_id: string,
   inspect: inspect,
 ): Promise<{ loc: Loc }> {
   assert(loc.t.tag === "program");
-  return go_down(loc, (loc) => postexpand_body(loc, unit, counter, context, "value", inspect));
+  return go_down(loc, (loc) =>
+    postexpand_body(loc, unit, counter, context, rib_id, "value", inspect),
+  );
 }
 
 function invalid_form(loc: Loc): never {
@@ -792,6 +795,7 @@ function expand_type_parameters(
                 counter,
                 unit,
                 context,
+                rib_id,
                 sort: "type",
                 inspect,
               }).then(({ loc, counter, unit, context }) =>
@@ -874,6 +878,7 @@ function expand_expr({
   counter,
   unit,
   context,
+  rib_id,
   sort,
   inspect,
 }: {
@@ -881,6 +886,7 @@ function expand_expr({
   unit: CompilationUnit;
   counter: number;
   context: Context;
+  rib_id: string;
   sort: "type" | "value";
   inspect: inspect;
 }): Promise<Omit<goodies, "rib">> {
@@ -888,10 +894,9 @@ function expand_expr({
     loc,
     async (loc) => {
       const rib: Rib = { type: "rib", types_env: {}, normal_env: {} };
-      const rib_id = "invalid";
       return preexpand_forms(loc, rib, rib_id, counter, unit, context, sort, inspect).then(
-        ({ loc, rib: _rib, unit, counter, context }) =>
-          postexpand_body(loc, unit, counter, context, sort, inspect).then(({ loc }) => ({
+        ({ loc, rib, unit, counter, context }) =>
+          postexpand_body(loc, unit, counter, context, rib_id, sort, inspect).then(({ loc }) => ({
             loc,
             unit,
             counter,
@@ -908,6 +913,7 @@ async function postexpand_type_alias_declaration(
   unit: CompilationUnit,
   counter: number,
   context: Context,
+  rib_id: string,
   inspect: inspect,
 ): Promise<Loc> {
   return go_down(loc, (loc) => {
@@ -926,6 +932,7 @@ async function postexpand_type_alias_declaration(
             counter,
             unit,
             context,
+            rib_id,
             sort: "type",
             inspect,
           }).then(({ loc, unit: _unit, counter: _counter, context: _context }) => {
@@ -987,6 +994,7 @@ async function postexpand_body(
   unit: CompilationUnit,
   counter: number,
   context: Context,
+  rib_id: string,
   sort: "type" | "value",
   inspect: inspect,
 ): Promise<{ loc: Loc }> {
@@ -1041,8 +1049,54 @@ async function postexpand_body(
         switch (loc.t.tag) {
           case "lexical_declaration":
             return descend(loc);
-          case "variable_declarator":
-            return descend(loc); // looks wrong
+          case "variable_declarator": {
+            return go_down(
+              loc,
+              (loc) =>
+                in_isolation(
+                  loc,
+                  (loc) =>
+                    expand_expr({
+                      // TODO not exactly right
+                      loc,
+                      counter,
+                      unit,
+                      context,
+                      rib_id,
+                      sort: "value",
+                      inspect,
+                    }),
+                  (loc, { counter, context, unit }) =>
+                    go_right(
+                      loc,
+                      (loc) => {
+                        assert(loc.t.content === "=");
+                        return go_right(
+                          loc,
+                          (loc) =>
+                            in_isolation(
+                              loc,
+                              (loc) =>
+                                expand_expr({
+                                  loc,
+                                  counter,
+                                  unit,
+                                  context,
+                                  rib_id,
+                                  sort: "value",
+                                  inspect,
+                                }),
+                              (loc, { counter, unit, context }) => go_up(loc),
+                            ).then(cont),
+                          syntax_error,
+                        );
+                      },
+                      syntax_error,
+                    ),
+                ),
+              syntax_error,
+            );
+          }
           case "arrow_function": {
             return in_isolation(
               loc,
@@ -1054,15 +1108,20 @@ async function postexpand_body(
             return syntax_error(loc, "invalid slice");
           }
           case "type_alias_declaration": {
-            return postexpand_type_alias_declaration(loc, unit, counter, context, inspect).then(
-              cont,
-            );
+            return postexpand_type_alias_declaration(
+              loc,
+              unit,
+              counter,
+              context,
+              rib_id,
+              inspect,
+            ).then(cont);
           }
           case "member_expression": {
             return go_down(loc, (loc) =>
               in_isolation(
                 loc,
-                (loc) => postexpand_body(loc, unit, counter, context, sort, inspect),
+                (loc) => postexpand_body(loc, unit, counter, context, rib_id, sort, inspect),
                 (loc, _gs) =>
                   go_right(loc, (loc) => {
                     assert(loc.t.content === ".");
