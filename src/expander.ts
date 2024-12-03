@@ -19,11 +19,19 @@ export function initial_step(
   cu_id: string,
   patterns: CorePatterns,
 ): [Loc, (inspect: inspect) => Promise<Step>] {
-  const { stx, counter, unit, context } = init_top_level(ast, cu_id, patterns);
+  const { stx, counter, unit, context, rib, rib_id } = init_top_level(ast, cu_id, patterns);
   const initial_loc: Loc = mkzipper(stx);
   async function expand(inspect: inspect): Promise<Step> {
     try {
-      const { loc } = await expand_program({ loc: initial_loc, unit, context, counter, inspect });
+      const { loc } = await expand_program({
+        loc: initial_loc,
+        unit,
+        context,
+        counter,
+        rib,
+        rib_id,
+        inspect,
+      });
       return new Step("DONE", loc);
     } catch (error) {
       if (error instanceof Step) {
@@ -170,17 +178,14 @@ async function expand_program(step: {
   context: Context;
   counter: number;
   inspect: inspect;
+  rib: Rib;
+  rib_id: string;
 }): Promise<{ loc: Loc }> {
   assert(step.loc.t.tag === "program");
-  const rib: Rib = {
-    type: "rib",
-    types_env: {},
-    normal_env: {},
-  };
-  const [rib_id, counter] = new_rib_id(step.counter);
-  const wrap: Wrap = { marks: null, subst: [{ rib_id, cu_id: step.unit.cu_id }, null] };
+  const { rib, rib_id, counter } = step;
+  //const wrap: Wrap = { marks: null, subst: [{ rib_id, cu_id: step.unit.cu_id }, null] };
   const loc = go_down(
-    wrap_loc(step.loc, wrap),
+    step.loc,
     (x) => x,
     (loc) => syntax_error(loc, "empty program?"),
   );

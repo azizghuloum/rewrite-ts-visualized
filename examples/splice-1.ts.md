@@ -16,9 +16,9 @@ const q = t + x;
 ### Output Program
 
 ```typescript
-const t_3 = 13;
-const x_5 = 17;
-const y_7 = x_5 + t_3;
-const q_9 = t_3 + x_5;
+const t_2 = 13;
+const x_4 = 17;
+const y_6 = x_4 + t_2;
+const q_8 = t_2 + x_4;
 ```
 

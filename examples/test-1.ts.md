@@ -12,7 +12,7 @@ x;
 ### Output Program
 
 ```typescript
-const x_3 = 12;
-x_3;
+const x_2 = 12;
+x_2;
 ```
 

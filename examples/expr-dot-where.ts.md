@@ -22,6 +22,6 @@ using_syntax_rules(
 ### Output Program
 
 ```typescript
-((x_6) => ((y_10) => x_6 + y_10)(x_6 + 2))(1);
+((x_5) => ((y_9) => x_5 + y_9)(x_5 + 2))(1);
 ```
 

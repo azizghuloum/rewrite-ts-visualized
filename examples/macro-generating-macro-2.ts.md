@@ -22,9 +22,9 @@ using_syntax_rules(
 ### Output Program
 
 ```typescript
-(x_5) => {
-  const using_syntax_rules_8 = 10;
-  (x_13) => x_13 + x_5;
+(x_4) => {
+  const using_syntax_rules_7 = 10;
+  (x_12) => x_12 + x_4;
 };
 ```
 
