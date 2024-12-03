@@ -491,15 +491,10 @@ const define_rewrite_rules: handler = async (
           counter,
           extend_context(ac[2], label, {
             type: "syntax_rules_transformer",
-            clauses: rhs.map(({ pattern, template }) => ({
-              pattern,
-              template: template,
-            })),
+            clauses: rhs,
           }),
         ],
-        (reason) => {
-          throw new Error(`"${reason}" shouldnt happen if things are partitioned properly`);
-        },
+        (reason) => syntax_error(loc, reason),
       );
     },
     [orig_rib, orig_counter, orig_context],
