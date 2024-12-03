@@ -28,8 +28,9 @@ type handler = (
   context: Context,
   unit: CompilationUnit,
   counter: number,
-  pattern: STX,
-) => Promise<{ loc: Loc; counter: number; unit: CompilationUnit; context: Context }>;
+  rib_id: string,
+  rib: Rib,
+) => Promise<{ loc: Loc; counter: number; unit: CompilationUnit; context: Context; rib: Rib }>;
 
 const zipper_find: (loc: Loc, pred: (x: STX) => boolean) => Loc | null = (loc, pred) => {
   const t = loc.t;
@@ -241,10 +242,8 @@ export const core_pattern_match: (
   return unification;
 };
 
-const splice: handler = async (loc, context, unit, counter, pattern) => {
-  const kwd = find_identifier_by_name(mkzipper(pattern), "splice");
-  assert(kwd !== null);
-  const unification = unify_paths(kwd.p, loc, unit);
+const splice: handler = async (loc, context, unit, counter, _rib_id, rib) => {
+  const unification = await core_pattern_match(loc, context, unit, "splice");
   assert(unification !== null);
   const { subst } = unification;
   assert(subst.length === 1);
@@ -256,7 +255,7 @@ const splice: handler = async (loc, context, unit, counter, pattern) => {
     wrap: undefined,
     content: body_code,
   };
-  return { loc: change(unification.loc, mkzipper(result)), counter, unit, context };
+  return { loc: change(unification.loc, mkzipper(result)), counter, unit, context, rib };
 };
 
 function literal_binding(name: string, subst: subst, unit: CompilationUnit): boolean {
@@ -321,7 +320,14 @@ function group_by<K, V>(ls: [K, V][], eq: (a: K, b: K) => boolean): [K, V[]][] {
   return ac;
 }
 
-const using_syntax_rules: handler = async (orig_loc, orig_context, orig_unit, orig_counter) => {
+const using_syntax_rules: handler = async (
+  orig_loc,
+  orig_context,
+  orig_unit,
+  orig_counter,
+  _rib_id,
+  orig_rib,
+) => {
   const unification = await core_pattern_match(
     orig_loc,
     orig_context,
@@ -381,6 +387,7 @@ const using_syntax_rules: handler = async (orig_loc, orig_context, orig_unit, or
     counter: final_counter,
     unit: final_unit,
     context: final_context,
+    rib: orig_rib,
   };
 };
 
@@ -446,6 +453,71 @@ export async function apply_syntax_rules(
   return { loc: new_loc, counter: new_counter };
 }
 
+const define_rewrite_rules: handler = async (
+  orig_loc,
+  orig_context,
+  orig_unit,
+  orig_counter,
+  rib_id,
+  orig_rib,
+) => {
+  const unification = await core_pattern_match(
+    orig_loc,
+    orig_context,
+    orig_unit,
+    "define_rewrite_rules",
+  );
+  if (!unification) syntax_error(orig_loc);
+  const { subst, loc } = unification;
+  const clauses_binding = subst.find(([lhs]) => lhs.content === "clauses");
+  assert(clauses_binding !== undefined);
+  const clauses = group_by(
+    ll_to_array(clauses_binding[1])
+      .filter((x) => x.content !== ",")
+      .map((x) => parse_syntax_rules_clause(x, loc)),
+    (x, y) => bound_id_equal(x, y),
+  );
+  const [final_rib, final_counter, final_context] = clauses.reduce(
+    (ac: [Rib, number, Context], [lhs, rhs]) => {
+      assert(lhs.type === "atom" && lhs.wrap !== undefined);
+      return extend_rib(
+        ac[0],
+        lhs.content,
+        lhs.wrap.marks,
+        ac[1],
+        "normal_env",
+        ({ rib, counter, label }) => [
+          rib,
+          counter,
+          extend_context(ac[2], label, {
+            type: "syntax_rules_transformer",
+            clauses: rhs.map(({ pattern, template }) => ({
+              pattern,
+              template: template,
+            })),
+          }),
+        ],
+        (reason) => {
+          throw new Error(`"${reason}" shouldnt happen if things are partitioned properly`);
+        },
+      );
+    },
+    [orig_rib, orig_counter, orig_context],
+  );
+  const final_unit = extend_unit(orig_unit, rib_id, final_rib);
+  const final_loc = change(
+    loc,
+    mkzipper({ type: "list", tag: "slice", wrap: { marks: null, subst: null }, content: null }),
+  );
+  return {
+    loc: final_loc,
+    counter: final_counter,
+    unit: final_unit,
+    context: final_context,
+    rib: final_rib,
+  };
+};
+
 //export const pattern_match: <S>(
 //  loc: Loc,
 //  context: Context,
@@ -469,6 +541,7 @@ export async function apply_syntax_rules(
 export const core_handlers: { [k: string]: handler } = {
   splice,
   using_syntax_rules,
+  define_rewrite_rules,
 };
 
 export const core_patterns = (parse: (code: string) => AST) => {
@@ -483,6 +556,7 @@ export const core_patterns = (parse: (code: string) => AST) => {
   return {
     splice: pattern("splice(() => {body});"),
     using_syntax_rules: pattern("using_syntax_rules(clauses).rewrite(expression)"),
+    define_rewrite_rules: pattern("define_rewrite_rules(clauses)"),
     //arrow_function_single_param: pattern("arrow_function_single_param => _;"),
     //arrow_function_paren_params: pattern("(arrow_function_paren_params) => _;"),
     //arrow_function_block_body: pattern("_ => {arrow_function_block_body};"),
