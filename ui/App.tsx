@@ -89,7 +89,7 @@ function Example({ code, onChange }: ExampleProps) {
   }
   const [state, setState] = useState(init_state(code)[0]);
   useEffect(() => {
-    setState((old_state) => {
+    setState((_old_state) => {
       const [my_state, expand] = init_state(code);
       function record(step: Step) {
         setState((state) => {
@@ -166,12 +166,14 @@ function Example({ code, onChange }: ExampleProps) {
 
 const sample_program = `
 /* c is for curry */
-using_rewrite_rules(
+define_rewrite_rules(
   [c, c(() => {body}),   (() => {body})()],
   [c, c(() => expr),     expr],
   [c, c((a, rest) => e), (a) => c((rest) => e)],
   [c, c((a) => e),       (a) => e],
-).rewrite(c((a, b, c, d) => a + b + c + d));
+);
+
+const curried = c((a, b, c, d) => a + b + c + d);
 `;
 
 function Expander() {
@@ -186,7 +188,7 @@ function Expander() {
     <Example
       code={sample}
       onChange={(code) => {
-        setSample((prev_code) => code);
+        setSample((_prev_code) => code);
         localStorage.setItem("sample_program", code);
       }}
     />
