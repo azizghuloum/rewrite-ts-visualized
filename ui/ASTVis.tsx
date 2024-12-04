@@ -12,7 +12,7 @@ const colormap: { [k in atom_tag]: string } = {
   number: "magenta",
   jsx_text: "teal",
   string: "cyan",
-  regex_pattern: "magenta",
+  regex: "magenta",
   other: "#89a",
   ERROR: "red",
 };

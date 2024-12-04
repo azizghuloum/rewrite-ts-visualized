@@ -1,7 +1,7 @@
 export type atom_tag =
   | "identifier"
   | "number"
-  | "regex_pattern"
+  | "regex"
   | "jsx_text"
   | "string"
   | "ERROR"

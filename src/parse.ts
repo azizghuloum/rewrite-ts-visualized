@@ -13,7 +13,6 @@ const pass_through: { [k in SyntaxKind]?: list_tag } = {
   [SyntaxKind.ConditionalExpression]: "ternary_expression",
   [SyntaxKind.VariableDeclaration]: "variable_declarator",
   [SyntaxKind.TypeAliasDeclaration]: "type_alias_declaration",
-  [SyntaxKind.ExportSpecifier]: "export_specifier",
   [SyntaxKind.ExportDeclaration]: "export_declaration",
   [SyntaxKind.EmptyStatement]: "empty_statement",
   [SyntaxKind.SyntaxList]: "syntax_list",
@@ -57,6 +56,8 @@ function absurdly(node: TS.Node, src: TS.SourceFile): AST {
         return { type: "atom", tag: "string", content };
       case SyntaxKind.Identifier:
         return { type: "atom", tag: "identifier", content };
+      case SyntaxKind.RegularExpressionLiteral:
+        return { type: "atom", tag: "regex", content };
       case SyntaxKind.OpenParenToken:
       case SyntaxKind.CloseParenToken:
       case SyntaxKind.EqualsGreaterThanToken:
@@ -188,6 +189,13 @@ function absurdly(node: TS.Node, src: TS.SourceFile): AST {
           return ls[0];
         } else {
           return { type: "list", tag: "required_parameter", content };
+        }
+      }
+      case SyntaxKind.ExportSpecifier: {
+        if (ls.length === 1) {
+          return ls[0];
+        } else {
+          return { type: "list", tag: "export_specifier", content };
         }
       }
       case SyntaxKind.UnionType: {

@@ -31,7 +31,7 @@ function loc_to_ns(loc: Loc): ns {
           case "identifier":
           case "jsx_text":
           case "string":
-          case "regex_pattern":
+          case "regex":
           case "other":
             return stx.content;
           case "ERROR":

@@ -274,7 +274,7 @@ const atom_handlers_table: { [tag in atom_tag]: "next" | "stop" } = {
   number: "next",
   jsx_text: "next",
   string: "next",
-  regex_pattern: "next",
+  regex: "next",
   ERROR: "stop",
   other: "next",
 };
