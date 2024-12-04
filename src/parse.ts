@@ -13,6 +13,9 @@ const pass_through: { [k in SyntaxKind]?: list_tag } = {
   [SyntaxKind.ConditionalExpression]: "ternary_expression",
   [SyntaxKind.VariableDeclaration]: "variable_declarator",
   [SyntaxKind.TypeAliasDeclaration]: "type_alias_declaration",
+  [SyntaxKind.ExportSpecifier]: "export_specifier",
+  [SyntaxKind.ExportDeclaration]: "export_declaration",
+  [SyntaxKind.EmptyStatement]: "empty_statement",
   [SyntaxKind.SyntaxList]: "syntax_list",
 };
 
@@ -20,6 +23,7 @@ const splice_middle: { [k in SyntaxKind]?: list_tag } = {
   [SyntaxKind.ObjectLiteralExpression]: "object",
   [SyntaxKind.ArrayLiteralExpression]: "array",
   [SyntaxKind.Block]: "statement_block",
+  [SyntaxKind.NamedExports]: "named_exports",
 };
 
 function left_associate(op: string, [head, tail]: [AST, LL<AST>]): AST {
@@ -68,6 +72,7 @@ function absurdly(node: TS.Node, src: TS.SourceFile): AST {
       case SyntaxKind.ColonToken:
       case SyntaxKind.PlusToken:
       case SyntaxKind.MinusToken:
+      case SyntaxKind.AsteriskToken:
       case SyntaxKind.LessThanToken:
       case SyntaxKind.GreaterThanToken:
       case SyntaxKind.EqualsToken:
@@ -75,6 +80,7 @@ function absurdly(node: TS.Node, src: TS.SourceFile): AST {
       case SyntaxKind.AmpersandToken:
       case SyntaxKind.ImportKeyword:
       case SyntaxKind.ExportKeyword:
+      case SyntaxKind.FromKeyword:
       case SyntaxKind.ConstKeyword:
       case SyntaxKind.TypeKeyword:
       case SyntaxKind.ExtendsKeyword:

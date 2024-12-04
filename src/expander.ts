@@ -182,7 +182,7 @@ async function expand_program(
   rib: Rib,
   rib_id: string,
 ): Promise<{ loc: Loc }> {
-  assert(loc.t.tag === "program");
+  if (loc.t.tag !== "program") syntax_error(loc, "expected a program");
   const fst = go_down(
     loc,
     (x) => x,
@@ -286,6 +286,8 @@ const list_handlers_table: { [tag in list_tag]: "descend" | "stop" | "todo" } = 
   export_statement: "descend",
   export_specifier: "todo",
   export_clause: "todo",
+  export_declaration: "todo",
+  named_exports: "todo",
   slice: "descend",
   arrow_function: "stop",
   statement_block: "stop",
