@@ -253,19 +253,24 @@ export function init_top_level(
   rib_id: string;
 } {
   const [rib_id, counter] = new_rib_id(0);
-  const top_wrap: Wrap = { marks: top_marks, subst: [{ rib_id, cu_id }, null] };
+  const marks: Marks = [cu_id, top_marks];
+  const top_wrap: Wrap = { marks, subst: [{ rib_id, cu_id }, null] };
+  const outer_top_wrap: Wrap = { marks: top_marks, subst: [{ rib_id, cu_id }, null] };
   function wrap(ast: AST): STX {
     return { ...ast, wrap: top_wrap };
+  }
+  function outer_wrap(ast: AST): STX {
+    return { ...ast, wrap: outer_top_wrap };
   }
   const globals = get_globals("es2024.full");
   const rib: Rib = {
     type: "rib",
     types_env: Object.fromEntries([
-      ...Object.keys(core_handlers).map((name) => [name, [[top_marks, `global.${name}`]]]),
+      ...Object.keys(core_handlers).map((name) => [name, [[marks, `global.${name}`]]]),
     ]),
     normal_env: Object.fromEntries([
-      ...Object.keys(core_handlers).map((name) => [name, [[top_marks, `global.${name}`]]]),
-      ...globals.map((name) => [name, [[top_marks, `global.${name}`]]]),
+      ...Object.keys(core_handlers).map((name) => [name, [[marks, `global.${name}`]]]),
+      ...globals.map((name) => [name, [[marks, `global.${name}`]]]),
     ]),
   };
   const unit: CompilationUnit = {
@@ -280,7 +285,7 @@ export function init_top_level(
     unit,
     rib,
     rib_id,
-    context: init_global_context(patterns, wrap, globals),
+    context: init_global_context(patterns, outer_wrap, globals),
   };
 }
 
