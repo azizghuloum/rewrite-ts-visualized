@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "vite",
     "test": "vitest",
-    "watch": "tsc -b --noEmit --watch",
+    "watch": "deno --watch --allow-all ./rtsc/watch.ts",
     "coverage": "vitest run --coverage",
     "build": "tsc -b && vite build",
     "lint": "eslint .",

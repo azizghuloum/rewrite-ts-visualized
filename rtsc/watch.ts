@@ -3,7 +3,10 @@
 import TS from "typescript";
 
 const watch_reporter: TS.WatchStatusReporter = (diagnostics, newline, _options, error_count) => {
-  console.log({ diagnostics, newline, error_count });
+  console.log(`rtsc: ${diagnostics.messageText}`);
+  if (error_count) {
+    console.log(`rtsc: Error count: ${error_count}`);
+  }
 };
 
 const watch_options: TS.WatchOptions = {};
@@ -53,9 +56,6 @@ host.readFile = (path, encoding) => {
 };
 
 host.watchFile = (path, callback) => {
-  //if (path.match(/\.rts\.ts$/)) {
-  //console.log({ watchFile: path });
-  //}
   if (!TS.sys.watchFile) throw new Error("system cannot watch");
   return TS.sys.watchFile(path, callback);
 };
@@ -63,7 +63,6 @@ host.watchFile = (path, callback) => {
 const dir_watchers: { [k: string]: TS.DirectoryWatcherCallback } = {};
 
 host.watchDirectory = (path, callback, recursive, options) => {
-  console.log({ in: "watchDirectory", path, recursive, options });
   if (!TS.sys.watchDirectory) throw new Error("system cannot watch");
   dir_watchers[path] = callback;
   return TS.sys.watchDirectory(path, callback, recursive, options);
@@ -88,13 +87,6 @@ host.fileExists = (path) => {
     setTimeout(() => {
       simulate_path_created(path);
     }, 2000);
-    //if (timer === undefined) {
-    //  timer = setInterval(() => {
-    //    console.log(`timer firing on ${path}`);
-    //
-    //  }, 1000);
-    //}
-    console.log({ fileExists: path });
     return false;
   } else {
     return TS.sys.fileExists(path);
@@ -102,26 +94,3 @@ host.fileExists = (path) => {
 };
 
 const prog = TS.createWatchProgram(host);
-
-//const x = prog.getSourceFile(host1.getCurrentDirectory() + "/test.r.ts");
-//console.log(x);
-//
-//// this crashes
-//const results = prog.emit(
-//  undefined,
-//  (name, text) => {
-//    console.log({ name, text });
-//  },
-//  undefined,
-//  undefined,
-//  {},
-//);
-//
-//console.log(results);
-//console.log({
-//  global: prog.getGlobalDiagnostics(),
-//  options: prog.getOptionsDiagnostics(),
-//  semantic: prog.getSemanticDiagnostics(),
-//  syntactic: prog.getSyntacticDiagnostics(),
-//  declaration: prog.getDeclarationDiagnostics(),
-//});
