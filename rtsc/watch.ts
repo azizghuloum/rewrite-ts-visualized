@@ -1,11 +1,16 @@
 #!/usr/bin/env deno --allow-all
 
+import { basename, dirname, join } from "node:path";
 import TS from "typescript";
+import {} from "./testing-file-extensions.ts";
+import { LibraryManager } from "../src/library-manager.ts";
 
-const watch_reporter: TS.WatchStatusReporter = (diagnostics, newline, _options, error_count) => {
+const library_manager = new LibraryManager();
+
+const watch_reporter: TS.WatchStatusReporter = (diagnostics, _newline, _options, error_count) => {
   console.log(`rtsc: ${diagnostics.messageText}`);
   if (error_count) {
-    console.log(`rtsc: Error count: ${error_count}`);
+    console.log(`rtsc: error count: ${error_count}`);
   }
 };
 
@@ -48,49 +53,42 @@ const host: TS.WatchCompilerHostOfConfigFile<TS.BuilderProgram> = TS.createWatch
   undefined,
 );
 
-host.readFile = (path, encoding) => {
-  if (path.match(/\.rts\.ts$/)) {
-    console.log({ readFile: path });
+const fileExists = host.fileExists;
+const readFile = host.readFile;
+const watchFile = host.watchFile;
+const watchDirectory = host.watchDirectory;
+
+function check_path(path: string) {
+  const suffix = ".ts";
+  if (path.endsWith(suffix)) {
+    const module_dir = dirname(path);
+    const module_name = basename(path, suffix) + ".rts";
+    const rts_file = join(module_dir, module_name);
+    if (fileExists(rts_file)) {
+      library_manager.ensureUpToDate(rts_file);
+    }
   }
-  return TS.sys.readFile(path, encoding);
+}
+
+host.fileExists = (path) => {
+  check_path(path);
+  return fileExists(path);
+};
+
+host.readFile = (path, encoding) => {
+  check_path(path);
+  return readFile(path, encoding);
 };
 
 host.watchFile = (path, callback) => {
-  if (!TS.sys.watchFile) throw new Error("system cannot watch");
-  return TS.sys.watchFile(path, callback);
+  return watchFile(path, callback);
 };
 
 const dir_watchers: { [k: string]: TS.DirectoryWatcherCallback } = {};
 
 host.watchDirectory = (path, callback, recursive, options) => {
-  if (!TS.sys.watchDirectory) throw new Error("system cannot watch");
   dir_watchers[path] = callback;
-  return TS.sys.watchDirectory(path, callback, recursive, options);
-};
-
-const paths: { [k: string]: { queried: boolean } } = {};
-
-function simulate_path_created(path: string) {
-  console.log(`simulating path creation for ${path}`);
-  const dir = path.replace(/\/[^\/]*$/, "");
-  console.log(`directory: ${dir}`);
-  const callback = dir_watchers[dir];
-  console.log(`has_callback? ${callback !== undefined}`);
-  callback(dir);
-}
-
-host.fileExists = (path) => {
-  if (path.match(/\.d\.rts\.ts$/)) {
-    if (!paths[path]) paths[path] = { queried: false };
-    paths[path].queried = true;
-    console.log(`path queried: ${path}`);
-    setTimeout(() => {
-      simulate_path_created(path);
-    }, 2000);
-    return false;
-  } else {
-    return TS.sys.fileExists(path);
-  }
+  return watchDirectory(path, callback, recursive, options);
 };
 
 const prog = TS.createWatchProgram(host);
