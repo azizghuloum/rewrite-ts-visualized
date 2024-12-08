@@ -8,6 +8,7 @@ import {
   extend_rib,
   extend_unit,
   lexical_extension,
+  modular_extension,
   free_id_equal,
   push_wrap,
 } from "./stx";
@@ -30,12 +31,14 @@ type handler = (
   unit: CompilationUnit,
   counter: number,
   lexical: lexical_extension,
+  modular: modular_extension,
 ) => Promise<{
   loc: Loc;
   counter: number;
   unit: CompilationUnit;
   context: Context;
   lexical: lexical_extension;
+  modular: modular_extension;
 }>;
 
 const zipper_find: (loc: Loc, pred: (x: STX) => boolean) => Loc | null = (loc, pred) => {
@@ -248,7 +251,7 @@ export const core_pattern_match: (
   return unification;
 };
 
-const splice: handler = async (loc, context, unit, counter, lexical) => {
+const splice: handler = async (loc, context, unit, counter, lexical, modular) => {
   const unification = await core_pattern_match(loc, context, unit, "splice");
   assert(unification !== null);
   const { subst } = unification;
@@ -261,7 +264,14 @@ const splice: handler = async (loc, context, unit, counter, lexical) => {
     wrap: undefined,
     content: body_code,
   };
-  return { loc: change(unification.loc, mkzipper(result)), counter, unit, context, lexical };
+  return {
+    loc: change(unification.loc, mkzipper(result)),
+    counter,
+    unit,
+    context,
+    lexical,
+    modular,
+  };
 };
 
 function literal_binding(name: string, subst: subst, unit: CompilationUnit): boolean {
@@ -332,6 +342,7 @@ const using_rewrite_rules: handler = async (
   orig_unit,
   orig_counter,
   orig_lexical,
+  orig_modular,
 ) => {
   const unification = await core_pattern_match(
     orig_loc,
@@ -393,6 +404,7 @@ const using_rewrite_rules: handler = async (
     unit: final_unit,
     context: final_context,
     lexical: orig_lexical,
+    modular: orig_modular,
   };
 };
 
@@ -464,6 +476,7 @@ const define_rewrite_rules: handler = async (
   orig_unit,
   orig_counter,
   orig_lexical,
+  orig_modular,
 ) => {
   if (orig_lexical.extensible === false)
     syntax_error(orig_loc, "cannot define rules in nondefinition context");
@@ -521,6 +534,7 @@ const define_rewrite_rules: handler = async (
     unit: final_unit,
     context: final_context,
     lexical,
+    modular: orig_modular,
   };
 };
 

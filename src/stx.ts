@@ -293,6 +293,10 @@ export type lexical_extension =
   | { extensible: true; rib_id: string; rib: Rib }
   | { extensible: false };
 
+export type modular_extension =
+  | { extensible: true; implicit: Rib; explicit: Rib }
+  | { extensible: false };
+
 export function extend_unit(unit: CompilationUnit, extension: lexical_extension): CompilationUnit {
   if (extension.extensible) {
     const { rib_id, rib } = extension;
