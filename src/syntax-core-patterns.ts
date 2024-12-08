@@ -7,7 +7,7 @@ import {
   extend_context,
   extend_rib,
   extend_unit,
-  extension,
+  lexical_extension,
   free_id_equal,
   push_wrap,
 } from "./stx";
@@ -29,13 +29,13 @@ type handler = (
   context: Context,
   unit: CompilationUnit,
   counter: number,
-  lexical: extension,
+  lexical: lexical_extension,
 ) => Promise<{
   loc: Loc;
   counter: number;
   unit: CompilationUnit;
   context: Context;
-  lexical: extension;
+  lexical: lexical_extension;
 }>;
 
 const zipper_find: (loc: Loc, pred: (x: STX) => boolean) => Loc | null = (loc, pred) => {
@@ -505,7 +505,11 @@ const define_rewrite_rules: handler = async (
     },
     [orig_lexical.rib, orig_counter, orig_context],
   );
-  const lexical: extension = { extensible: true, rib_id: orig_lexical.rib_id, rib: final_rib };
+  const lexical: lexical_extension = {
+    extensible: true,
+    rib_id: orig_lexical.rib_id,
+    rib: final_rib,
+  };
   const final_unit = extend_unit(orig_unit, lexical);
   const final_loc = change(
     loc,

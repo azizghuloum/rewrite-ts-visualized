@@ -289,9 +289,11 @@ export function init_top_level(
   };
 }
 
-export type extension = { extensible: true; rib_id: string; rib: Rib } | { extensible: false };
+export type lexical_extension =
+  | { extensible: true; rib_id: string; rib: Rib }
+  | { extensible: false };
 
-export function extend_unit(unit: CompilationUnit, extension: extension): CompilationUnit {
+export function extend_unit(unit: CompilationUnit, extension: lexical_extension): CompilationUnit {
   if (extension.extensible) {
     const { rib_id, rib } = extension;
     return {

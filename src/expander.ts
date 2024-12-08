@@ -10,7 +10,7 @@ import {
   extend_context_lexical,
   CorePatterns,
   push_wrap,
-  extension,
+  lexical_extension,
 } from "./stx";
 import { change, go_down, go_next, go_right, go_up, mkzipper, wrap_loc } from "./zipper";
 import { apply_syntax_rules, core_handlers } from "./syntax-core-patterns";
@@ -36,7 +36,7 @@ export function initial_step(
 
 type goodies = {
   loc: Loc;
-  lexical: extension;
+  lexical: lexical_extension;
   context: Context;
   counter: number;
   unit: CompilationUnit;
@@ -106,7 +106,12 @@ function extract_lexical_declaration_bindings({
     syntax_error(loc, "expected a ',' or a ';'");
   }
 
-  function get_vars(ls: Loc, lexical: extension, context: Context, counter: number): goodies {
+  function get_vars(
+    ls: Loc,
+    lexical: lexical_extension,
+    context: Context,
+    counter: number,
+  ): goodies {
     if (ls.t.type === "list" && ls.t.tag === "variable_declarator") {
       return go_down(
         ls,
@@ -176,7 +181,7 @@ async function expand_program(
   context: Context,
   counter: number,
   inspect: inspect,
-  lexical: extension,
+  lexical: lexical_extension,
 ): Promise<{ loc: Loc; unit: CompilationUnit; context: Context }> {
   if (loc.t.tag !== "program") syntax_error(loc, "expected a program");
   const fst = go_down(
@@ -200,7 +205,7 @@ async function expand_program(
 
 async function preexpand_body(
   loc: Loc,
-  lexical: extension,
+  lexical: lexical_extension,
   unit: CompilationUnit,
   context: Context,
   counter: number,
@@ -221,7 +226,7 @@ async function preexpand_body(
 
 async function preexpand_body_curly(
   loc: Loc,
-  lexical: extension,
+  lexical: lexical_extension,
   unit: CompilationUnit,
   context: Context,
   counter: number,
@@ -258,13 +263,13 @@ async function handle_core_syntax(
   context: Context,
   unit: CompilationUnit,
   counter: number,
-  lexical: extension,
+  lexical: lexical_extension,
 ): Promise<{
   loc: Loc;
   counter: number;
   unit: CompilationUnit;
   context: Context;
-  lexical: extension;
+  lexical: lexical_extension;
 }> {
   const handler = core_handlers[name];
   assert(handler !== undefined);
@@ -331,7 +336,7 @@ const list_handlers_table: { [tag in list_tag]: "descend" | "stop" | "todo" } = 
 
 async function preexpand_block(
   loc: Loc,
-  lexical: extension,
+  lexical: lexical_extension,
   counter: number,
   unit: CompilationUnit,
   context: Context,
@@ -357,7 +362,7 @@ async function preexpand_block(
 
 async function expand_concise_body(
   loc: Loc,
-  lexical: extension,
+  lexical: lexical_extension,
   counter: number,
   unit: CompilationUnit,
   context: Context,
@@ -387,7 +392,7 @@ function rewrap(loc: Loc, rib_id: string, cu_id: string): Loc {
 
 async function preexpand_forms(
   loc: Loc,
-  lexical: extension,
+  lexical: lexical_extension,
   counter: number,
   unit: CompilationUnit,
   context: Context,
@@ -707,7 +712,7 @@ function expand_arrow_function(
     loc,
     (loc) => {
       const [rib_id, new_counter] = new_rib_id(counter);
-      const lexical: extension = {
+      const lexical: lexical_extension = {
         extensible: true,
         rib_id,
         rib: { type: "rib", normal_env: {}, types_env: {} },
@@ -858,7 +863,7 @@ function expand_type_parameters(
 
     const [rib_id, counter] = new_rib_id(orig_counter);
     const rib: Rib = { type: "rib", normal_env: {}, types_env: {} };
-    const lexical: extension = { extensible: true, rib_id, rib };
+    const lexical: lexical_extension = { extensible: true, rib_id, rib };
     return go_down(
       loc,
       (loc) => pre_var({ loc, lexical, unit, counter, context }),
