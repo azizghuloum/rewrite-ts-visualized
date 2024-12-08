@@ -64,9 +64,9 @@ class Module {
     const code = await fs.readFile(this.path, { encoding: "utf-8" });
     const patterns = core_patterns(parse);
     const [_loc0, expand] = initial_step(parse(code), this.state.cid, patterns);
-    const { loc, unit, context } = await expand((_loc, _reason, k) => k());
+    const { loc, unit, context, modular } = await expand((_loc, _reason, k) => k());
     console.log(await pprint(loc));
-    console.log(context);
+    console.log(modular);
     throw new Error("done recompiling");
   }
 }

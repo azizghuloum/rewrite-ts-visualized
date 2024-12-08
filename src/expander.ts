@@ -12,6 +12,7 @@ import {
   push_wrap,
   lexical_extension,
   modular_extension,
+  extend_modular,
 } from "./stx";
 import { change, go_down, go_next, go_right, go_up, mkzipper, wrap_loc } from "./zipper";
 import { apply_syntax_rules, core_handlers } from "./syntax-core-patterns";
@@ -43,7 +44,11 @@ export function initial_step(
           rib,
           rib_id,
         },
-        { extensible: false }, // TODO
+        {
+          extensible: true,
+          explicit: { type: "rib", normal_env: {}, types_env: {} },
+          implicit: { type: "rib", normal_env: {}, types_env: {} },
+        },
       ),
   ];
 }
@@ -70,12 +75,13 @@ function gen_binding({
   assert(stx.type === "atom" && stx.tag === "identifier", stx);
   assert(lexical.extensible);
   const { rib, rib_id } = lexical;
+  const env_type = { type: "types_env" as const, value: "normal_env" as const }[sort];
   return extend_rib(
     rib,
     stx.content,
     stx.wrap.marks,
     counter,
-    { type: "types_env" as const, value: "normal_env" as const }[sort],
+    env_type,
     ({ rib, counter, label }) =>
       extend_context_lexical(
         context,
@@ -85,7 +91,7 @@ function gen_binding({
         stx.content,
         ({ context, counter, name }) => ({
           lexical: { extensible: true, rib, rib_id },
-          modular, // TODO
+          modular: extend_modular(modular, stx.content, stx.wrap.marks, label, env_type), // TODO
           context,
           counter,
           name,
@@ -1088,7 +1094,6 @@ async function postexpand_body(
   inspect: inspect,
 ): Promise<{ loc: Loc }> {
   type T = Promise<{ loc: Loc }>;
-
   async function done(loc: Loc): T {
     return { loc };
   }

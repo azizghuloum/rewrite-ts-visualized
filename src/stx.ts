@@ -106,6 +106,21 @@ export function bound_id_equal(id1: STX, id2: STX): boolean {
   return id1.content === id2.content && same_marks(id1.wrap.marks, id2.wrap.marks);
 }
 
+function rib_push(
+  rib: Rib,
+  name: string,
+  marks: Marks,
+  label: string,
+  env_type: "normal_env" | "types_env",
+): Rib {
+  const env = rib[env_type];
+  const entry = env[name] ?? [];
+  return {
+    ...rib,
+    [env_type]: { ...env, [name]: [...entry, [marks, label]] },
+  };
+}
+
 export function extend_rib<S>(
   rib: Rib,
   name: string,
@@ -122,10 +137,7 @@ export function extend_rib<S>(
   }
   const label = `l${counter}`;
   const new_counter = counter + 1;
-  const new_rib: Rib = {
-    ...rib,
-    [env_type]: { ...env, [name]: [...entry, [marks, label]] },
-  };
+  const new_rib = rib_push(rib, name, marks, label, env_type);
   return sk({ rib: new_rib, counter: new_counter, label });
 }
 
@@ -306,5 +318,24 @@ export function extend_unit(unit: CompilationUnit, extension: lexical_extension)
     };
   } else {
     return unit;
+  }
+}
+
+export function extend_modular(
+  modular: modular_extension,
+  name: string,
+  marks: Marks,
+  label: string,
+  env_type: "types_env" | "normal_env",
+): modular_extension {
+  if (modular.extensible) {
+    const { implicit, explicit } = modular;
+    return {
+      extensible: true,
+      implicit: rib_push(implicit, name, marks, label, env_type),
+      explicit: rib_push(explicit, name, marks, label, env_type),
+    };
+  } else {
+    return modular;
   }
 }
