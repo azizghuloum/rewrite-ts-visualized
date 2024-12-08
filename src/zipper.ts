@@ -1,4 +1,4 @@
-import * as Zipper from "zipper/src/tagged-constructive-zipper";
+import { TaggedReconstructiveZipper as Zipper } from "zipper";
 import { assert } from "./assert";
 import { LL, llappend, llmap } from "./llhelpers";
 import { STX, Loc, Wrap } from "./syntax-structures";
