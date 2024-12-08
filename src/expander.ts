@@ -19,18 +19,18 @@ export function initial_step(
   ast: AST,
   cu_id: string,
   patterns: CorePatterns,
-): [Loc, (inspect: inspect) => Promise<{ loc: Loc }>] {
+): [Loc, (inspect: inspect) => Promise<{ loc: Loc; unit: CompilationUnit; context: Context }>] {
   const { stx, counter, unit, context, rib, rib_id } = init_top_level(ast, cu_id, patterns);
   const initial_loc: Loc = mkzipper(stx);
-  async function expand(inspect: inspect): Promise<{ loc: Loc }> {
-    const { loc } = await expand_program(initial_loc, unit, context, counter, inspect, {
-      extensible: true,
-      rib,
-      rib_id,
-    });
-    return { loc };
-  }
-  return [initial_loc, expand];
+  return [
+    initial_loc,
+    (inspect: inspect) =>
+      expand_program(initial_loc, unit, context, counter, inspect, {
+        extensible: true,
+        rib,
+        rib_id,
+      }),
+  ];
 }
 
 type goodies = {
@@ -176,7 +176,7 @@ async function expand_program(
   counter: number,
   inspect: inspect,
   extension: extension,
-): Promise<{ loc: Loc }> {
+): Promise<{ loc: Loc; unit: CompilationUnit; context: Context }> {
   if (loc.t.tag !== "program") syntax_error(loc, "expected a program");
   const fst = go_down(
     loc,
@@ -190,7 +190,9 @@ async function expand_program(
       assert(extension.extensible);
       const new_unit = extend_unit(unit, extension.rib_id, extension.rib);
       return inspect(loc, "After preexpanding the program", () =>
-        postexpand_program(loc, new_unit, counter, context, inspect),
+        postexpand_program(loc, new_unit, counter, context, inspect).then(({ loc }) => {
+          return { loc, unit: new_unit, context };
+        }),
       );
     },
   );

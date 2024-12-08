@@ -1,2 +1,4 @@
 export const x = 12;
+define_rewrite_rules([foo, foo, x]);
+type t = string;
 console.log("hello");

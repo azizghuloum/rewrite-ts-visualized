@@ -91,8 +91,8 @@ function StepperView({ step, step_number }: { step: Step; step_number: number })
 function Example({ code, onChange }: ExampleProps) {
   function init_state(code: string): [State, expand] {
     const patterns = core_patterns(parse);
-    const [loc, expand] = initial_step(parse(code), "example", patterns);
-    return [initial_state(loc), expand];
+    const [loc0, expand] = initial_step(parse(code), "example", patterns);
+    return [initial_state(loc0), expand];
   }
   const [state, setState] = useState(init_state(code)[0]);
   useEffect(() => {
