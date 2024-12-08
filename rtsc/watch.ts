@@ -19,7 +19,7 @@ const watch_options: TS.WatchOptions = {};
 const diagnostics_reporter: TS.DiagnosticReporter = (diagnostics) => {
   const {
     code,
-    file: _file,
+    file: file,
     length,
     category,
     messageText,
@@ -30,12 +30,13 @@ const diagnostics_reporter: TS.DiagnosticReporter = (diagnostics) => {
     source,
   } = diagnostics;
   console.log({
+    file: file?.fileName,
     code,
     length,
     category,
     messageText,
     start,
-    relatedInformation,
+    //relatedInformation,
     reportsDeprecated,
     reportsUnnecessary,
     source,

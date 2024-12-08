@@ -13,34 +13,18 @@ import {
 } from "./stx";
 import { change, go_down, go_next, go_right, go_up, mkzipper, wrap_loc } from "./zipper";
 import { apply_syntax_rules, core_handlers } from "./syntax-core-patterns";
-import { debug, inspect, in_isolation, Step, syntax_error } from "./step";
+import { debug, inspect, in_isolation, syntax_error } from "./stx-error";
 
 export function initial_step(
   ast: AST,
   cu_id: string,
   patterns: CorePatterns,
-): [Loc, (inspect: inspect) => Promise<Step>] {
+): [Loc, (inspect: inspect) => Promise<{ loc: Loc }>] {
   const { stx, counter, unit, context, rib, rib_id } = init_top_level(ast, cu_id, patterns);
   const initial_loc: Loc = mkzipper(stx);
-  async function expand(inspect: inspect): Promise<Step> {
-    try {
-      const { loc } = await expand_program(
-        initial_loc,
-        unit,
-        context,
-        counter,
-        inspect,
-        rib,
-        rib_id,
-      );
-      return new Step("DONE", loc);
-    } catch (error) {
-      if (error instanceof Step) {
-        return error;
-      } else {
-        throw error;
-      }
-    }
+  async function expand(inspect: inspect): Promise<{ loc: Loc }> {
+    const { loc } = await expand_program(initial_loc, unit, context, counter, inspect, rib, rib_id);
+    return { loc };
   }
   return [initial_loc, expand];
 }

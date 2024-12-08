@@ -1,7 +1,7 @@
 import { assert } from "./assert";
 import { AST } from "./ast";
 import { LL, llappend, llmap, llreduce, llreverse, ll_to_array } from "./llhelpers";
-import { syntax_error } from "./step";
+import { syntax_error } from "./stx-error";
 import {
   bound_id_equal,
   extend_context,

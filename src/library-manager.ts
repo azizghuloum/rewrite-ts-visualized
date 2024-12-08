@@ -7,6 +7,7 @@ import { mtime } from "./fs-helpers";
 import { parse } from "./parse";
 import { core_patterns } from "./syntax-core-patterns";
 import { initial_step } from "./expander";
+import { pprint } from "./pprint";
 
 type module_state =
   | { type: "initial" }
@@ -62,8 +63,9 @@ class Module {
     console.log(`expanding ${this.state.cid}`);
     const code = await fs.readFile(this.path, { encoding: "utf-8" });
     const patterns = core_patterns(parse);
-    const [init_step, expand] = initial_step(parse(code), this.state.cid, patterns);
-    const step = await expand((loc, reason, k) => k());
+    const [_loc0, expand] = initial_step(parse(code), this.state.cid, patterns);
+    const { loc } = await expand((loc, reason, k) => k());
+    console.log(await pprint(loc));
     throw new Error("done recompiling");
   }
 }

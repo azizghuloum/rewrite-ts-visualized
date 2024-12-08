@@ -9,7 +9,7 @@ import { Loc } from "../src/syntax-structures";
 import { core_patterns } from "../src/syntax-core-patterns";
 import { parse } from "../src/parse";
 import { pprint } from "../src/pprint";
-import { inspect, Step } from "../src/step";
+import { inspect } from "../src/stx-error";
 
 type ExampleProps = {
   code: string;
@@ -25,7 +25,14 @@ function zipper_to_view(zipper: Loc): React.ReactElement {
   );
 }
 
-type expand = (inspect: inspect) => Promise<Step>;
+type Step = {
+  name: string;
+  loc: Loc;
+  error?: string | undefined;
+  info?: any;
+};
+
+type expand = (inspect: inspect) => Promise<{ loc: Loc }>;
 
 type State = {
   prev_steps: Step[];
@@ -105,10 +112,10 @@ function Example({ code, onChange }: ExampleProps) {
         });
       }
       const inspect: inspect = (loc, reason, k) => {
-        record(new Step("Inspect", loc, undefined, undefined, reason));
+        record({ name: "Inspect", loc, error: undefined, info: reason });
         return k();
       };
-      setTimeout(() => expand(inspect).then(record), 0);
+      setTimeout(() => expand(inspect).then(({ loc }) => record({ name: "DONE", loc })), 0);
       return my_state;
     });
   }, [code]);
