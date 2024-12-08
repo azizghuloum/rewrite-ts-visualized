@@ -14,7 +14,7 @@ const foo = (x) => {
 
 ```typescript
 const foo_2 = (x_4) => {
-  const bar_7 = x_4(13);
+  const bar_5 = x_4(13);
 };
 ```
 

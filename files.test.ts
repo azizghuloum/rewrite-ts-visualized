@@ -5,6 +5,7 @@ import { parse } from "./src/parse";
 import { core_patterns } from "./src/syntax-core-patterns";
 import { initial_step } from "./src/expander";
 import { pprint } from "./src/pprint";
+import { StxError } from "./src/stx-error";
 
 const test_dir = __dirname + "/tests";
 const md_dir = __dirname + "/examples";
@@ -12,8 +13,19 @@ const md_dir = __dirname + "/examples";
 async function compile_script(filename: string, test_name: string) {
   const code = await readFile(filename, { encoding: "utf-8" });
   const patterns = core_patterns(parse);
-  const [init_step, expand] = initial_step(parse(code), test_name, patterns);
-  const step = await expand((loc, reason, k) => k());
+  const [loc0, expand] = initial_step(parse(code), test_name, patterns);
+  const result = await (async () => {
+    try {
+      const { loc } = await expand((loc, reason, k) => k());
+      return { name: "DONE", loc, error: undefined };
+    } catch (err) {
+      if (err instanceof StxError) {
+        return err;
+      } else {
+        throw err;
+      }
+    }
+  })();
   function ts(code: string): string {
     return "```typescript\n" + code + "```\n\n";
   }
@@ -23,11 +35,11 @@ async function compile_script(filename: string, test_name: string) {
   function q(str: string): string {
     return "`" + str + "`";
   }
-  const prog = await pprint(step.loc);
+  const prog = await pprint(result.loc);
   const out =
     `## ${q(test_name)}\n\n` +
-    `### Status: ${q(step.name)}\n\n` +
-    (step.error ? qq(`${step.error}\n`) : "") +
+    `### Status: ${q(result.name)}\n\n` +
+    (result.error ? qq(`${result.error}\n`) : "") +
     `### Input Program\n\n` +
     ts(code) +
     `### Output Program\n\n` +

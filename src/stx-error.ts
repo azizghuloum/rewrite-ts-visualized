@@ -1,40 +1,27 @@
 import { Loc } from "./syntax-structures";
 import { isolate, unisolate } from "./zipper";
 
-export class Step {
+export class StxError {
   name: string;
   loc: Loc;
-  next?: () => Promise<{ loc: Loc }>;
   error?: string | undefined;
   info?: any;
-  constructor(
-    name: string,
-    loc: Loc,
-    error?: string,
-    next?: () => Promise<{ loc: Loc }>,
-    info?: any,
-  ) {
+  constructor(name: string, loc: Loc, error?: string, info?: any) {
     this.name = name;
     this.loc = loc;
     this.error = error;
-    this.next = next;
     this.info = info;
   }
 }
 
 export function debug(loc: Loc, msg: string, info?: any): never {
-  throw new Step("DEBUG", loc, msg, undefined, info);
+  throw new StxError("DEBUG", loc, msg, info);
 }
 
 export type inspect = <T>(loc: Loc, reason: string, k: () => Promise<T>) => Promise<T>;
 
-const inspect: inspect = (loc, reason, k) => {
-  return k();
-  //throw new Step("Inspect", loc, undefined, k, reason);
-};
-
 export function syntax_error(loc: Loc, reason?: string): never {
-  throw new Step("SyntaxError", loc, reason ?? "syntax error");
+  throw new StxError("SyntaxError", loc, reason ?? "syntax error");
 }
 
 export const in_isolation: <G extends { loc: Loc }, T>(

@@ -16,6 +16,6 @@ using_rewrite_rules(
 ### Output Program
 
 ```typescript
-(a_5) => (b_9) => (c_13) => (d_17) => a_5 + b_9 + c_13 + d_17;
+(a_5) => (b_7) => (c_9) => (d_11) => a_5 + b_7 + c_9 + d_11;
 ```
 
