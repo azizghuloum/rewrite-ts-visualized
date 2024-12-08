@@ -29,13 +29,13 @@ type handler = (
   context: Context,
   unit: CompilationUnit,
   counter: number,
-  extension: extension,
+  lexical: extension,
 ) => Promise<{
   loc: Loc;
   counter: number;
   unit: CompilationUnit;
   context: Context;
-  extension: extension;
+  lexical: extension;
 }>;
 
 const zipper_find: (loc: Loc, pred: (x: STX) => boolean) => Loc | null = (loc, pred) => {
@@ -248,7 +248,7 @@ export const core_pattern_match: (
   return unification;
 };
 
-const splice: handler = async (loc, context, unit, counter, extension) => {
+const splice: handler = async (loc, context, unit, counter, lexical) => {
   const unification = await core_pattern_match(loc, context, unit, "splice");
   assert(unification !== null);
   const { subst } = unification;
@@ -261,7 +261,7 @@ const splice: handler = async (loc, context, unit, counter, extension) => {
     wrap: undefined,
     content: body_code,
   };
-  return { loc: change(unification.loc, mkzipper(result)), counter, unit, context, extension };
+  return { loc: change(unification.loc, mkzipper(result)), counter, unit, context, lexical };
 };
 
 function literal_binding(name: string, subst: subst, unit: CompilationUnit): boolean {
@@ -331,7 +331,7 @@ const using_rewrite_rules: handler = async (
   orig_context,
   orig_unit,
   orig_counter,
-  orig_extension,
+  orig_lexical,
 ) => {
   const unification = await core_pattern_match(
     orig_loc,
@@ -392,7 +392,7 @@ const using_rewrite_rules: handler = async (
     counter: final_counter,
     unit: final_unit,
     context: final_context,
-    extension: orig_extension,
+    lexical: orig_lexical,
   };
 };
 
@@ -463,9 +463,9 @@ const define_rewrite_rules: handler = async (
   orig_context,
   orig_unit,
   orig_counter,
-  orig_extension,
+  orig_lexical,
 ) => {
-  if (orig_extension.extensible === false)
+  if (orig_lexical.extensible === false)
     syntax_error(orig_loc, "cannot define rules in nondefinition context");
   const unification = await core_pattern_match(
     orig_loc,
@@ -503,10 +503,10 @@ const define_rewrite_rules: handler = async (
         (reason) => syntax_error(loc, reason),
       );
     },
-    [orig_extension.rib, orig_counter, orig_context],
+    [orig_lexical.rib, orig_counter, orig_context],
   );
-  const extension: extension = { extensible: true, rib_id: orig_extension.rib_id, rib: final_rib };
-  const final_unit = extend_unit(orig_unit, extension);
+  const lexical: extension = { extensible: true, rib_id: orig_lexical.rib_id, rib: final_rib };
+  const final_unit = extend_unit(orig_unit, lexical);
   const final_loc = change(
     loc,
     mkzipper({ type: "list", tag: "slice", wrap: { marks: null, subst: null }, content: null }),
@@ -516,7 +516,7 @@ const define_rewrite_rules: handler = async (
     counter: final_counter,
     unit: final_unit,
     context: final_context,
-    extension,
+    lexical,
   };
 };
 
