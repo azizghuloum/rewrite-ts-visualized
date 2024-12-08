@@ -1,37 +1,70 @@
 /* */
 
-import { assert } from "./assert.ts";
+import { assert } from "./assert";
 import fs from "node:fs/promises";
 import { dirname, basename, join } from "node:path";
+import { mtime } from "./fs-helpers";
+import { parse } from "./parse";
+import { core_patterns } from "./syntax-core-patterns";
+import { initial_step } from "./expander";
 
-type library_state = { type: "initial" } | { type: "initializing" };
+type module_state =
+  | { type: "initial" }
+  | { type: "stale"; cid: string; pkg: Package }
+  | { type: "error"; reason: string };
 
-class Library {
+class Module {
   private path: string;
   private library_manager: LibraryManager;
 
-  private state: library_state = { type: "initial" };
+  private state: module_state = { type: "initial" };
 
   constructor(path: string, library_manager: LibraryManager) {
     this.path = path;
     this.library_manager = library_manager;
   }
 
-  ensureUpToDate() {
+  async ensureUpToDate(): Promise<void> {
     switch (this.state.type) {
-      case "initial": {
-        this.initialize();
+      case "initial":
+        return this.initialize().then(() => this.ensureUpToDate());
+      case "stale":
+        return this.recompile().then(() => this.ensureUpToDate());
+      default: {
+        throw new Error(`ensureUpToDate: unhandled state type ${this.state.type}`);
       }
     }
   }
 
+  private get_json_path(): string {
+    return join(dirname(this.path), ".rts", basename(this.path) + ".json");
+  }
+
   async initialize() {
     assert(this.state.type === "initial");
-    this.state = { type: "initializing" };
     console.log("initializing ...");
     const [pkg, base] = await this.library_manager.findPackage(this.path);
     const cid = `${base} ${pkg.name} ${pkg.version}`;
-    console.log({ cid });
+    const json_path = this.get_json_path();
+    const json_mtime = await mtime(json_path);
+    const my_mtime = await mtime(this.path);
+    assert(my_mtime !== undefined);
+    //console.log({ cid, my_mtime, json_path });
+    if (my_mtime >= (json_mtime ?? 0)) {
+      this.state = { type: "stale", cid, pkg };
+    } else {
+      throw new Error("TODO: check dependencies");
+    }
+  }
+
+  async recompile() {
+    assert(this.state.type === "stale");
+    console.log(`expanding ${this.state.cid}`);
+    const code = await fs.readFile(this.path, { encoding: "utf-8" });
+    const patterns = core_patterns(parse);
+    const [init_step, expand] = initial_step(parse(code), this.state.cid, patterns);
+    const step = await expand((loc, reason, k) => k());
+    throw new Error("done recompiling");
   }
 }
 
@@ -48,12 +81,12 @@ class Package {
 }
 
 export class LibraryManager {
-  private libs: { [path: string]: Library } = {};
+  private modules: { [path: string]: Module } = {};
   private packages: { [dir: string]: Package } = {};
 
   ensureUpToDate(path: string) {
-    const lib = (this.libs[path] ??= new Library(path, this));
-    lib.ensureUpToDate();
+    const mod = (this.modules[path] ??= new Module(path, this));
+    mod.ensureUpToDate();
   }
 
   async findPackage(path: string): Promise<[Package, string]> {
