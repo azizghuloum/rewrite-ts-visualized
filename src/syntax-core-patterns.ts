@@ -23,14 +23,21 @@ import {
 } from "./syntax-structures";
 import { go_next, go_down, mkzipper, stx_list_content, go_up, change } from "./zipper";
 
+type extension = { extensible: true; rib_id: string; rib: Rib } | { extensible: false };
+
 type handler = (
   loc: Loc,
   context: Context,
   unit: CompilationUnit,
   counter: number,
-  rib_id: string,
-  rib: Rib,
-) => Promise<{ loc: Loc; counter: number; unit: CompilationUnit; context: Context; rib: Rib }>;
+  extension: extension,
+) => Promise<{
+  loc: Loc;
+  counter: number;
+  unit: CompilationUnit;
+  context: Context;
+  extension: extension;
+}>;
 
 const zipper_find: (loc: Loc, pred: (x: STX) => boolean) => Loc | null = (loc, pred) => {
   const t = loc.t;
@@ -242,7 +249,7 @@ export const core_pattern_match: (
   return unification;
 };
 
-const splice: handler = async (loc, context, unit, counter, _rib_id, rib) => {
+const splice: handler = async (loc, context, unit, counter, extension) => {
   const unification = await core_pattern_match(loc, context, unit, "splice");
   assert(unification !== null);
   const { subst } = unification;
@@ -255,7 +262,7 @@ const splice: handler = async (loc, context, unit, counter, _rib_id, rib) => {
     wrap: undefined,
     content: body_code,
   };
-  return { loc: change(unification.loc, mkzipper(result)), counter, unit, context, rib };
+  return { loc: change(unification.loc, mkzipper(result)), counter, unit, context, extension };
 };
 
 function literal_binding(name: string, subst: subst, unit: CompilationUnit): boolean {
@@ -325,8 +332,7 @@ const using_rewrite_rules: handler = async (
   orig_context,
   orig_unit,
   orig_counter,
-  _rib_id,
-  orig_rib,
+  orig_extension,
 ) => {
   const unification = await core_pattern_match(
     orig_loc,
@@ -387,7 +393,7 @@ const using_rewrite_rules: handler = async (
     counter: final_counter,
     unit: final_unit,
     context: final_context,
-    rib: orig_rib,
+    extension: orig_extension,
   };
 };
 
@@ -458,9 +464,10 @@ const define_rewrite_rules: handler = async (
   orig_context,
   orig_unit,
   orig_counter,
-  rib_id,
-  orig_rib,
+  orig_extension,
 ) => {
+  if (orig_extension.extensible === false)
+    syntax_error(orig_loc, "cannot define rules in nondefinition context");
   const unification = await core_pattern_match(
     orig_loc,
     orig_context,
@@ -497,9 +504,9 @@ const define_rewrite_rules: handler = async (
         (reason) => syntax_error(loc, reason),
       );
     },
-    [orig_rib, orig_counter, orig_context],
+    [orig_extension.rib, orig_counter, orig_context],
   );
-  const final_unit = extend_unit(orig_unit, rib_id, final_rib);
+  const final_unit = extend_unit(orig_unit, orig_extension.rib_id, final_rib);
   const final_loc = change(
     loc,
     mkzipper({ type: "list", tag: "slice", wrap: { marks: null, subst: null }, content: null }),
@@ -509,7 +516,7 @@ const define_rewrite_rules: handler = async (
     counter: final_counter,
     unit: final_unit,
     context: final_context,
-    rib: final_rib,
+    extension: { extensible: true, rib_id: orig_extension.rib_id, rib: final_rib },
   };
 };
 

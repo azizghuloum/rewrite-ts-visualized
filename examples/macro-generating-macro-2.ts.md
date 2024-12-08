@@ -23,8 +23,8 @@ using_rewrite_rules(
 
 ```typescript
 (x_4) => {
-  const using_rewrite_rules_7 = 10;
-  (x_12) => x_12 + x_4;
+  const using_rewrite_rules_5 = 10;
+  (x_10) => x_10 + x_4;
 };
 ```
 

@@ -23,17 +23,27 @@ export function initial_step(
   const { stx, counter, unit, context, rib, rib_id } = init_top_level(ast, cu_id, patterns);
   const initial_loc: Loc = mkzipper(stx);
   async function expand(inspect: inspect): Promise<{ loc: Loc }> {
-    const { loc } = await expand_program(initial_loc, unit, context, counter, inspect, rib, rib_id);
+    const { loc } = await expand_program(initial_loc, unit, context, counter, inspect, {
+      extensible: true,
+      rib,
+      rib_id,
+    });
     return { loc };
   }
   return [initial_loc, expand];
 }
 
-type goodies = { loc: Loc; rib: Rib; context: Context; counter: number; unit: CompilationUnit };
+type goodies = {
+  loc: Loc;
+  extension: extension;
+  context: Context;
+  counter: number;
+  unit: CompilationUnit;
+};
 
 function gen_binding({
   loc,
-  rib,
+  extension,
   counter,
   context,
   unit,
@@ -41,6 +51,8 @@ function gen_binding({
 }: goodies & { sort: "type" | "value" }): Omit<goodies, "loc"> & { name: string } {
   const stx = loc.t;
   assert(stx.type === "atom" && stx.tag === "identifier", stx);
+  assert(extension.extensible);
+  const { rib, rib_id } = extension;
   return extend_rib(
     rib,
     stx.content,
@@ -55,7 +67,7 @@ function gen_binding({
         { type: "type" as const, value: "lexical" as const }[sort],
         stx.content,
         ({ context, counter, name }) => ({
-          rib,
+          extension: { extensible: true, rib, rib_id },
           context,
           counter,
           name,
@@ -68,24 +80,24 @@ function gen_binding({
 
 function extract_lexical_declaration_bindings({
   loc,
-  rib,
+  extension,
   context,
   counter,
   unit,
 }: goodies): goodies {
-  function after_vars({ loc, rib, context, counter, unit }: goodies): goodies {
+  function after_vars({ loc, extension, context, counter, unit }: goodies): goodies {
     if (loc.t.type === "atom" && loc.t.tag === "other") {
       switch (loc.t.content) {
         case ";":
           return go_right(
             loc,
             (loc) => syntax_error(loc, "expected nothing after semicolon"),
-            (loc) => ({ loc, rib, context, counter, unit }),
+            (loc) => ({ loc, extension, context, counter, unit }),
           );
         case ",":
           return go_right(
             loc,
-            (loc) => get_vars(loc, rib, context, counter),
+            (loc) => get_vars(loc, extension, context, counter),
             (loc) => syntax_error(loc, "expected variable after ','"),
           );
       }
@@ -93,12 +105,12 @@ function extract_lexical_declaration_bindings({
     syntax_error(loc, "expected a ',' or a ';'");
   }
 
-  function get_vars(ls: Loc, rib: Rib, context: Context, counter: number): goodies {
+  function get_vars(ls: Loc, extension: extension, context: Context, counter: number): goodies {
     if (ls.t.type === "list" && ls.t.tag === "variable_declarator") {
       return go_down(
         ls,
         (loc) => {
-          const goodies = gen_binding({ loc, rib, counter, context, unit, sort: "value" });
+          const goodies = gen_binding({ loc, extension, counter, context, unit, sort: "value" });
           return go_right(
             ls,
             (loc) => after_vars({ ...goodies, loc }),
@@ -118,7 +130,7 @@ function extract_lexical_declaration_bindings({
         if (loc.t.tag === "other" && (loc.t.content === "const" || loc.t.content === "let")) {
           return go_right(
             loc,
-            (loc) => get_vars(loc, rib, context, counter),
+            (loc) => get_vars(loc, extension, context, counter),
             (loc) => syntax_error(loc, "no bindings after keyword"),
           );
         } else {
@@ -134,7 +146,7 @@ function extract_lexical_declaration_bindings({
 
 function extract_type_alias_declaration_bindings({
   loc,
-  rib,
+  extension,
   context,
   counter,
   unit,
@@ -147,7 +159,7 @@ function extract_type_alias_declaration_bindings({
         loc,
         (loc) => {
           assert(loc.t.type === "atom" && loc.t.tag === "identifier", "expected an identifier");
-          const gs = gen_binding({ loc, rib, counter, context, unit, sort: "type" });
+          const gs = gen_binding({ loc, extension, counter, context, unit, sort: "type" });
           return { ...gs, loc: go_up(loc) };
         },
         syntax_error,
@@ -163,8 +175,7 @@ async function expand_program(
   context: Context,
   counter: number,
   inspect: inspect,
-  rib: Rib,
-  rib_id: string,
+  extension: extension,
 ): Promise<{ loc: Loc }> {
   if (loc.t.tag !== "program") syntax_error(loc, "expected a program");
   const fst = go_down(
@@ -172,12 +183,14 @@ async function expand_program(
     (x) => x,
     (loc) => syntax_error(loc, "empty program?"),
   );
-  return preexpand_body(fst, rib, rib_id, unit, context, counter, "value", inspect).then(
-    ({ loc, rib, counter, context, unit }) => {
+  return preexpand_body(fst, extension, unit, context, counter, "value", inspect).then(
+    ({ loc, extension, counter, context, unit }) => {
       // rib is filled
       // context is filled also
+      assert(extension.extensible);
+      const new_unit = extend_unit(unit, extension.rib_id, extension.rib);
       return inspect(loc, "After preexpanding the program", () =>
-        postexpand_program(loc, extend_unit(unit, rib_id, rib), counter, context, rib_id, inspect),
+        postexpand_program(loc, new_unit, counter, context, inspect),
       );
     },
   );
@@ -185,8 +198,7 @@ async function expand_program(
 
 async function preexpand_body(
   loc: Loc,
-  rib: Rib,
-  rib_id: string,
+  extension: extension,
   unit: CompilationUnit,
   context: Context,
   counter: number,
@@ -195,20 +207,19 @@ async function preexpand_body(
 ): Promise<goodies> {
   return in_isolation(
     loc,
-    (loc) => preexpand_forms(loc, rib, rib_id, counter, unit, context, sort, inspect),
-    (loc, { rib, context, counter, unit }) =>
+    (loc) => preexpand_forms(loc, extension, counter, unit, context, sort, inspect),
+    (loc, { extension, context, counter, unit }) =>
       go_next(
         loc,
-        (loc) => preexpand_body(loc, rib, rib_id, unit, context, counter, sort, inspect),
-        (loc) => Promise.resolve({ loc, rib, context, counter, unit }),
+        (loc) => preexpand_body(loc, extension, unit, context, counter, sort, inspect),
+        (loc) => Promise.resolve({ loc, extension, context, counter, unit }),
       ),
   );
 }
 
 async function preexpand_body_curly(
   loc: Loc,
-  rib: Rib,
-  rib_id: string,
+  extension: extension,
   unit: CompilationUnit,
   context: Context,
   counter: number,
@@ -221,18 +232,18 @@ async function preexpand_body_curly(
         loc: go_up(loc),
         context,
         counter,
-        rib,
+        extension,
         unit,
       }),
     );
   }
   return in_isolation(
     loc,
-    (loc) => preexpand_forms(loc, rib, rib_id, counter, unit, context, sort, inspect),
-    (loc, { rib, context, counter, unit }) => {
+    (loc) => preexpand_forms(loc, extension, counter, unit, context, sort, inspect),
+    (loc, { extension, context, counter, unit }) => {
       return go_right(
         loc,
-        (loc) => preexpand_body_curly(loc, rib, rib_id, unit, context, counter, sort, inspect),
+        (loc) => preexpand_body_curly(loc, extension, unit, context, counter, sort, inspect),
         (loc) => syntax_error(loc, "no right"),
       );
     },
@@ -245,12 +256,17 @@ async function handle_core_syntax(
   context: Context,
   unit: CompilationUnit,
   counter: number,
-  rib_id: string,
-  rib: Rib,
-): Promise<{ loc: Loc; counter: number; unit: CompilationUnit; context: Context; rib: Rib }> {
+  extension: extension,
+): Promise<{
+  loc: Loc;
+  counter: number;
+  unit: CompilationUnit;
+  context: Context;
+  extension: extension;
+}> {
   const handler = core_handlers[name];
   assert(handler !== undefined);
-  return handler(loc, context, unit, counter, rib_id, rib);
+  return handler(loc, context, unit, counter, extension);
 }
 
 const atom_handlers_table: { [tag in atom_tag]: "next" | "stop" } = {
@@ -313,8 +329,7 @@ const list_handlers_table: { [tag in list_tag]: "descend" | "stop" | "todo" } = 
 
 async function preexpand_block(
   loc: Loc,
-  rib: Rib,
-  rib_id: string,
+  extension: extension,
   counter: number,
   unit: CompilationUnit,
   context: Context,
@@ -327,8 +342,7 @@ async function preexpand_block(
   const bodies_rest = go_right(bodies, itself, (loc) => syntax_error(loc, "no body rest"));
   const gs = await preexpand_body_curly(
     bodies_rest,
-    rib,
-    rib_id,
+    extension,
     unit,
     context,
     counter,
@@ -341,8 +355,7 @@ async function preexpand_block(
 
 async function expand_concise_body(
   loc: Loc,
-  rib: Rib,
-  rib_id: string,
+  extension: extension,
   counter: number,
   unit: CompilationUnit,
   context: Context,
@@ -350,7 +363,7 @@ async function expand_concise_body(
   inspect: inspect,
 ): Promise<{ loc: Loc }> {
   const gs = await (loc.t.type === "list" && loc.t.tag === "statement_block"
-    ? preexpand_block(loc, rib, rib_id, counter, unit, context, sort, inspect).then(
+    ? preexpand_block(loc, extension, counter, unit, context, sort, inspect).then(
         ({ loc, ...gs }) =>
           go_down(
             loc,
@@ -358,9 +371,10 @@ async function expand_concise_body(
             (loc) => debug(loc, "???"),
           ),
       )
-    : preexpand_forms(loc, rib, rib_id, counter, unit, context, sort, inspect));
-  const new_unit = extend_unit(gs.unit, rib_id, gs.rib);
-  return postexpand_body(gs.loc, new_unit, gs.counter, gs.context, rib_id, sort, inspect);
+    : preexpand_forms(loc, extension, counter, unit, context, sort, inspect));
+  assert(gs.extension.extensible);
+  const new_unit = extend_unit(gs.unit, gs.extension.rib_id, gs.extension.rib);
+  return postexpand_body(gs.loc, new_unit, gs.counter, gs.context, sort, inspect);
 }
 
 function rewrap(loc: Loc, rib_id: string, cu_id: string): Loc {
@@ -371,10 +385,11 @@ function rewrap(loc: Loc, rib_id: string, cu_id: string): Loc {
   };
 }
 
+type extension = { extensible: true; rib_id: string; rib: Rib } | { extensible: false };
+
 async function preexpand_forms(
   loc: Loc,
-  rib: Rib,
-  rib_id: string,
+  extension: extension,
   counter: number,
   unit: CompilationUnit,
   context: Context,
@@ -384,7 +399,7 @@ async function preexpand_forms(
   function done(loc: Loc): Promise<goodies> {
     return Promise.resolve({
       loc,
-      rib,
+      extension,
       context,
       counter,
       unit,
@@ -418,10 +433,10 @@ async function preexpand_forms(
               case "core_syntax": {
                 const { name } = binding;
                 return inspect(loc, "core form", () =>
-                  handle_core_syntax(loc, name, context, unit, counter, rib_id, rib).then(
-                    ({ loc, counter, unit, context, rib }) =>
+                  handle_core_syntax(loc, name, context, unit, counter, extension).then(
+                    ({ loc, counter, unit, context, extension }) =>
                       inspect(loc, `core output`, () =>
-                        preexpand_forms(loc, rib, rib_id, counter, unit, context, sort, inspect),
+                        preexpand_forms(loc, extension, counter, unit, context, sort, inspect),
                       ),
                   ),
                 );
@@ -430,18 +445,11 @@ async function preexpand_forms(
                 const { clauses } = binding;
                 return inspect(loc, `transformer form`, () =>
                   apply_syntax_rules(loc, clauses, unit, counter).then(({ loc, counter }) => {
-                    const rewrapped = rewrap(loc, rib_id, unit.cu_id);
+                    const rewrapped = extension.extensible
+                      ? rewrap(loc, extension.rib_id, unit.cu_id)
+                      : loc;
                     return inspect(rewrapped, `transformer output`, () =>
-                      preexpand_forms(
-                        rewrapped,
-                        rib,
-                        rib_id,
-                        counter,
-                        unit,
-                        context,
-                        sort,
-                        inspect,
-                      ),
+                      preexpand_forms(rewrapped, extension, counter, unit, context, sort, inspect),
                     );
                   }),
                 );
@@ -464,7 +472,7 @@ async function preexpand_forms(
           case "lexical_declaration": {
             const goodies = extract_lexical_declaration_bindings({
               loc,
-              rib,
+              extension,
               context,
               counter,
               unit,
@@ -474,8 +482,7 @@ async function preexpand_forms(
               (loc) =>
                 preexpand_forms(
                   loc,
-                  goodies.rib,
-                  rib_id,
+                  goodies.extension,
                   goodies.counter,
                   goodies.unit,
                   goodies.context,
@@ -488,7 +495,7 @@ async function preexpand_forms(
           case "type_alias_declaration": {
             const goodies = extract_type_alias_declaration_bindings({
               loc,
-              rib,
+              extension,
               context,
               counter,
               unit,
@@ -498,8 +505,7 @@ async function preexpand_forms(
               (loc) =>
                 preexpand_forms(
                   loc,
-                  goodies.rib,
-                  rib_id,
+                  goodies.extension,
                   goodies.counter,
                   goodies.unit,
                   goodies.context,
@@ -589,13 +595,10 @@ function postexpand_program(
   unit: CompilationUnit,
   counter: number,
   context: Context,
-  rib_id: string,
   inspect: inspect,
 ): Promise<{ loc: Loc }> {
   assert(loc.t.tag === "program");
-  return go_down(loc, (loc) =>
-    postexpand_body(loc, unit, counter, context, rib_id, "value", inspect),
-  );
+  return go_down(loc, (loc) => postexpand_body(loc, unit, counter, context, "value", inspect));
 }
 
 function invalid_form(loc: Loc): never {
@@ -705,27 +708,26 @@ function expand_arrow_function(
   return go_down(
     loc,
     (loc) => {
-      const pgs = extract_parameters({
-        loc,
+      const [rib_id, new_counter] = new_rib_id(counter);
+      const extension: extension = {
+        extensible: true,
+        rib_id,
         rib: { type: "rib", normal_env: {}, types_env: {} },
-        counter,
-        context,
-        unit,
-      });
+      };
+      const pgs = extract_parameters({ loc, extension, counter, context, unit });
       const arr = go_right(pgs.loc, itself, invalid_form);
       check_punct(arr, "=>");
       const body = go_right(arr, itself, invalid_form);
       return in_isolation(
         body,
         async (body) => {
-          const [rib_id, new_counter] = new_rib_id(pgs.counter);
           const wrap: Wrap = { marks: null, subst: [{ rib_id, cu_id: unit.cu_id }, null] };
           const loc = wrap_loc(body, wrap);
-          const new_unit = extend_unit(pgs.unit, rib_id, pgs.rib); // params are in rib
+          assert(pgs.extension.extensible);
+          const new_unit = extend_unit(pgs.unit, pgs.extension.rib_id, pgs.extension.rib); // params are in rib
           return expand_concise_body(
             loc,
-            pgs.rib,
-            rib_id,
+            pgs.extension,
             new_counter,
             new_unit,
             pgs.context,
@@ -746,47 +748,49 @@ function expand_type_parameters(
   orig_counter: number,
   context: Context,
   inspect: inspect,
-): Promise<goodies & { rib_id: string }> {
-  const [rib_id, counter] = new_rib_id(orig_counter);
-  type T = Promise<goodies & { rib_id: string }>;
-  function post_after_var({ loc, rib, counter, unit, context }: goodies): T {
+): Promise<goodies> {
+  type T = Promise<goodies>;
+  function post_after_var({ loc, extension, counter, unit, context }: goodies): T {
     return go_right(
       loc,
       (loc) => {
         assert(loc.t.content === ",");
         return go_right(
           loc,
-          (loc) => post_var({ loc, rib, counter, unit, context }),
+          (loc) => post_var({ loc, extension, counter, unit, context }),
           (loc) => {
             debug(loc, "cant go past commma2?");
           },
         );
       },
-      (loc) => end({ loc: go_up(loc), rib, unit, counter, context }),
+      (loc) => end({ loc: go_up(loc), extension, unit, counter, context }),
     );
   }
 
-  function post_var({ loc, rib, counter, unit, context }: goodies): T {
+  function post_var({ loc, extension, counter, unit, context }: goodies): T {
     switch (loc.t.tag) {
       case "identifier":
-        return post_after_var({ loc, rib, counter, unit, context });
+        return post_after_var({ loc, extension, counter, unit, context });
       case "type_parameter":
         return go_down(loc, (loc) => {
           assert(loc.t.tag === "identifier");
           return go_right(loc, (loc) => {
             if (loc.t.content !== "extends") syntax_error(loc, "expected 'extends'");
+            assert(extension.extensible);
             return go_right(loc, (loc) =>
               expand_expr({
-                loc: wrap_loc(loc, { marks: null, subst: [{ rib_id, cu_id: unit.cu_id }, null] }),
+                loc: wrap_loc(loc, {
+                  marks: null,
+                  subst: [{ rib_id: extension.rib_id, cu_id: unit.cu_id }, null],
+                }),
                 counter,
                 unit,
                 context,
-                rib_id,
                 sort: "type",
                 inspect,
               }).then(({ loc, counter, unit, context }) =>
                 go_right(loc, syntax_error, () =>
-                  post_after_var({ loc: go_up(loc), rib, counter, unit, context }),
+                  post_after_var({ loc: go_up(loc), extension, counter, unit, context }),
                 ),
               ),
             );
@@ -797,33 +801,54 @@ function expand_type_parameters(
     }
   }
 
-  function pre_after_var({ loc, rib, counter, unit, context }: goodies): T {
+  function pre_after_var({ loc, extension, counter, unit, context }: goodies): T {
+    assert(extension.extensible);
     return go_right(
       loc,
       (loc) => {
         if (loc.t.content !== ",") syntax_error(loc, "expected a comma ','");
         return go_right(
           loc,
-          (loc) => pre_var({ loc, rib, counter, unit, context }),
+          (loc) => pre_var({ loc, extension, counter, unit, context }),
           (loc) => debug(loc, "cant go past commma?"),
         );
       },
       (loc) =>
         go_down(go_up(loc), (loc) =>
-          post_var({ loc, rib, counter, unit: extend_unit(unit, rib_id, rib), context }),
+          post_var({
+            loc,
+            extension,
+            counter,
+            unit: extend_unit(unit, extension.rib_id, extension.rib),
+            context,
+          }),
         ),
     );
   }
 
-  function pre_var({ loc, rib, counter, unit, context }: goodies): T {
+  function pre_var({ loc, extension, counter, unit, context }: goodies): T {
     switch (loc.t.tag) {
       case "identifier":
-        const { name, ...gs } = gen_binding({ loc, rib, counter, context, unit, sort: "type" });
+        const { name, ...gs } = gen_binding({
+          loc,
+          extension,
+          counter,
+          context,
+          unit,
+          sort: "type",
+        });
         return pre_after_var({ ...gs, loc: rename(loc, name) });
       case "type_parameter":
         return go_down(loc, (loc) => {
           if (loc.t.tag !== "identifier") syntax_error(loc, "expected an identifier");
-          const { name, ...gs } = gen_binding({ loc, rib, counter, context, unit, sort: "type" });
+          const { name, ...gs } = gen_binding({
+            loc,
+            extension,
+            counter,
+            context,
+            unit,
+            sort: "type",
+          });
           return pre_after_var({ ...gs, loc: go_up(rename(loc, name)) });
         });
       default:
@@ -831,32 +856,32 @@ function expand_type_parameters(
     }
   }
 
-  function start(loc: Loc, rib: Rib): T {
+  function start(loc: Loc): T {
     assert(loc.t.tag === "syntax_list");
+
+    const [rib_id, counter] = new_rib_id(orig_counter);
+    const rib: Rib = { type: "rib", normal_env: {}, types_env: {} };
+    const extension: extension = { extensible: true, rib_id, rib };
     return go_down(
       loc,
-      (loc) => pre_var({ loc, rib, unit, counter, context }),
-      (loc) => end({ loc, unit, rib, context, counter }),
+      (loc) => pre_var({ loc, extension, unit, counter, context }),
+      (loc) => end({ loc, unit, extension, context, counter }),
     );
   }
 
-  async function end({ loc, rib, unit, context, counter }: goodies): T {
+  async function end({ loc, extension, unit, context, counter }: goodies): T {
     return go_right(
       loc,
       (loc) => {
         assert(loc.t.content === ">");
-        return { loc, rib, unit, counter, context, rib_id };
+        return { loc, extension, unit, counter, context };
       },
       syntax_error,
     );
   }
 
   assert(loc.t.content === "<");
-  return go_right(
-    loc,
-    (loc) => start(loc, { type: "rib", normal_env: {}, types_env: {} }),
-    syntax_error,
-  );
+  return go_right(loc, start, syntax_error);
 }
 
 function expand_expr({
@@ -864,7 +889,6 @@ function expand_expr({
   counter,
   unit,
   context,
-  rib_id,
   sort,
   inspect,
 }: {
@@ -872,22 +896,27 @@ function expand_expr({
   unit: CompilationUnit;
   counter: number;
   context: Context;
-  rib_id: string;
   sort: "type" | "value";
   inspect: inspect;
-}): Promise<Omit<goodies, "rib">> {
+}): Promise<Omit<goodies, "extension">> {
   return in_isolation(
     loc,
     async (loc) => {
-      const rib: Rib = { type: "rib", types_env: {}, normal_env: {} };
-      return preexpand_forms(loc, rib, rib_id, counter, unit, context, sort, inspect).then(
-        ({ loc, rib, unit, counter, context }) =>
-          postexpand_body(loc, unit, counter, context, rib_id, sort, inspect).then(({ loc }) => ({
-            loc,
-            unit,
-            counter,
-            context,
-          })),
+      return preexpand_forms(
+        loc,
+        { extensible: false },
+        counter,
+        unit,
+        context,
+        sort,
+        inspect,
+      ).then(({ loc, unit, counter, context }) =>
+        postexpand_body(loc, unit, counter, context, sort, inspect).then(({ loc }) => ({
+          loc,
+          unit,
+          counter,
+          context,
+        })),
       );
     },
     (loc, { unit, counter, context }) => ({ loc, unit, counter, context }),
@@ -899,7 +928,6 @@ async function postexpand_type_alias_declaration(
   unit: CompilationUnit,
   counter: number,
   context: Context,
-  rib_id: string,
   inspect: inspect,
 ): Promise<Loc> {
   return go_down(loc, (loc) => {
@@ -912,13 +940,12 @@ async function postexpand_type_alias_declaration(
       assert(resolution.binding.type === "type");
       const new_name = resolution.binding.name;
       return go_right(rename(loc, new_name), async (loc) => {
-        async function do_after_equal({ loc, counter, unit, context }: Omit<goodies, "rib">) {
+        async function do_after_equal({ loc, counter, unit, context }: Omit<goodies, "extension">) {
           return expand_expr({
             loc,
             counter,
             unit,
             context,
-            rib_id,
             sort: "type",
             inspect,
           }).then(({ loc, unit: _unit, counter: _counter, context: _context }) => {
@@ -937,15 +964,16 @@ async function postexpand_type_alias_declaration(
             return go_right(loc, (loc) => do_after_equal({ loc, counter, unit, context }));
           case "<":
             return expand_type_parameters(loc, unit, counter, context, inspect).then(
-              ({ loc, counter, unit, context, rib: _rib, rib_id }) => {
+              ({ loc, counter, unit, context, extension }) => {
                 assert(loc.t.content === ">");
+                assert(extension.extensible);
                 return go_right(loc, (loc) => {
                   if (loc.t.content !== "=") syntax_error(loc, "expected '='");
                   return go_right(loc, (loc) =>
                     do_after_equal({
                       loc: wrap_loc(loc, {
                         marks: null,
-                        subst: [{ rib_id, cu_id: unit.cu_id }, null],
+                        subst: [{ rib_id: extension.rib_id, cu_id: unit.cu_id }, null],
                       }),
                       counter,
                       unit,
@@ -980,7 +1008,6 @@ async function postexpand_body(
   unit: CompilationUnit,
   counter: number,
   context: Context,
-  rib_id: string,
   sort: "type" | "value",
   inspect: inspect,
 ): Promise<{ loc: Loc }> {
@@ -1048,7 +1075,6 @@ async function postexpand_body(
                       counter,
                       unit,
                       context,
-                      rib_id,
                       sort: "value",
                       inspect,
                     }),
@@ -1068,7 +1094,6 @@ async function postexpand_body(
                                   counter,
                                   unit,
                                   context,
-                                  rib_id,
                                   sort: "value",
                                   inspect,
                                 }),
@@ -1094,20 +1119,15 @@ async function postexpand_body(
             return syntax_error(loc, "invalid slice");
           }
           case "type_alias_declaration": {
-            return postexpand_type_alias_declaration(
-              loc,
-              unit,
-              counter,
-              context,
-              rib_id,
-              inspect,
-            ).then(cont);
+            return postexpand_type_alias_declaration(loc, unit, counter, context, inspect).then(
+              cont,
+            );
           }
           case "member_expression": {
             return go_down(loc, (loc) =>
               in_isolation(
                 loc,
-                (loc) => postexpand_body(loc, unit, counter, context, rib_id, sort, inspect),
+                (loc) => postexpand_body(loc, unit, counter, context, sort, inspect),
                 (loc, _gs) =>
                   go_right(loc, (loc) => {
                     assert(loc.t.content === ".");
