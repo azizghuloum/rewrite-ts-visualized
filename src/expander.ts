@@ -10,6 +10,7 @@ import {
   extend_context_lexical,
   CorePatterns,
   push_wrap,
+  extension,
 } from "./stx";
 import { change, go_down, go_next, go_right, go_up, mkzipper, wrap_loc } from "./zipper";
 import { apply_syntax_rules, core_handlers } from "./syntax-core-patterns";
@@ -187,8 +188,7 @@ async function expand_program(
     ({ loc, extension, counter, context, unit }) => {
       // rib is filled
       // context is filled also
-      assert(extension.extensible);
-      const new_unit = extend_unit(unit, extension.rib_id, extension.rib);
+      const new_unit = extend_unit(unit, extension);
       return inspect(loc, "After preexpanding the program", () =>
         postexpand_program(loc, new_unit, counter, context, inspect).then(({ loc }) => {
           return { loc, unit: new_unit, context };
@@ -374,8 +374,7 @@ async function expand_concise_body(
           ),
       )
     : preexpand_forms(loc, extension, counter, unit, context, sort, inspect));
-  assert(gs.extension.extensible);
-  const new_unit = extend_unit(gs.unit, gs.extension.rib_id, gs.extension.rib);
+  const new_unit = extend_unit(gs.unit, gs.extension);
   return postexpand_body(gs.loc, new_unit, gs.counter, gs.context, sort, inspect);
 }
 
@@ -386,8 +385,6 @@ function rewrap(loc: Loc, rib_id: string, cu_id: string): Loc {
     p: loc.p,
   };
 }
-
-type extension = { extensible: true; rib_id: string; rib: Rib } | { extensible: false };
 
 async function preexpand_forms(
   loc: Loc,
@@ -726,7 +723,7 @@ function expand_arrow_function(
           const wrap: Wrap = { marks: null, subst: [{ rib_id, cu_id: unit.cu_id }, null] };
           const loc = wrap_loc(body, wrap);
           assert(pgs.extension.extensible);
-          const new_unit = extend_unit(pgs.unit, pgs.extension.rib_id, pgs.extension.rib); // params are in rib
+          const new_unit = extend_unit(pgs.unit, pgs.extension); // params are in rib
           return expand_concise_body(
             loc,
             pgs.extension,
@@ -821,7 +818,7 @@ function expand_type_parameters(
             loc,
             extension,
             counter,
-            unit: extend_unit(unit, extension.rib_id, extension.rib),
+            unit: extend_unit(unit, extension),
             context,
           }),
         ),

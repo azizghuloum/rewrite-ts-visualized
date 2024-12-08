@@ -289,9 +289,16 @@ export function init_top_level(
   };
 }
 
-export function extend_unit(unit: CompilationUnit, rib_id: string, rib: Rib): CompilationUnit {
-  return {
-    cu_id: unit.cu_id,
-    store: { ...unit.store, [rib_id]: rib },
-  };
+export type extension = { extensible: true; rib_id: string; rib: Rib } | { extensible: false };
+
+export function extend_unit(unit: CompilationUnit, extension: extension): CompilationUnit {
+  if (extension.extensible) {
+    const { rib_id, rib } = extension;
+    return {
+      cu_id: unit.cu_id,
+      store: { ...unit.store, [rib_id]: rib },
+    };
+  } else {
+    return unit;
+  }
 }

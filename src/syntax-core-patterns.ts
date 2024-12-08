@@ -7,6 +7,7 @@ import {
   extend_context,
   extend_rib,
   extend_unit,
+  extension,
   free_id_equal,
   push_wrap,
 } from "./stx";
@@ -22,8 +23,6 @@ import {
   STX,
 } from "./syntax-structures";
 import { go_next, go_down, mkzipper, stx_list_content, go_up, change } from "./zipper";
-
-type extension = { extensible: true; rib_id: string; rib: Rib } | { extensible: false };
 
 type handler = (
   loc: Loc,
@@ -386,7 +385,7 @@ const using_rewrite_rules: handler = async (
     },
     [{ type: "rib", normal_env: {}, types_env: {} }, new_counter, orig_context],
   );
-  const final_unit = extend_unit(orig_unit, rib_id, new_rib);
+  const final_unit = extend_unit(orig_unit, { extensible: true, rib_id, rib: new_rib });
   const final_loc = change(loc, mkzipper(do_wrap(expression)));
   return {
     loc: final_loc,
@@ -506,7 +505,8 @@ const define_rewrite_rules: handler = async (
     },
     [orig_extension.rib, orig_counter, orig_context],
   );
-  const final_unit = extend_unit(orig_unit, orig_extension.rib_id, final_rib);
+  const extension: extension = { extensible: true, rib_id: orig_extension.rib_id, rib: final_rib };
+  const final_unit = extend_unit(orig_unit, extension);
   const final_loc = change(
     loc,
     mkzipper({ type: "list", tag: "slice", wrap: { marks: null, subst: null }, content: null }),
@@ -516,7 +516,7 @@ const define_rewrite_rules: handler = async (
     counter: final_counter,
     unit: final_unit,
     context: final_context,
-    extension: { extensible: true, rib_id: orig_extension.rib_id, rib: final_rib },
+    extension,
   };
 };
 
