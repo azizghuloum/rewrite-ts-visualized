@@ -12,8 +12,18 @@ import {
   push_wrap,
   lexical_extension,
   modular_extension,
+  extend_modular,
 } from "./stx";
-import { change, go_down, go_next, go_right, go_up, mkzipper, wrap_loc } from "./zipper";
+import {
+  change,
+  go_down,
+  go_next,
+  go_right,
+  go_up,
+  mkzipper,
+  stx_list_content,
+  wrap_loc,
+} from "./zipper";
 import { apply_syntax_rules, core_handlers } from "./syntax-core-patterns";
 import { debug, inspect, in_isolation, syntax_error } from "./stx-error";
 
@@ -167,19 +177,29 @@ function extract_type_alias_declaration_bindings({
   counter,
   unit,
 }: goodies): goodies {
+  function after_type(loc: Loc) {
+    assert(loc.t.type === "atom" && loc.t.tag === "identifier", "expected an identifier");
+    const gs = gen_binding({ loc, lexical, counter, context, unit, sort: "type" });
+    return { ...gs, loc: go_up(loc) };
+  }
   return go_down(
     loc,
     (loc) => {
-      assert(loc.t.content === "type", "expected 'type' keyword");
-      return go_right(
-        loc,
-        (loc) => {
-          assert(loc.t.type === "atom" && loc.t.tag === "identifier", "expected an identifier");
-          const gs = gen_binding({ loc, lexical, counter, context, unit, sort: "type" });
-          return { ...gs, loc: go_up(loc) };
-        },
-        syntax_error,
-      );
+      switch (loc.t.content) {
+        case "type":
+          return go_right(loc, after_type, syntax_error);
+        case "export":
+          return go_right(
+            loc,
+            (loc) => {
+              assert(loc.t.content === "type", "expected 'type' keyword");
+              return go_right(loc, after_type, syntax_error);
+            },
+            syntax_error,
+          );
+        default:
+          syntax_error(loc);
+      }
     },
     syntax_error,
   );
@@ -955,77 +975,142 @@ function expand_expr({
   );
 }
 
+const export_keyword: STX = {
+  type: "atom",
+  tag: "other",
+  content: "export",
+  wrap: { marks: null, subst: null },
+};
+
 async function postexpand_type_alias_declaration(
   loc: Loc,
+  modular: modular_extension,
   unit: CompilationUnit,
   counter: number,
   context: Context,
   inspect: inspect,
-): Promise<Loc> {
-  return go_down(loc, (loc) => {
+): Promise<{ loc: Loc; modular: modular_extension }> {
+  async function do_after_equal(
+    loc: Loc,
+    counter: number,
+    unit: CompilationUnit,
+    context: Context,
+  ): Promise<Loc> {
+    return expand_expr({
+      loc,
+      counter,
+      unit,
+      context,
+      sort: "type",
+      inspect,
+    }).then(({ loc, unit: _unit, counter: _counter, context: _context }) => {
+      return go_right(
+        loc,
+        (loc) => {
+          assert(loc.t.content === ";");
+          return go_right(loc, syntax_error, (loc) => go_up(loc));
+        },
+        (loc) => go_up(loc),
+      );
+    });
+  }
+  async function do_after_identifier(
+    loc: Loc,
+    counter: number,
+    unit: CompilationUnit,
+    context: Context,
+  ): Promise<Loc> {
+    switch (loc.t.content) {
+      case "=":
+        return go_right(loc, (loc) => do_after_equal(loc, counter, unit, context));
+      case "<":
+        return expand_type_parameters(loc, unit, counter, context, inspect).then(
+          ({ loc, counter, unit, context, lexical }) => {
+            assert(loc.t.content === ">");
+            assert(lexical.extensible);
+            return go_right(loc, (loc) => {
+              if (loc.t.content !== "=") syntax_error(loc, "expected '='");
+              return go_right(loc, (loc) =>
+                do_after_equal(
+                  wrap_loc(loc, {
+                    marks: null,
+                    subst: [{ rib_id: lexical.rib_id, cu_id: unit.cu_id }, null],
+                  }),
+                  counter,
+                  unit,
+                  context,
+                ),
+              );
+            });
+          },
+        );
+      default:
+        return syntax_error(loc);
+    }
+  }
+
+  function handle_type(loc: Loc, exporting: boolean) {
     assert(loc.t.content === "type");
-    return go_right(loc, (loc) => {
+    return go_right(loc, async (loc) => {
       assert(loc.t.tag === "identifier");
       const { content, wrap } = loc.t;
       const resolution = resolve(content, wrap, context, unit, "types_env");
       assert(resolution.type === "bound");
       assert(resolution.binding.type === "type");
       const new_name = resolution.binding.name;
-      return go_right(rename(loc, new_name), async (loc) => {
-        async function do_after_equal({
-          loc,
-          counter,
-          unit,
-          context,
-        }: Omit<goodies, "lexical" | "modular">) {
-          return expand_expr({
-            loc,
-            counter,
-            unit,
-            context,
-            sort: "type",
-            inspect,
-          }).then(({ loc, unit: _unit, counter: _counter, context: _context }) => {
-            return go_right(
-              loc,
-              (loc) => {
-                assert(loc.t.content === ";");
-                return go_right(loc, syntax_error, (loc) => go_up(loc));
-              },
-              (loc) => go_up(loc),
-            );
-          });
-        }
-        switch (loc.t.content) {
-          case "=":
-            return go_right(loc, (loc) => do_after_equal({ loc, counter, unit, context }));
-          case "<":
-            return expand_type_parameters(loc, unit, counter, context, inspect).then(
-              ({ loc, counter, unit, context, lexical }) => {
-                assert(loc.t.content === ">");
-                assert(lexical.extensible);
-                return go_right(loc, (loc) => {
-                  if (loc.t.content !== "=") syntax_error(loc, "expected '='");
-                  return go_right(loc, (loc) =>
-                    do_after_equal({
-                      loc: wrap_loc(loc, {
-                        marks: null,
-                        subst: [{ rib_id: lexical.rib_id, cu_id: unit.cu_id }, null],
-                      }),
-                      counter,
-                      unit,
-                      context,
-                    }),
-                  );
-                });
-              },
-            );
-          default:
-            return syntax_error(loc);
-        }
-      });
+      const new_loc = await go_right(rename(loc, new_name), async (loc) =>
+        do_after_identifier(loc, counter, unit, context),
+      );
+      const new_modular = extend_modular(
+        modular,
+        exporting,
+        content,
+        wrap.marks,
+        resolution.label,
+        "types_env",
+      );
+      return { loc: new_loc, modular: new_modular };
     });
-  });
+  }
+
+  function handle_export(loc: Loc) {
+    assert(loc.t.content === "export");
+    if (!modular.extensible) syntax_error(loc, "location does not permit export");
+    return go_right(loc, (loc) => handle_type(loc, true), syntax_error);
+  }
+
+  function postprocess({ loc, modular }: { loc: Loc; modular: modular_extension }): {
+    loc: Loc;
+    modular: modular_extension;
+  } {
+    if (modular.extensible) {
+      assert(loc.t.tag === "type_alias_declaration");
+      const content = stx_list_content(loc.t);
+      assert(content !== null);
+      const fst = content[0];
+      if (fst.content === "export") {
+        return { loc, modular };
+      } else {
+        return {
+          loc: { type: "loc", t: { ...loc.t, content: [export_keyword, content] }, p: loc.p },
+          modular,
+        };
+      }
+    } else {
+      return { loc, modular };
+    }
+  }
+
+  return go_down(loc, (loc) => {
+    switch (loc.t.content) {
+      case "type":
+        return handle_type(loc, false);
+      case "export":
+        return handle_export(loc);
+      default:
+        syntax_error(loc);
+    }
+  }).then(postprocess);
 }
 
 function rename(loc: Loc, new_name: string): Loc {
@@ -1050,20 +1135,28 @@ async function postexpand_body(
   inspect: inspect,
 ): Promise<{ loc: Loc; modular: modular_extension }> {
   type T = Promise<{ loc: Loc; modular: modular_extension }>;
-  async function done(loc: Loc): T {
+  async function done(loc: Loc, modular: modular_extension): T {
     return { loc, modular }; // FIXME
   }
-  function cont(loc: Loc): T {
-    return go_next(loc, (loc) => h(find_form(loc)), done);
+  function cont(loc: Loc, modular: modular_extension): T {
+    return go_next(
+      loc,
+      (loc) => h(find_form(loc), modular),
+      (loc) => done(loc, modular),
+    );
   }
-  function descend(loc: Loc): T {
-    return go_down(loc, (loc) => h(find_form(loc)), cont);
+  function descend(loc: Loc, modular: modular_extension): T {
+    return go_down(
+      loc,
+      (loc) => h(find_form(loc), modular),
+      (loc) => cont(loc, modular),
+    );
   }
-  async function h(ffrv: ffrv): T {
+  async function h(ffrv: ffrv, modular: modular_extension): T {
     const loc = ffrv.loc;
     switch (ffrv.type) {
       case "done":
-        return done(loc);
+        return done(loc, modular);
       case "identifier": {
         assert(loc.t.type === "atom");
         const { tag, content, wrap } = loc.t;
@@ -1077,7 +1170,7 @@ async function postexpand_body(
                   case "ts":
                   case "type":
                   case "lexical": {
-                    return cont(rename(loc, binding.name));
+                    return cont(rename(loc, binding.name), modular); // FIXME
                   }
                   default: {
                     debug(loc, `unhandled ${binding.type}`);
@@ -1098,7 +1191,7 @@ async function postexpand_body(
         if (loc.t.type !== "list") throw new Error("expected list");
         switch (loc.t.tag) {
           case "lexical_declaration":
-            return descend(loc);
+            return descend(loc, modular); // FIXME
           case "variable_declarator": {
             return go_down(
               loc,
@@ -1135,7 +1228,7 @@ async function postexpand_body(
                                   inspect,
                                 }),
                               (loc, { counter, unit, context }) => go_up(loc),
-                            ).then(cont),
+                            ).then((loc) => cont(loc, modular)),
                           syntax_error,
                         );
                       },
@@ -1150,15 +1243,20 @@ async function postexpand_body(
               loc,
               (loc) => expand_arrow_function(loc, counter, context, unit, inspect),
               (loc, _gs) => loc,
-            ).then(cont);
+            ).then((loc) => cont(loc, modular));
           }
           case "slice": {
             return syntax_error(loc, "invalid slice");
           }
           case "type_alias_declaration": {
-            return postexpand_type_alias_declaration(loc, unit, counter, context, inspect).then(
-              cont,
-            );
+            return postexpand_type_alias_declaration(
+              loc,
+              modular,
+              unit,
+              counter,
+              context,
+              inspect,
+            ).then(({ loc, modular }) => cont(loc, modular));
           }
           case "member_expression": {
             return go_down(loc, (loc) =>
@@ -1186,18 +1284,18 @@ async function postexpand_body(
                       }
                     });
                   }),
-              ).then(cont),
+              ).then((loc) => cont(loc, modular)),
             );
           }
           default: {
             if (list_handlers_table[loc.t.tag] !== "descend") {
               debug(loc, `unhandled '${loc.t.tag}' form in postexpand_body`);
             }
-            return cont(loc);
+            return cont(loc, modular);
           }
         }
       }
     }
   }
-  return h(find_form(loc));
+  return h(find_form(loc), modular);
 }

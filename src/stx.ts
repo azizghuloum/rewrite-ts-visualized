@@ -61,7 +61,7 @@ function id_to_label(
 
 export type Resolution =
   | { type: "unbound" }
-  | { type: "bound"; binding: Binding }
+  | { type: "bound"; binding: Binding; label: string }
   | { type: "error"; reason: string };
 
 export function resolve(
@@ -77,7 +77,7 @@ export function resolve(
   }
   const binding = context[label];
   if (binding) {
-    return { type: "bound", binding };
+    return { type: "bound", binding, label };
   } else {
     return { type: "error", reason: "out of context" };
   }
@@ -323,6 +323,7 @@ export function extend_unit(unit: CompilationUnit, extension: lexical_extension)
 
 export function extend_modular(
   modular: modular_extension,
+  exporting: boolean,
   name: string,
   marks: Marks,
   label: string,
@@ -333,9 +334,10 @@ export function extend_modular(
     return {
       extensible: true,
       implicit: rib_push(implicit, name, marks, label, env_type),
-      explicit: rib_push(explicit, name, marks, label, env_type),
+      explicit: exporting ? rib_push(explicit, name, marks, label, env_type) : explicit,
     };
   } else {
+    assert(!exporting);
     return modular;
   }
 }
