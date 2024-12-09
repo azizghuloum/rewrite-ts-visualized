@@ -1122,7 +1122,7 @@ async function postexpand_lexical_declaration(
   context: Context,
   inspect: inspect,
 ): Promise<{ loc: Loc; modular: modular_extension }> {
-  async function handle_initializer(loc: Loc): Promise<Loc> {
+  async function handle_value_initializer(loc: Loc): Promise<Loc> {
     assert(loc.t.content === "=");
     return go_right(
       loc,
@@ -1130,6 +1130,28 @@ async function postexpand_lexical_declaration(
         expand_expr({ loc, counter, unit, context, sort: "value", inspect }).then(({ loc }) => loc),
       (loc) => syntax_error(loc, "expected an expression following the '=' sign"),
     );
+  }
+  async function handle_type_then_initializer(loc: Loc): Promise<Loc> {
+    assert(loc.t.content === ":");
+    return go_right(
+      loc,
+      (loc) =>
+        expand_expr({ loc, counter, unit, context, sort: "type", inspect }).then(
+          ({ loc, counter, unit, context }) =>
+            go_right(loc, handle_value_initializer, (loc) => Promise.resolve(loc)),
+        ),
+      (loc) => syntax_error(loc, "expected an expression following the '=' sign"),
+    );
+  }
+  async function handle_initializer(loc: Loc): Promise<Loc> {
+    switch (loc.t.content) {
+      case "=":
+        return handle_value_initializer(loc);
+      case ":":
+        return handle_type_then_initializer(loc);
+      default:
+        syntax_error(loc);
+    }
   }
   async function handle_inner_variable_declarator(
     loc: Loc,
