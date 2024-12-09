@@ -1260,13 +1260,6 @@ async function postexpand_body(
       (loc) => done(loc, modular),
     );
   }
-  function descend(loc: Loc, modular: modular_extension): T {
-    return go_down(
-      loc,
-      (loc) => h(find_form(loc), modular),
-      (loc) => cont(loc, modular),
-    );
-  }
   async function h(ffrv: ffrv, modular: modular_extension): T {
     const loc = ffrv.loc;
     switch (ffrv.type) {
