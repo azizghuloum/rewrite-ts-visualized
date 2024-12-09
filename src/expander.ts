@@ -149,21 +149,32 @@ function extract_lexical_declaration_bindings({
       syntax_error(ls, `expected a variable declaration; found ${ls.t.tag}`);
     }
   }
+
+  function handle_let_or_const(loc: Loc) {
+    switch (loc.t.content) {
+      case "const":
+      case "let":
+        return go_right(
+          loc,
+          (loc) => get_vars(loc, lexical, context, counter),
+          (loc) => syntax_error(loc, "no bindings after keyword"),
+        );
+      default:
+        syntax_error(loc, "expected keyword const or let");
+    }
+  }
+
   return go_down(
     loc,
     (loc) => {
-      if (loc.t.type === "atom") {
-        if (loc.t.tag === "other" && (loc.t.content === "const" || loc.t.content === "let")) {
-          return go_right(
-            loc,
-            (loc) => get_vars(loc, lexical, context, counter),
-            (loc) => syntax_error(loc, "no bindings after keyword"),
-          );
-        } else {
-          throw new Error(`HERE? ${loc.t.type}:${loc.t.tag}`);
-        }
-      } else {
-        syntax_error(loc, "expected keyword const or let");
+      switch (loc.t.content) {
+        case "const":
+        case "let":
+          return handle_let_or_const(loc);
+        case "export":
+          return go_right(loc, handle_let_or_const, syntax_error);
+        default:
+          syntax_error(loc, "expected keyword const or let");
       }
     },
     syntax_error,
@@ -327,7 +338,6 @@ const list_handlers_table: { [tag in list_tag]: "descend" | "stop" | "todo" } = 
   ERROR: "stop",
   lexical_declaration: "stop",
   variable_declarator: "stop",
-  export_statement: "descend",
   export_specifier: "todo",
   export_clause: "todo",
   export_declaration: "todo",

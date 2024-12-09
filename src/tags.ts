@@ -11,7 +11,6 @@ export type list_tag =
   | "program"
   | "lexical_declaration"
   | "variable_declarator"
-  | "export_statement"
   | "export_specifier"
   | "export_declaration"
   | "export_clause"

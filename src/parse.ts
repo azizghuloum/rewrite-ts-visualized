@@ -129,9 +129,11 @@ function absurdly(node: TS.Node, src: TS.SourceFile): AST {
           ls[2].content === ";"
         ) {
           return {
-            type: "list",
-            tag: "export_statement",
-            content: [ls[0].content[0], [ls[1], [ls[2], null]]],
+            ...ls[1], // lexical_declaration
+            content: [
+              ls[0].content[0], // export keyword
+              llappend(ls[1].content, [ls[2], null]),
+            ],
           };
         } else {
           return { type: "list", tag: "ERROR", content };
