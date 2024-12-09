@@ -16,6 +16,6 @@ const x = 12;
 
 ```typescript
 x_7 + x_7;
-const x_7 = 12;
+export const x_7 = 12;
 ```
 

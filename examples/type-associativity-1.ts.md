@@ -13,6 +13,6 @@ const q = 12 | 13 & 14 | 15
 
 ```typescript
 export type q_2 = (number | (string & 17)) | 13;
-const q_4 = 12 | (13 & 14) | 15;
+export const q_4 = 12 | (13 & 14) | 15;
 ```
 

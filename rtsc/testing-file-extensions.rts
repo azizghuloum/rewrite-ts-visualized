@@ -1,3 +1,4 @@
+const y = 13;
 export const x = 12;
 define_rewrite_rules([foo, foo, x]);
 type t_local = string;

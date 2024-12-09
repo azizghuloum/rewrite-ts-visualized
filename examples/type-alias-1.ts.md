@@ -14,7 +14,7 @@ type q = number;
 
 ```typescript
 export type t_2 = string;
-const t_4 = 12;
+export const t_4 = 12;
 export type q_6 = number;
 ```
 

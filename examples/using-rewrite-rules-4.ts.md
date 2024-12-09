@@ -17,6 +17,6 @@ const x = 12;
 
 ```typescript
 x_6 + ((foo_8, foo_10) => foo_10 + foo_8);
-const x_6 = 12;
+export const x_6 = 12;
 ```
 

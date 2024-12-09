@@ -715,13 +715,6 @@ function extract_parameters(goodies: goodies): goodies {
     syntax_error(loc);
   }
 
-  const rename = (loc: Loc, name: string) =>
-    change(loc, {
-      type: "loc",
-      p: { type: "top" },
-      t: { type: "atom", tag: "identifier", content: name, wrap: { marks: null, subst: null } },
-    });
-
   function identifier(goodies: goodies): goodies {
     const id = goodies.loc.t;
     assert(id.type === "atom" && id.tag === "identifier");
@@ -992,6 +985,27 @@ const export_keyword: STX = {
   wrap: { marks: null, subst: null },
 };
 
+function insert_export_keyword({ loc, modular }: { loc: Loc; modular: modular_extension }): {
+  loc: Loc;
+  modular: modular_extension;
+} {
+  if (modular.extensible) {
+    assert(loc.t.type === "list");
+    const content = stx_list_content(loc.t);
+    assert(content !== null);
+    const fst = content[0];
+    if (fst.content === "export") {
+      return { loc, modular };
+    } else {
+      return {
+        loc: { type: "loc", t: { ...loc.t, content: [export_keyword, content] }, p: loc.p },
+        modular,
+      };
+    }
+  } else {
+    return { loc, modular };
+  }
+}
 async function postexpand_type_alias_declaration(
   loc: Loc,
   modular: modular_extension,
@@ -1088,29 +1102,6 @@ async function postexpand_type_alias_declaration(
     if (!modular.extensible) syntax_error(loc, "location does not permit export");
     return go_right(loc, (loc) => handle_type(loc, true), syntax_error);
   }
-
-  function postprocess({ loc, modular }: { loc: Loc; modular: modular_extension }): {
-    loc: Loc;
-    modular: modular_extension;
-  } {
-    if (modular.extensible) {
-      assert(loc.t.tag === "type_alias_declaration");
-      const content = stx_list_content(loc.t);
-      assert(content !== null);
-      const fst = content[0];
-      if (fst.content === "export") {
-        return { loc, modular };
-      } else {
-        return {
-          loc: { type: "loc", t: { ...loc.t, content: [export_keyword, content] }, p: loc.p },
-          modular,
-        };
-      }
-    } else {
-      return { loc, modular };
-    }
-  }
-
   return go_down(loc, (loc) => {
     switch (loc.t.content) {
       case "type":
@@ -1120,7 +1111,121 @@ async function postexpand_type_alias_declaration(
       default:
         syntax_error(loc);
     }
-  }).then(postprocess);
+  }).then(insert_export_keyword);
+}
+
+async function postexpand_lexical_declaration(
+  loc: Loc,
+  modular: modular_extension,
+  unit: CompilationUnit,
+  counter: number,
+  context: Context,
+  inspect: inspect,
+): Promise<{ loc: Loc; modular: modular_extension }> {
+  async function handle_initializer(loc: Loc): Promise<Loc> {
+    assert(loc.t.content === "=");
+    return go_right(
+      loc,
+      (loc) =>
+        expand_expr({ loc, counter, unit, context, sort: "value", inspect }).then(({ loc }) => loc),
+      (loc) => syntax_error(loc, "expected an expression following the '=' sign"),
+    );
+  }
+  async function handle_inner_variable_declarator(
+    loc: Loc,
+    exporting: boolean,
+    modular: modular_extension,
+  ): Promise<{ loc: Loc; modular: modular_extension }> {
+    assert(loc.t.tag === "identifier");
+    const { content, wrap } = loc.t;
+    const resolution = resolve(content, wrap, context, unit, "normal_env");
+    assert(resolution.type === "bound");
+    assert(resolution.binding.type === "lexical");
+    const new_name = resolution.binding.name;
+    const new_loc = await go_right(
+      rename(loc, new_name),
+      (loc) => handle_initializer(loc),
+      (loc) => Promise.resolve(loc),
+    );
+    return {
+      loc: go_up(new_loc),
+      modular: extend_modular(
+        modular,
+        exporting,
+        content,
+        wrap.marks,
+        resolution.label,
+        "normal_env",
+      ),
+    };
+  }
+  async function handle_variable_declarator(
+    loc: Loc,
+    exporting: boolean,
+    modular: modular_extension,
+  ): Promise<{ loc: Loc; modular: modular_extension }> {
+    assert(loc.t.tag === "variable_declarator");
+    return go_down(
+      loc,
+      (loc) => handle_inner_variable_declarator(loc, exporting, modular),
+      syntax_error,
+    );
+  }
+  async function handle_declarations(
+    loc: Loc,
+    exporting: boolean,
+    modular: modular_extension,
+  ): Promise<{ loc: Loc; modular: modular_extension }> {
+    if (loc.t.tag === "variable_declarator") {
+      return handle_variable_declarator(loc, exporting, modular).then(({ loc, modular }) =>
+        go_right(
+          loc,
+          (loc) => {
+            switch (loc.t.content) {
+              case ",":
+                return go_right(
+                  loc,
+                  (loc) => handle_declarations(loc, exporting, modular),
+                  (loc) => Promise.resolve({ loc: go_up(loc), modular }),
+                );
+              case ";":
+                return Promise.resolve({ loc: go_up(loc), modular });
+              default:
+                syntax_error(loc);
+            }
+          },
+          (loc) => Promise.resolve({ loc: go_up(loc), modular }),
+        ),
+      );
+    }
+    debug(loc, "handle_declarations");
+  }
+  async function handle_declaration_list(
+    loc: Loc,
+    exporting: boolean,
+  ): Promise<{ loc: Loc; modular: modular_extension }> {
+    assert(loc.t.content === "let" || loc.t.content === "const");
+    return go_right(loc, (loc) => handle_declarations(loc, exporting, modular), syntax_error);
+  }
+  async function handle_export(loc: Loc): Promise<{ loc: Loc; modular: modular_extension }> {
+    if (!modular.extensible) syntax_error(loc, "unexpected export keyword");
+    return go_right(loc, (loc) => handle_declaration_list(loc, true), syntax_error);
+  }
+  return go_down(
+    loc,
+    (loc) => {
+      switch (loc.t.content) {
+        case "export":
+          return handle_export(loc);
+        case "const":
+        case "let":
+          return handle_declaration_list(loc, false);
+        default:
+          syntax_error(loc);
+      }
+    },
+    syntax_error,
+  ).then(insert_export_keyword);
 }
 
 function rename(loc: Loc, new_name: string): Loc {
@@ -1201,53 +1306,15 @@ async function postexpand_body(
         if (loc.t.type !== "list") throw new Error("expected list");
         switch (loc.t.tag) {
           case "lexical_declaration":
-            return descend(loc, modular); // FIXME
-          case "variable_declarator": {
-            return go_down(
+            assert(sort === "value");
+            return postexpand_lexical_declaration(
               loc,
-              (loc) =>
-                in_isolation(
-                  loc,
-                  (loc) =>
-                    expand_expr({
-                      // TODO not exactly right
-                      loc,
-                      counter,
-                      unit,
-                      context,
-                      sort: "value",
-                      inspect,
-                    }),
-                  (loc, { counter, context, unit }) =>
-                    go_right(
-                      loc,
-                      (loc) => {
-                        assert(loc.t.content === "=");
-                        return go_right(
-                          loc,
-                          (loc) =>
-                            in_isolation(
-                              loc,
-                              (loc) =>
-                                expand_expr({
-                                  loc,
-                                  counter,
-                                  unit,
-                                  context,
-                                  sort: "value",
-                                  inspect,
-                                }),
-                              (loc, { counter, unit, context }) => go_up(loc),
-                            ).then((loc) => cont(loc, modular)),
-                          syntax_error,
-                        );
-                      },
-                      syntax_error,
-                    ),
-                ),
-              syntax_error,
-            );
-          }
+              modular,
+              unit,
+              counter,
+              context,
+              inspect,
+            ).then(({ loc, modular }) => cont(loc, modular));
           case "arrow_function": {
             return in_isolation(
               loc,
