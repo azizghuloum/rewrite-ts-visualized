@@ -81,8 +81,8 @@ host.readFile = (path, encoding) => {
   return readFile(path, encoding);
 };
 
-host.watchFile = (path, callback) => {
-  return watchFile(path, callback);
+host.watchFile = (path, callback, polling_interval, options) => {
+  return watchFile(path, callback, polling_interval, options);
 };
 
 const dir_watchers: { [k: string]: TS.DirectoryWatcherCallback } = {};
