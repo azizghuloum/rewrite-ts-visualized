@@ -9,7 +9,7 @@ import { Loc } from "../src/syntax-structures";
 import { core_patterns } from "../src/syntax-core-patterns";
 import { parse } from "../src/parse";
 import { pprint } from "../src/pprint";
-import { inspect } from "../src/stx-error";
+import { inspect, StxError } from "../src/stx-error";
 
 type ExampleProps = {
   code: string;
@@ -115,7 +115,19 @@ function Example({ code, onChange }: ExampleProps) {
         record({ name: "Inspect", loc, error: undefined, info: reason });
         return k();
       };
-      setTimeout(() => expand(inspect).then(({ loc }) => record({ name: "DONE", loc })), 0);
+      setTimeout(async () => {
+        try {
+          const { loc } = await expand(inspect);
+          record({ name: "DONE", loc });
+        } catch (err) {
+          if (err instanceof StxError) {
+            record(err);
+          } else {
+            console.error(err);
+            throw err;
+          }
+        }
+      }, 0);
       return my_state;
     });
   }, [code]);
