@@ -17,7 +17,7 @@ type b = a;
 ### Output Program
 
 ```typescript
-type a_5 = string;
-type b_7 = a_5;
+export type a_5 = string;
+export type b_7 = a_5;
 ```
 

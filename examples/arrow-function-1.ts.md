@@ -13,8 +13,8 @@ const h = (x) => x((x) => f(x));
 ### Output Program
 
 ```typescript
-const f_2 = (x_8) => x_8;
-const g_4 = (x_8) => f_2(x_8);
-const h_6 = (x_8) => x_8((x_11) => f_2(x_11));
+export const f_2 = (x_8) => x_8;
+export const g_4 = (x_8) => f_2(x_8);
+export const h_6 = (x_8) => x_8((x_9) => f_2(x_9));
 ```
 

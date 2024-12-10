@@ -9,7 +9,7 @@ import { Loc } from "../src/syntax-structures";
 import { core_patterns } from "../src/syntax-core-patterns";
 import { parse } from "../src/parse";
 import { pprint } from "../src/pprint";
-import { inspect, Step } from "../src/step";
+import { inspect, StxError } from "../src/stx-error";
 
 type ExampleProps = {
   code: string;
@@ -25,7 +25,14 @@ function zipper_to_view(zipper: Loc): React.ReactElement {
   );
 }
 
-type expand = (inspect: inspect) => Promise<Step>;
+type Step = {
+  name: string;
+  loc: Loc;
+  error?: string | undefined;
+  info?: any;
+};
+
+type expand = (inspect: inspect) => Promise<{ loc: Loc }>;
 
 type State = {
   prev_steps: Step[];
@@ -84,8 +91,8 @@ function StepperView({ step, step_number }: { step: Step; step_number: number })
 function Example({ code, onChange }: ExampleProps) {
   function init_state(code: string): [State, expand] {
     const patterns = core_patterns(parse);
-    const [loc, expand] = initial_step(parse(code), "example", patterns);
-    return [initial_state(loc), expand];
+    const [loc0, expand] = initial_step(parse(code), "example", patterns);
+    return [initial_state(loc0), expand];
   }
   const [state, setState] = useState(init_state(code)[0]);
   useEffect(() => {
@@ -105,10 +112,22 @@ function Example({ code, onChange }: ExampleProps) {
         });
       }
       const inspect: inspect = (loc, reason, k) => {
-        record(new Step("Inspect", loc, undefined, undefined, reason));
+        record({ name: "Inspect", loc, error: undefined, info: reason });
         return k();
       };
-      setTimeout(() => expand(inspect).then(record), 0);
+      setTimeout(async () => {
+        try {
+          const { loc } = await expand(inspect);
+          record({ name: "DONE", loc });
+        } catch (err) {
+          if (err instanceof StxError) {
+            record(err);
+          } else {
+            console.error(err);
+            throw err;
+          }
+        }
+      }, 0);
       return my_state;
     });
   }, [code]);

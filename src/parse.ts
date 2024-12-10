@@ -12,7 +12,6 @@ const pass_through: { [k in SyntaxKind]?: list_tag } = {
   [SyntaxKind.PropertyAssignment]: "pair",
   [SyntaxKind.ConditionalExpression]: "ternary_expression",
   [SyntaxKind.VariableDeclaration]: "variable_declarator",
-  [SyntaxKind.TypeAliasDeclaration]: "type_alias_declaration",
   [SyntaxKind.ExportDeclaration]: "export_declaration",
   [SyntaxKind.EmptyStatement]: "empty_statement",
   [SyntaxKind.SyntaxList]: "syntax_list",
@@ -130,9 +129,11 @@ function absurdly(node: TS.Node, src: TS.SourceFile): AST {
           ls[2].content === ";"
         ) {
           return {
-            type: "list",
-            tag: "export_statement",
-            content: [ls[0].content[0], [ls[1], [ls[2], null]]],
+            ...ls[1], // lexical_declaration
+            content: [
+              ls[0].content[0], // export keyword
+              llappend(ls[1].content, [ls[2], null]),
+            ],
           };
         } else {
           return { type: "list", tag: "ERROR", content };
@@ -215,6 +216,19 @@ function absurdly(node: TS.Node, src: TS.SourceFile): AST {
       case SyntaxKind.AsExpression: {
         assert(ls.length === 3);
         return { type: "list", tag: "binary_expression", content };
+      }
+      case SyntaxKind.TypeAliasDeclaration: {
+        assert(content !== null);
+        const [fst, rest] = content;
+        if (fst.tag === "syntax_list") {
+          return {
+            type: "list",
+            tag: "type_alias_declaration",
+            content: llappend(fst.content, rest),
+          };
+        } else {
+          return { type: "list", tag: "type_alias_declaration", content };
+        }
       }
       default:
         throw new Error(

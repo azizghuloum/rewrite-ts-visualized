@@ -6,7 +6,9 @@
   "scripts": {
     "dev": "vite",
     "test": "vitest",
-    "watch": "deno --watch --allow-all ./rtsc/watch.ts",
+    "watch": "tsc -b --watch --noEmit",
+    "rts-watch-with-deno": "deno --watch --unstable-sloppy-imports --allow-all ./rtsc/watch.ts",
+    "rts-watch": "vite-node --watch ./rtsc/watch.ts",
     "coverage": "vitest run --coverage",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
@@ -24,7 +26,7 @@
     "react-dom": "^19.0.0",
     "react-router-dom": "^7.0.2",
     "typescript": "^5.5.3",
-    "zipper": "https://github.com/azizghuloum/zipper.git"
+    "zipper": "github:azizghuloum/zipper"
   },
   "devDependencies": {
     "@eslint/js": "^9.11.1",

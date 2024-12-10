@@ -61,7 +61,7 @@ function id_to_label(
 
 export type Resolution =
   | { type: "unbound" }
-  | { type: "bound"; binding: Binding }
+  | { type: "bound"; binding: Binding; label: string }
   | { type: "error"; reason: string };
 
 export function resolve(
@@ -77,7 +77,7 @@ export function resolve(
   }
   const binding = context[label];
   if (binding) {
-    return { type: "bound", binding };
+    return { type: "bound", binding, label };
   } else {
     return { type: "error", reason: "out of context" };
   }
@@ -106,6 +106,21 @@ export function bound_id_equal(id1: STX, id2: STX): boolean {
   return id1.content === id2.content && same_marks(id1.wrap.marks, id2.wrap.marks);
 }
 
+function rib_push(
+  rib: Rib,
+  name: string,
+  marks: Marks,
+  label: string,
+  env_type: "normal_env" | "types_env",
+): Rib {
+  const env = rib[env_type];
+  const entry = env[name] ?? [];
+  return {
+    ...rib,
+    [env_type]: { ...env, [name]: [...entry, [marks, label]] },
+  };
+}
+
 export function extend_rib<S>(
   rib: Rib,
   name: string,
@@ -122,10 +137,7 @@ export function extend_rib<S>(
   }
   const label = `l${counter}`;
   const new_counter = counter + 1;
-  const new_rib: Rib = {
-    ...rib,
-    [env_type]: { ...env, [name]: [...entry, [marks, label]] },
-  };
+  const new_rib = rib_push(rib, name, marks, label, env_type);
   return sk({ rib: new_rib, counter: new_counter, label });
 }
 
@@ -289,9 +301,43 @@ export function init_top_level(
   };
 }
 
-export function extend_unit(unit: CompilationUnit, rib_id: string, rib: Rib): CompilationUnit {
-  return {
-    cu_id: unit.cu_id,
-    store: { ...unit.store, [rib_id]: rib },
-  };
+export type lexical_extension =
+  | { extensible: true; rib_id: string; rib: Rib }
+  | { extensible: false };
+
+export type modular_extension =
+  | { extensible: true; implicit: Rib; explicit: Rib }
+  | { extensible: false };
+
+export function extend_unit(unit: CompilationUnit, extension: lexical_extension): CompilationUnit {
+  if (extension.extensible) {
+    const { rib_id, rib } = extension;
+    return {
+      cu_id: unit.cu_id,
+      store: { ...unit.store, [rib_id]: rib },
+    };
+  } else {
+    return unit;
+  }
+}
+
+export function extend_modular(
+  modular: modular_extension,
+  exporting: boolean,
+  name: string,
+  marks: Marks,
+  label: string,
+  env_type: "types_env" | "normal_env",
+): modular_extension {
+  if (modular.extensible) {
+    const { implicit, explicit } = modular;
+    return {
+      extensible: true,
+      implicit: rib_push(implicit, name, marks, label, env_type),
+      explicit: exporting ? rib_push(explicit, name, marks, label, env_type) : explicit,
+    };
+  } else {
+    assert(!exporting);
+    return modular;
+  }
 }

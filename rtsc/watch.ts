@@ -2,7 +2,7 @@
 
 import { basename, dirname, join } from "node:path";
 import TS from "typescript";
-import {} from "./testing-file-extensions.ts";
+import {} from "./testing-file-extensions.rts.ts";
 import { LibraryManager } from "../src/library-manager.ts";
 
 const library_manager = new LibraryManager();
@@ -19,7 +19,7 @@ const watch_options: TS.WatchOptions = {};
 const diagnostics_reporter: TS.DiagnosticReporter = (diagnostics) => {
   const {
     code,
-    file: _file,
+    file: file,
     length,
     category,
     messageText,
@@ -30,12 +30,13 @@ const diagnostics_reporter: TS.DiagnosticReporter = (diagnostics) => {
     source,
   } = diagnostics;
   console.log({
+    file: file?.fileName,
     code,
     length,
     category,
     messageText,
     start,
-    relatedInformation,
+    //relatedInformation,
     reportsDeprecated,
     reportsUnnecessary,
     source,
@@ -59,7 +60,7 @@ const watchFile = host.watchFile;
 const watchDirectory = host.watchDirectory;
 
 function check_path(path: string) {
-  const suffix = ".ts";
+  const suffix = ".rts.ts";
   if (path.endsWith(suffix)) {
     const module_dir = dirname(path);
     const module_name = basename(path, suffix) + ".rts";
@@ -80,8 +81,8 @@ host.readFile = (path, encoding) => {
   return readFile(path, encoding);
 };
 
-host.watchFile = (path, callback) => {
-  return watchFile(path, callback);
+host.watchFile = (path, callback, polling_interval, options) => {
+  return watchFile(path, callback, polling_interval, options);
 };
 
 const dir_watchers: { [k: string]: TS.DirectoryWatcherCallback } = {};
