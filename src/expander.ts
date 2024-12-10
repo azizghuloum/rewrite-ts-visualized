@@ -26,6 +26,7 @@ import {
 } from "./zipper";
 import { apply_syntax_rules, core_handlers } from "./syntax-core-patterns";
 import { debug, inspect, in_isolation, syntax_error } from "./stx-error";
+import { array_to_ll } from "./llhelpers";
 
 export function initial_step(
   ast: AST,
@@ -224,31 +225,50 @@ async function expand_program(
   inspect: inspect,
   lexical: lexical_extension,
 ): Promise<{ loc: Loc; unit: CompilationUnit; context: Context; modular: modular_extension }> {
+  async function expand(loc: Loc) {
+    return preexpand_body(loc, lexical, unit, context, counter, "value", inspect).then(
+      ({ loc, lexical, counter, context, unit }) => {
+        // rib is filled
+        // context is filled also
+        const new_unit = extend_unit(unit, lexical);
+        const modular: modular_extension = {
+          extensible: true,
+          explicit: { type: "rib", normal_env: {}, types_env: {} },
+          implicit: { type: "rib", normal_env: {}, types_env: {} },
+        };
+        return inspect(loc, "After preexpanding the program", () =>
+          postexpand_program(loc, modular, new_unit, counter, context, inspect).then(
+            ({ loc, modular }) => {
+              return { loc, unit: new_unit, context, modular };
+            },
+          ),
+        );
+      },
+    );
+  }
+  async function expand_empty_program(loc: Loc) {
+    const empty_rib: Rib = { type: "rib", normal_env: {}, types_env: {} };
+    const modular: modular_extension = {
+      extensible: true,
+      implicit: empty_rib,
+      explicit: empty_rib,
+    };
+    const empty_export: STX = {
+      type: "list",
+      tag: "export_declaration",
+      wrap: empty_wrap,
+      content: array_to_ll([export_keyword, lt_brace_keyword, rt_brace_keyword]),
+    };
+    const empty_program: STX = {
+      type: "list",
+      tag: "program",
+      wrap: empty_wrap,
+      content: array_to_ll([empty_export]),
+    };
+    return { loc: mkzipper(empty_program), unit, context, modular };
+  }
   if (loc.t.tag !== "program") syntax_error(loc, "expected a program");
-  const fst = go_down(
-    loc,
-    (x) => x,
-    (loc) => syntax_error(loc, "empty program?"),
-  );
-  return preexpand_body(fst, lexical, unit, context, counter, "value", inspect).then(
-    ({ loc, lexical, counter, context, unit }) => {
-      // rib is filled
-      // context is filled also
-      const new_unit = extend_unit(unit, lexical);
-      const modular: modular_extension = {
-        extensible: true,
-        explicit: { type: "rib", normal_env: {}, types_env: {} },
-        implicit: { type: "rib", normal_env: {}, types_env: {} },
-      };
-      return inspect(loc, "After preexpanding the program", () =>
-        postexpand_program(loc, modular, new_unit, counter, context, inspect).then(
-          ({ loc, modular }) => {
-            return { loc, unit: new_unit, context, modular };
-          },
-        ),
-      );
-    },
-  );
+  return go_down(loc, expand, expand_empty_program);
 }
 
 async function preexpand_body(
@@ -978,11 +998,27 @@ function expand_expr({
   );
 }
 
+const empty_wrap: Wrap = { marks: null, subst: null };
+
 const export_keyword: STX = {
   type: "atom",
   tag: "other",
   content: "export",
-  wrap: { marks: null, subst: null },
+  wrap: empty_wrap,
+};
+
+const lt_brace_keyword: STX = {
+  type: "atom",
+  tag: "other",
+  content: "{",
+  wrap: empty_wrap,
+};
+
+const rt_brace_keyword: STX = {
+  type: "atom",
+  tag: "other",
+  content: "}",
+  wrap: empty_wrap,
 };
 
 function insert_export_keyword({ loc, modular }: { loc: Loc; modular: modular_extension }): {
