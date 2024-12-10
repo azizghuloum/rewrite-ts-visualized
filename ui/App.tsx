@@ -184,15 +184,13 @@ function Example({ code, onChange }: ExampleProps) {
 }
 
 const sample_program = `
-/* c is for curry */
 define_rewrite_rules(
-  [c, c(() => {body}),   (() => {body})()],
-  [c, c(() => expr),     expr],
-  [c, c((a, rest) => e), (a) => c((rest) => e)],
-  [c, c((a) => e),       (a) => e],
+  [where, expr.where(a = b, rest), ((a) => expr.where(rest))(b)],
+  [where, expr.where(a = b),       ((a) => expr)(b)],
+  [where, expr.where(),            expr],
 );
-
-const curried = c((a, b, c, d) => a + b + c + d);
+  
+console.log(x + y).where(x = 1, y = x + 2);
 `;
 
 function Expander() {
