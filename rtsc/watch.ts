@@ -2,7 +2,7 @@
 
 import { basename, dirname, join } from "node:path";
 import TS from "typescript";
-import {} from "./testing-file-extensions.ts";
+import {} from "./testing-file-extensions.rts.ts";
 import { LibraryManager } from "../src/library-manager.ts";
 
 const library_manager = new LibraryManager();
@@ -60,7 +60,7 @@ const watchFile = host.watchFile;
 const watchDirectory = host.watchDirectory;
 
 function check_path(path: string) {
-  const suffix = ".ts";
+  const suffix = ".rts.ts";
   if (path.endsWith(suffix)) {
     const module_dir = dirname(path);
     const module_name = basename(path, suffix) + ".rts";

@@ -1,17 +1,17 @@
-/* */
-
 import { assert } from "./assert";
-import fs from "node:fs/promises";
+import fs, { mkdir, writeFile } from "node:fs/promises";
 import { dirname, basename, join } from "node:path";
 import { mtime } from "./fs-helpers";
 import { parse } from "./parse";
 import { core_patterns } from "./syntax-core-patterns";
 import { initial_step } from "./expander";
 import { pprint } from "./pprint";
+import { generate_proxy_code } from "./proxy-code";
 
 type module_state =
   | { type: "initial" }
   | { type: "stale"; cid: string; pkg: Package }
+  | { type: "fresh" }
   | { type: "error"; reason: string };
 
 class Module {
@@ -31,6 +31,8 @@ class Module {
         return this.initialize().then(() => this.ensureUpToDate());
       case "stale":
         return this.recompile().then(() => this.ensureUpToDate());
+      case "fresh":
+        return;
       default: {
         throw new Error(`ensureUpToDate: unhandled state type ${this.state.type}`);
       }
@@ -39,6 +41,18 @@ class Module {
 
   private get_json_path(): string {
     return join(dirname(this.path), ".rts", basename(this.path) + ".json");
+  }
+
+  private get_generated_code_absolute_path(): string {
+    return join(dirname(this.path), ".rts", basename(this.path) + ".ts");
+  }
+
+  private get_generated_code_relative_path(): string {
+    return "./.rts/" + basename(this.path) + ".ts";
+  }
+
+  private get_proxy_path(): string {
+    return this.path + ".ts";
   }
 
   async initialize() {
@@ -54,7 +68,8 @@ class Module {
     if (my_mtime >= (json_mtime ?? 0)) {
       this.state = { type: "stale", cid, pkg };
     } else {
-      throw new Error("TODO: check dependencies");
+      console.error("TODO: check dependencies");
+      this.state = { type: "fresh" };
     }
   }
 
@@ -64,10 +79,19 @@ class Module {
     const code = await fs.readFile(this.path, { encoding: "utf-8" });
     const patterns = core_patterns(parse);
     const [_loc0, expand] = initial_step(parse(code), this.state.cid, patterns);
-    const { loc, unit, context, modular } = await expand((_loc, _reason, k) => k());
-    console.log(await pprint(loc));
-    console.log(modular);
-    throw new Error("done recompiling");
+    const { loc, unit: _unit, context, modular } = await expand((_loc, _reason, k) => k());
+    const proxy_code = generate_proxy_code(
+      this.get_generated_code_relative_path(),
+      modular,
+      context,
+    );
+    const json_content = { cid: this.state.cid };
+    const code_path = this.get_generated_code_absolute_path();
+    await mkdir(dirname(code_path), { recursive: true });
+    await writeFile(code_path, await pprint(loc));
+    await writeFile(this.get_proxy_path(), proxy_code);
+    await writeFile(this.get_json_path(), JSON.stringify(json_content));
+    this.state = { type: "fresh" };
   }
 }
 
