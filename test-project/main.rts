@@ -1,0 +1,3 @@
+import { x } from "./mod.rts";
+
+console.log(x);

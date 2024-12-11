@@ -27,6 +27,7 @@ import {
 import { apply_syntax_rules, core_handlers } from "./syntax-core-patterns";
 import { debug, inspect, in_isolation, syntax_error } from "./stx-error";
 import { array_to_ll } from "./llhelpers";
+import { gen_binding, goodies, preexpand_list_handlers } from "./preexpand-handlers";
 
 export function initial_step(
   ast: AST,
@@ -45,176 +46,6 @@ export function initial_step(
     initial_loc,
     (inspect: inspect) => expand_program(initial_loc, unit, context, counter, inspect, lexical),
   ];
-}
-
-type goodies = {
-  loc: Loc;
-  lexical: lexical_extension;
-  context: Context;
-  counter: number;
-  unit: CompilationUnit;
-};
-
-function gen_binding({
-  loc,
-  lexical,
-  counter,
-  context,
-  unit,
-  sort,
-}: goodies & { sort: "type" | "value" }): Omit<goodies, "loc"> & { name: string } {
-  const stx = loc.t;
-  assert(stx.type === "atom" && stx.tag === "identifier", stx);
-  assert(lexical.extensible);
-  const { rib, rib_id } = lexical;
-  const env_type = { type: "types_env" as const, value: "normal_env" as const }[sort];
-  return extend_rib(
-    rib,
-    stx.content,
-    stx.wrap.marks,
-    counter,
-    env_type,
-    ({ rib, counter, label }) =>
-      extend_context_lexical(
-        context,
-        counter,
-        label,
-        { type: "type" as const, value: "lexical" as const }[sort],
-        stx.content,
-        ({ context, counter, name }) => ({
-          lexical: { extensible: true, rib, rib_id },
-          context,
-          counter,
-          name,
-          unit,
-        }),
-      ),
-    (reason) => syntax_error(loc, reason),
-  );
-}
-
-function extract_lexical_declaration_bindings({
-  loc,
-  lexical,
-  context,
-  counter,
-  unit,
-}: goodies): goodies {
-  function after_vars({ loc, lexical, context, counter, unit }: goodies): goodies {
-    if (loc.t.type === "atom" && loc.t.tag === "other") {
-      switch (loc.t.content) {
-        case ";":
-          return go_right(
-            loc,
-            (loc) => syntax_error(loc, "expected nothing after semicolon"),
-            (loc) => ({ loc, lexical, context, counter, unit }),
-          );
-        case ",":
-          return go_right(
-            loc,
-            (loc) => get_vars(loc, lexical, context, counter),
-            (loc) => syntax_error(loc, "expected variable after ','"),
-          );
-      }
-    }
-    syntax_error(loc, "expected a ',' or a ';'");
-  }
-
-  function get_vars(
-    ls: Loc,
-    lexical: lexical_extension,
-    context: Context,
-    counter: number,
-  ): goodies {
-    if (ls.t.type === "list" && ls.t.tag === "variable_declarator") {
-      return go_down(
-        ls,
-        (loc) => {
-          const goodies = gen_binding({
-            loc,
-            lexical,
-            counter,
-            context,
-            unit,
-            sort: "value",
-          });
-          return go_right(
-            ls,
-            (loc) => after_vars({ ...goodies, loc }),
-            (loc) => ({ ...goodies, loc }),
-          );
-        },
-        syntax_error,
-      );
-    } else {
-      syntax_error(ls, `expected a variable declaration; found ${ls.t.tag}`);
-    }
-  }
-
-  function handle_let_or_const(loc: Loc) {
-    switch (loc.t.content) {
-      case "const":
-      case "let":
-        return go_right(
-          loc,
-          (loc) => get_vars(loc, lexical, context, counter),
-          (loc) => syntax_error(loc, "no bindings after keyword"),
-        );
-      default:
-        syntax_error(loc, "expected keyword const or let");
-    }
-  }
-
-  return go_down(
-    loc,
-    (loc) => {
-      switch (loc.t.content) {
-        case "const":
-        case "let":
-          return handle_let_or_const(loc);
-        case "export":
-          return go_right(loc, handle_let_or_const, syntax_error);
-        default:
-          syntax_error(loc, "expected keyword const or let");
-      }
-    },
-    syntax_error,
-  );
-}
-
-function extract_type_alias_declaration_bindings({
-  loc,
-  lexical,
-  context,
-  counter,
-  unit,
-}: goodies): goodies {
-  function after_type(loc: Loc) {
-    assert(loc.t.type === "atom" && loc.t.tag === "identifier", "expected an identifier");
-    const gs = gen_binding({ loc, lexical, counter, context, unit, sort: "type" });
-    return { ...gs, loc: go_up(loc) };
-  }
-  return go_down(
-    loc,
-    (loc) => {
-      switch (loc.t.content) {
-        case "type":
-          return go_right(loc, after_type, syntax_error);
-        case "export":
-          return go_right(
-            loc,
-            (loc) => {
-              assert(loc.t.content === "type", "expected 'type' keyword");
-              return go_right(loc, after_type, syntax_error);
-            },
-            syntax_error,
-          );
-        default:
-          syntax_error(loc);
-      }
-    },
-    syntax_error,
-  );
 }
 
 async function expand_program(
@@ -381,9 +212,9 @@ const list_handlers_table: { [tag in list_tag]: "descend" | "stop" | "todo" } = 
   array_pattern: "todo",
   constraint: "todo",
   import: "todo",
+  import_declaration: "stop",
   import_clause: "todo",
   import_specifier: "todo",
-  import_statement: "todo",
   namespace_import: "todo",
   named_imports: "todo",
   instantiation_expression: "todo",
@@ -489,7 +320,7 @@ async function preexpand_forms(
   function descend(loc: Loc): Promise<goodies> {
     return go_down(loc, (loc) => h(find_form(loc)), syntax_error);
   }
-  function h(ffrv: ffrv): Promise<goodies> {
+  async function h(ffrv: ffrv): Promise<goodies> {
     const loc = ffrv.loc;
     switch (ffrv.type) {
       case "done":
@@ -546,53 +377,18 @@ async function preexpand_forms(
       }
       case "list": {
         assert(loc.t.type === "list");
+        const h = preexpand_list_handlers[loc.t.tag];
+        if (h) {
+          return h({ loc, lexical, counter, unit, context }).then(
+            ({ loc, lexical, counter, unit, context }) =>
+              go_next(
+                loc,
+                (loc) => preexpand_forms(loc, lexical, counter, unit, context, sort, inspect),
+                (loc) => Promise.resolve({ loc, lexical, counter, unit, context }),
+              ),
+          );
+        }
         switch (loc.t.tag) {
-          case "lexical_declaration": {
-            const goodies = extract_lexical_declaration_bindings({
-              loc,
-              lexical,
-              context,
-              counter,
-              unit,
-            });
-            return go_next(
-              goodies.loc,
-              (loc) =>
-                preexpand_forms(
-                  loc,
-                  goodies.lexical,
-                  goodies.counter,
-                  goodies.unit,
-                  goodies.context,
-                  sort,
-                  inspect,
-                ),
-              (loc) => Promise.resolve({ ...goodies, loc }),
-            );
-          }
-          case "type_alias_declaration": {
-            const goodies = extract_type_alias_declaration_bindings({
-              loc,
-              lexical,
-              context,
-              counter,
-              unit,
-            });
-            return go_next(
-              goodies.loc,
-              (loc) =>
-                preexpand_forms(
-                  loc,
-                  goodies.lexical,
-                  goodies.counter,
-                  goodies.unit,
-                  goodies.context,
-                  sort,
-                  inspect,
-                ),
-              (loc) => Promise.resolve({ ...goodies, loc }),
-            );
-          }
           case "arrow_function":
             return next(loc);
           case "member_expression":
@@ -692,7 +488,6 @@ function itself(loc: Loc): Loc {
 
 function extract_parameters(goodies: goodies): goodies {
   //
-
   function tail(goodies: goodies): goodies {
     const loc = goodies.loc;
     switch (loc.t.type) {

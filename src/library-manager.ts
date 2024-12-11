@@ -57,7 +57,7 @@ class Module {
 
   async initialize() {
     assert(this.state.type === "initial");
-    console.log("initializing ...");
+    console.log(`initializing ${this.path}`);
     const [pkg, base] = await this.library_manager.findPackage(this.path);
     const cid = `${base} ${pkg.name} ${pkg.version}`;
     const json_path = this.get_json_path();

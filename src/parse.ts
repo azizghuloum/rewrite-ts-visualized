@@ -14,6 +14,10 @@ const pass_through: { [k in SyntaxKind]?: list_tag } = {
   [SyntaxKind.VariableDeclaration]: "variable_declarator",
   [SyntaxKind.ExportDeclaration]: "export_declaration",
   [SyntaxKind.EmptyStatement]: "empty_statement",
+  [SyntaxKind.ImportSpecifier]: "import_specifier",
+  [SyntaxKind.ImportClause]: "import_clause",
+  [SyntaxKind.ImportDeclaration]: "import_declaration",
+  [SyntaxKind.NamespaceImport]: "namespace_import",
   [SyntaxKind.SyntaxList]: "syntax_list",
 };
 
@@ -22,6 +26,7 @@ const splice_middle: { [k in SyntaxKind]?: list_tag } = {
   [SyntaxKind.ArrayLiteralExpression]: "array",
   [SyntaxKind.Block]: "statement_block",
   [SyntaxKind.NamedExports]: "named_exports",
+  [SyntaxKind.NamedImports]: "named_imports",
 };
 
 function left_associate(op: string, [head, tail]: [AST, LL<AST>]): AST {
