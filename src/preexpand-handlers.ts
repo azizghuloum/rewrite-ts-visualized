@@ -13,6 +13,22 @@ export type goodies = {
   unit: CompilationUnit;
 };
 
+function skip_optional(loc: Loc, kwd: string): Loc {
+  if (loc.t.content === kwd) {
+    return go_right(loc, (loc) => loc, syntax_error);
+  } else {
+    return loc;
+  }
+}
+
+function skip_required(loc: Loc, kwd_options: string[]): Loc {
+  if (loc.t.type === "atom" && kwd_options.includes(loc.t.content)) {
+    return go_right(loc, (loc) => loc, syntax_error);
+  } else {
+    syntax_error(loc, `expected '${kwd_options}'`);
+  }
+}
+
 export function gen_binding({
   loc,
   lexical,
@@ -108,37 +124,20 @@ function preexpand_lexical_declaration({
     }
   }
 
-  function handle_let_or_const(loc: Loc) {
-    switch (loc.t.content) {
-      case "const":
-      case "let":
-        return go_right(
-          loc,
-          (loc) => get_vars(loc, lexical, context, counter),
-          (loc) => syntax_error(loc, "no bindings after keyword"),
-        );
-      default:
-        syntax_error(loc, "expected keyword const or let");
-    }
-  }
-
   function main(loc: Loc) {
     return go_down(
       loc,
-      (loc) => {
-        switch (loc.t.content) {
-          case "const":
-          case "let":
-            return handle_let_or_const(loc);
-          case "export":
-            return go_right(loc, handle_let_or_const, syntax_error);
-          default:
-            syntax_error(loc, "expected keyword const or let");
-        }
-      },
+      (loc) =>
+        get_vars(
+          skip_required(skip_optional(loc, "export"), ["let", "const"]),
+          lexical,
+          context,
+          counter,
+        ),
       syntax_error,
     );
   }
+
   return Promise.resolve(main(loc));
 }
 
@@ -157,23 +156,7 @@ function preexpand_type_alias_declaration({
   function main() {
     return go_down(
       loc,
-      (loc) => {
-        switch (loc.t.content) {
-          case "type":
-            return go_right(loc, after_type, syntax_error);
-          case "export":
-            return go_right(
-              loc,
-              (loc) => {
-                assert(loc.t.content === "type", "expected 'type' keyword");
-                return go_right(loc, after_type, syntax_error);
-              },
-              syntax_error,
-            );
-          default:
-            syntax_error(loc);
-        }
-      },
+      (loc) => after_type(skip_required(skip_optional(loc, "export"), ["type"])),
       syntax_error,
     );
   }
