@@ -9,7 +9,8 @@ import { Loc } from "../src/syntax-structures";
 import { core_patterns } from "../src/syntax-core-patterns";
 import { parse } from "../src/parse";
 import { pprint } from "../src/pprint";
-import { inspect, StxError } from "../src/stx-error";
+import { StxError, syntax_error } from "../src/stx-error";
+import { preexpand_helpers } from "../src/preexpand-helpers";
 
 type ExampleProps = {
   code: string;
@@ -31,8 +32,6 @@ type Step = {
   error?: string | undefined;
   info?: any;
 };
-
-type expand = (inspect: inspect) => Promise<{ loc: Loc }>;
 
 type State = {
   prev_steps: Step[];
@@ -89,6 +88,7 @@ function StepperView({ step, step_number }: { step: Step; step_number: number })
 }
 
 function Example({ code, onChange }: ExampleProps) {
+  type expand = (helpers: preexpand_helpers) => Promise<{ loc: Loc }>;
   function init_state(code: string): [State, expand] {
     const patterns = core_patterns(parse);
     const [loc0, expand] = initial_step(parse(code), "example", patterns);
@@ -111,13 +111,20 @@ function Example({ code, onChange }: ExampleProps) {
           };
         });
       }
-      const inspect: inspect = (loc, reason, k) => {
-        record({ name: "Inspect", loc, error: undefined, info: reason });
-        return k();
+      const helpers: preexpand_helpers = {
+        manager: {
+          resolve_import(loc) {
+            syntax_error(loc, `import is not supported in gui`);
+          },
+        },
+        inspect(loc, reason, k) {
+          record({ name: "Inspect", loc, error: undefined, info: reason });
+          return k();
+        },
       };
       setTimeout(async () => {
         try {
-          const { loc } = await expand(inspect);
+          const { loc } = await expand(helpers);
           record({ name: "DONE", loc });
         } catch (err) {
           if (err instanceof StxError) {

@@ -6,8 +6,6 @@ import {
   extend_unit,
   init_top_level,
   resolve,
-  extend_rib,
-  extend_context_lexical,
   CorePatterns,
   push_wrap,
   lexical_extension,
@@ -25,9 +23,10 @@ import {
   wrap_loc,
 } from "./zipper";
 import { apply_syntax_rules, core_handlers } from "./syntax-core-patterns";
-import { debug, inspect, in_isolation, syntax_error } from "./stx-error";
+import { debug, in_isolation, syntax_error } from "./stx-error";
 import { array_to_ll } from "./llhelpers";
 import { gen_binding, goodies, preexpand_list_handlers } from "./preexpand-handlers";
+import { preexpand_helpers } from "./preexpand-helpers";
 
 export function initial_step(
   ast: AST,
@@ -36,7 +35,7 @@ export function initial_step(
 ): [
   Loc,
   (
-    inspect: inspect,
+    helpers: preexpand_helpers,
   ) => Promise<{ loc: Loc; unit: CompilationUnit; context: Context; modular: modular_extension }>,
 ] {
   const { stx, counter, unit, context, rib, rib_id } = init_top_level(ast, cu_id, patterns);
@@ -44,7 +43,8 @@ export function initial_step(
   const lexical: lexical_extension = { extensible: true, rib, rib_id };
   return [
     initial_loc,
-    (inspect: inspect) => expand_program(initial_loc, unit, context, counter, inspect, lexical),
+    (helpers: preexpand_helpers) =>
+      expand_program(initial_loc, unit, context, counter, lexical, helpers),
   ];
 }
 
@@ -53,11 +53,11 @@ async function expand_program(
   unit: CompilationUnit,
   context: Context,
   counter: number,
-  inspect: inspect,
   lexical: lexical_extension,
+  helpers: preexpand_helpers,
 ): Promise<{ loc: Loc; unit: CompilationUnit; context: Context; modular: modular_extension }> {
   async function expand(loc: Loc) {
-    return preexpand_body(loc, lexical, unit, context, counter, "value", inspect).then(
+    return preexpand_body(loc, lexical, unit, context, counter, "value", helpers).then(
       ({ loc, lexical, counter, context, unit }) => {
         // rib is filled
         // context is filled also
@@ -67,8 +67,8 @@ async function expand_program(
           explicit: { type: "rib", normal_env: {}, types_env: {} },
           implicit: { type: "rib", normal_env: {}, types_env: {} },
         };
-        return inspect(loc, "After preexpanding the program", () =>
-          postexpand_program(loc, modular, new_unit, counter, context, inspect).then(
+        return helpers.inspect(loc, "After preexpanding the program", () =>
+          postexpand_program(loc, modular, new_unit, counter, context, helpers).then(
             ({ loc, modular }) => {
               return { loc, unit: new_unit, context, modular };
             },
@@ -77,7 +77,7 @@ async function expand_program(
       },
     );
   }
-  async function expand_empty_program(loc: Loc) {
+  async function expand_empty_program() {
     const empty_rib: Rib = { type: "rib", normal_env: {}, types_env: {} };
     const modular: modular_extension = {
       extensible: true,
@@ -109,15 +109,15 @@ async function preexpand_body(
   context: Context,
   counter: number,
   sort: "type" | "value",
-  inspect: inspect,
+  helpers: preexpand_helpers,
 ): Promise<goodies> {
   return in_isolation(
     loc,
-    (loc) => preexpand_forms(loc, lexical, counter, unit, context, sort, inspect),
+    (loc) => preexpand_forms(loc, lexical, counter, unit, context, sort, helpers),
     (loc, { lexical, context, counter, unit }) =>
       go_next(
         loc,
-        (loc) => preexpand_body(loc, lexical, unit, context, counter, sort, inspect),
+        (loc) => preexpand_body(loc, lexical, unit, context, counter, sort, helpers),
         (loc) => Promise.resolve({ loc, lexical, context, counter, unit }),
       ),
   );
@@ -130,7 +130,7 @@ async function preexpand_body_curly(
   context: Context,
   counter: number,
   sort: "type" | "value",
-  inspect: inspect,
+  helpers: preexpand_helpers,
 ): Promise<goodies> {
   if (loc.t.type === "atom" && loc.t.tag === "other" && loc.t.content === "}") {
     return go_right(loc, syntax_error, () =>
@@ -145,11 +145,11 @@ async function preexpand_body_curly(
   }
   return in_isolation(
     loc,
-    (loc) => preexpand_forms(loc, lexical, counter, unit, context, sort, inspect),
+    (loc) => preexpand_forms(loc, lexical, counter, unit, context, sort, helpers),
     (loc, { lexical, context, counter, unit }) => {
       return go_right(
         loc,
-        (loc) => preexpand_body_curly(loc, lexical, unit, context, counter, sort, inspect),
+        (loc) => preexpand_body_curly(loc, lexical, unit, context, counter, sort, helpers),
         (loc) => syntax_error(loc, "no right"),
       );
     },
@@ -239,7 +239,7 @@ async function preexpand_block(
   unit: CompilationUnit,
   context: Context,
   sort: "type" | "value",
-  inspect: inspect,
+  helpers: preexpand_helpers,
 ): Promise<goodies> {
   assert(loc.t.type === "list" && loc.t.tag === "statement_block");
   const bodies = go_down(loc, itself, (loc) => syntax_error(loc, "no bodies"));
@@ -252,7 +252,7 @@ async function preexpand_block(
     context,
     counter,
     sort,
-    inspect,
+    helpers,
   );
   assert(gs.loc.t.type === "list" && gs.loc.t.tag === "statement_block");
   return gs;
@@ -265,17 +265,17 @@ async function expand_concise_body(
   unit: CompilationUnit,
   context: Context,
   sort: "type" | "value",
-  inspect: inspect,
+  helpers: preexpand_helpers,
 ): Promise<{ loc: Loc }> {
   const gs = await (loc.t.type === "list" && loc.t.tag === "statement_block"
-    ? preexpand_block(loc, lexical, counter, unit, context, sort, inspect).then(({ loc, ...gs }) =>
+    ? preexpand_block(loc, lexical, counter, unit, context, sort, helpers).then(({ loc, ...gs }) =>
         go_down(
           loc,
           (loc) => ({ ...gs, loc }),
           (loc) => debug(loc, "???"),
         ),
       )
-    : preexpand_forms(loc, lexical, counter, unit, context, sort, inspect));
+    : preexpand_forms(loc, lexical, counter, unit, context, sort, helpers));
   const new_unit = extend_unit(gs.unit, gs.lexical);
   return postexpand_body(
     gs.loc,
@@ -284,7 +284,7 @@ async function expand_concise_body(
     gs.counter,
     gs.context,
     sort,
-    inspect,
+    helpers,
   );
 }
 
@@ -303,7 +303,7 @@ async function preexpand_forms(
   unit: CompilationUnit,
   context: Context,
   sort: "type" | "value",
-  inspect: inspect,
+  helpers: preexpand_helpers,
 ): Promise<goodies> {
   function done(loc: Loc): Promise<goodies> {
     return Promise.resolve({
@@ -341,24 +341,24 @@ async function preexpand_forms(
                 return next(loc);
               case "core_syntax": {
                 const { name } = binding;
-                return inspect(loc, "core form", () =>
+                return helpers.inspect(loc, "core form", () =>
                   handle_core_syntax(loc, name, context, unit, counter, lexical).then(
                     ({ loc, counter, unit, context, lexical }) =>
-                      inspect(loc, `core output`, () =>
-                        preexpand_forms(loc, lexical, counter, unit, context, sort, inspect),
+                      helpers.inspect(loc, `core output`, () =>
+                        preexpand_forms(loc, lexical, counter, unit, context, sort, helpers),
                       ),
                   ),
                 );
               }
               case "syntax_rules_transformer": {
                 const { clauses } = binding;
-                return inspect(loc, `transformer form`, () =>
+                return helpers.inspect(loc, `transformer form`, () =>
                   apply_syntax_rules(loc, clauses, unit, counter).then(({ loc, counter }) => {
                     const rewrapped = lexical.extensible
                       ? rewrap(loc, lexical.rib_id, unit.cu_id)
                       : loc;
-                    return inspect(rewrapped, `transformer output`, () =>
-                      preexpand_forms(rewrapped, lexical, counter, unit, context, sort, inspect),
+                    return helpers.inspect(rewrapped, `transformer output`, () =>
+                      preexpand_forms(rewrapped, lexical, counter, unit, context, sort, helpers),
                     );
                   }),
                 );
@@ -379,11 +379,11 @@ async function preexpand_forms(
         assert(loc.t.type === "list");
         const h = preexpand_list_handlers[loc.t.tag];
         if (h) {
-          return h({ loc, lexical, counter, unit, context }).then(
+          return h({ loc, lexical, counter, unit, context }, helpers).then(
             ({ loc, lexical, counter, unit, context }) =>
               go_next(
                 loc,
-                (loc) => preexpand_forms(loc, lexical, counter, unit, context, sort, inspect),
+                (loc) => preexpand_forms(loc, lexical, counter, unit, context, sort, helpers),
                 (loc) => Promise.resolve({ loc, lexical, counter, unit, context }),
               ),
           );
@@ -470,11 +470,11 @@ function postexpand_program(
   unit: CompilationUnit,
   counter: number,
   context: Context,
-  inspect: inspect,
+  helpers: preexpand_helpers,
 ): Promise<{ loc: Loc; modular: modular_extension }> {
   assert(loc.t.tag === "program");
   return go_down(loc, (loc) =>
-    postexpand_body(loc, modular, unit, counter, context, "value", inspect),
+    postexpand_body(loc, modular, unit, counter, context, "value", helpers),
   );
 }
 
@@ -572,7 +572,7 @@ function expand_arrow_function(
   counter: number,
   context: Context,
   unit: CompilationUnit,
-  inspect: inspect,
+  helpers: preexpand_helpers,
 ): Promise<{ loc: Loc }> {
   return go_down(
     loc,
@@ -600,7 +600,7 @@ function expand_arrow_function(
             new_unit,
             pgs.context,
             "value",
-            inspect,
+            helpers,
           );
         },
         (loc) => ({ loc }),
@@ -615,7 +615,7 @@ function expand_type_parameters(
   unit: CompilationUnit,
   orig_counter: number,
   context: Context,
-  inspect: inspect,
+  helpers: preexpand_helpers,
 ): Promise<goodies> {
   type T = Promise<goodies>;
   function post_after_var({ loc, lexical, counter, unit, context }: goodies): T {
@@ -655,7 +655,7 @@ function expand_type_parameters(
                 unit,
                 context,
                 sort: "type",
-                inspect,
+                helpers,
               }).then(({ loc, counter, unit, context }) =>
                 go_right(loc, syntax_error, () =>
                   post_after_var({ loc: go_up(loc), lexical, counter, unit, context }),
@@ -758,14 +758,14 @@ function expand_expr({
   unit,
   context,
   sort,
-  inspect,
+  helpers,
 }: {
   loc: Loc;
   unit: CompilationUnit;
   counter: number;
   context: Context;
   sort: "type" | "value";
-  inspect: inspect;
+  helpers: preexpand_helpers;
 }): Promise<Omit<goodies, "lexical" | "modular">> {
   return in_isolation(
     loc,
@@ -777,9 +777,9 @@ function expand_expr({
         unit,
         context,
         sort,
-        inspect,
+        helpers,
       ).then(({ loc, unit, counter, context }) =>
-        postexpand_body(loc, { extensible: false }, unit, counter, context, sort, inspect).then(
+        postexpand_body(loc, { extensible: false }, unit, counter, context, sort, helpers).then(
           ({ loc }) => ({
             loc,
             unit,
@@ -843,7 +843,7 @@ async function postexpand_type_alias_declaration(
   unit: CompilationUnit,
   counter: number,
   context: Context,
-  inspect: inspect,
+  helpers: preexpand_helpers,
 ): Promise<{ loc: Loc; modular: modular_extension }> {
   async function do_after_equal(
     loc: Loc,
@@ -857,7 +857,7 @@ async function postexpand_type_alias_declaration(
       unit,
       context,
       sort: "type",
-      inspect,
+      helpers,
     }).then(({ loc, unit: _unit, counter: _counter, context: _context }) => {
       return go_right(
         loc,
@@ -879,7 +879,7 @@ async function postexpand_type_alias_declaration(
       case "=":
         return go_right(loc, (loc) => do_after_equal(loc, counter, unit, context));
       case "<":
-        return expand_type_parameters(loc, unit, counter, context, inspect).then(
+        return expand_type_parameters(loc, unit, counter, context, helpers).then(
           ({ loc, counter, unit, context, lexical }) => {
             assert(loc.t.content === ">");
             assert(lexical.extensible);
@@ -951,14 +951,14 @@ async function postexpand_lexical_declaration(
   unit: CompilationUnit,
   counter: number,
   context: Context,
-  inspect: inspect,
+  helpers: preexpand_helpers,
 ): Promise<{ loc: Loc; modular: modular_extension }> {
   async function handle_value_initializer(loc: Loc): Promise<Loc> {
     assert(loc.t.content === "=");
     return go_right(
       loc,
       (loc) =>
-        expand_expr({ loc, counter, unit, context, sort: "value", inspect }).then(({ loc }) => loc),
+        expand_expr({ loc, counter, unit, context, sort: "value", helpers }).then(({ loc }) => loc),
       (loc) => syntax_error(loc, "expected an expression following the '=' sign"),
     );
   }
@@ -967,7 +967,7 @@ async function postexpand_lexical_declaration(
     return go_right(
       loc,
       (loc) =>
-        expand_expr({ loc, counter, unit, context, sort: "type", inspect }).then(
+        expand_expr({ loc, counter, unit, context, sort: "type", helpers }).then(
           ({ loc, counter, unit, context }) =>
             go_right(loc, handle_value_initializer, (loc) => Promise.resolve(loc)),
         ),
@@ -1100,7 +1100,7 @@ async function postexpand_body(
   counter: number,
   context: Context,
   sort: "type" | "value",
-  inspect: inspect,
+  helpers: preexpand_helpers,
 ): Promise<{ loc: Loc; modular: modular_extension }> {
   type T = Promise<{ loc: Loc; modular: modular_extension }>;
   async function done(loc: Loc, modular: modular_extension): T {
@@ -1159,12 +1159,12 @@ async function postexpand_body(
               unit,
               counter,
               context,
-              inspect,
+              helpers,
             ).then(({ loc, modular }) => cont(loc, modular));
           case "arrow_function": {
             return in_isolation(
               loc,
-              (loc) => expand_arrow_function(loc, counter, context, unit, inspect),
+              (loc) => expand_arrow_function(loc, counter, context, unit, helpers),
               (loc, _gs) => loc,
             ).then((loc) => cont(loc, modular));
           }
@@ -1178,7 +1178,7 @@ async function postexpand_body(
               unit,
               counter,
               context,
-              inspect,
+              helpers,
             ).then(({ loc, modular }) => cont(loc, modular));
           }
           case "member_expression": {
@@ -1193,7 +1193,7 @@ async function postexpand_body(
                     counter,
                     context,
                     sort,
-                    inspect,
+                    helpers,
                   ),
                 (loc, _gs) =>
                   go_right(loc, (loc) => {

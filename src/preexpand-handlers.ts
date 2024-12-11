@@ -1,6 +1,7 @@
 import { assert } from "./assert";
+import { preexpand_helpers } from "./preexpand-helpers";
 import { extend_context_lexical, extend_rib, lexical_extension } from "./stx";
-import { syntax_error } from "./stx-error";
+import { debug, syntax_error } from "./stx-error";
 import { CompilationUnit, Context, Loc } from "./syntax-structures";
 import { list_tag } from "./tags";
 import { go_down, go_right, go_up } from "./zipper";
@@ -137,9 +138,31 @@ function type_alias_declaration({
   );
 }
 
-type preexpand_list_handler = (goodies: goodies) => Promise<goodies>;
+const import_declaration: preexpand_list_handler = ({ loc, ...goodies }, helpers) => {
+  async function handle_import_name(loc: Loc) {
+    if (loc.t.tag !== "string") syntax_error(loc, "expected a string literal for import");
+    const x = await helpers.manager.resolve_import(loc);
+    debug(loc, "done import", x);
+  }
+  async function handle_import_clause(loc: Loc): Promise<goodies> {
+    if (loc.t.tag === "import_clause") {
+      const stuff = await handle_import_name(
+        skip_required(
+          go_right(loc, (loc) => loc, syntax_error),
+          ["from"],
+        ),
+      );
+      syntax_error(loc, "done?!?");
+    }
+    syntax_error(loc, "here");
+  }
+  return go_down(loc, (loc) => handle_import_clause(skip_required(loc, ["import"])), syntax_error);
+};
+
+type preexpand_list_handler = (goodies: goodies, helpers: preexpand_helpers) => Promise<goodies>;
 
 export const preexpand_list_handlers: { [k in list_tag]?: preexpand_list_handler } = {
   lexical_declaration,
   type_alias_declaration,
+  import_declaration,
 };

@@ -5,7 +5,8 @@ import { parse } from "./src/parse";
 import { core_patterns } from "./src/syntax-core-patterns";
 import { initial_step } from "./src/expander";
 import { pprint } from "./src/pprint";
-import { StxError } from "./src/stx-error";
+import { StxError, syntax_error } from "./src/stx-error";
+import { preexpand_helpers } from "./src/preexpand-helpers";
 
 const test_dir = __dirname + "/tests";
 const md_dir = __dirname + "/examples";
@@ -13,10 +14,20 @@ const md_dir = __dirname + "/examples";
 async function compile_script(filename: string, test_name: string) {
   const code = await readFile(filename, { encoding: "utf-8" });
   const patterns = core_patterns(parse);
-  const [loc0, expand] = initial_step(parse(code), test_name, patterns);
+  const helpers: preexpand_helpers = {
+    manager: {
+      resolve_import(loc) {
+        syntax_error(loc, "import not supported in tests");
+      },
+    },
+    inspect(loc, reason, k) {
+      return k();
+    },
+  };
+  const [_loc0, expand] = initial_step(parse(code), test_name, patterns);
   const result = await (async () => {
     try {
-      const { loc } = await expand((loc, reason, k) => k());
+      const { loc } = await expand(helpers);
       return { name: "DONE", loc, error: undefined };
     } catch (err) {
       if (err instanceof StxError) {

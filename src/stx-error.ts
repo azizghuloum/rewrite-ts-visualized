@@ -18,8 +18,6 @@ export function debug(loc: Loc, msg: string, info?: any): never {
   throw new StxError("DEBUG", loc, msg, info);
 }
 
-export type inspect = <T>(loc: Loc, reason: string, k: () => Promise<T>) => Promise<T>;
-
 export function syntax_error(loc: Loc, reason?: string): never {
   throw new StxError("SyntaxError", loc, reason ?? "syntax error");
 }

@@ -7,6 +7,8 @@ import { core_patterns } from "./syntax-core-patterns";
 import { initial_step } from "./expander";
 import { pprint } from "./pprint";
 import { generate_proxy_code } from "./proxy-code";
+import { debug, StxError } from "./stx-error";
+import { preexpand_helpers } from "./preexpand-helpers";
 
 type module_state =
   | { type: "initial" }
@@ -32,9 +34,11 @@ class Module {
       case "stale":
         return this.recompile().then(() => this.ensureUpToDate());
       case "fresh":
+      case "error":
         return;
       default: {
-        throw new Error(`ensureUpToDate: unhandled state type ${this.state.type}`);
+        const invalid: never = this.state;
+        throw new Error(`ensureUpToDate: unhandled state ${invalid}`);
       }
     }
   }
@@ -79,19 +83,38 @@ class Module {
     const code = await fs.readFile(this.path, { encoding: "utf-8" });
     const patterns = core_patterns(parse);
     const [_loc0, expand] = initial_step(parse(code), this.state.cid, patterns);
-    const { loc, unit: _unit, context, modular } = await expand((_loc, _reason, k) => k());
-    const proxy_code = generate_proxy_code(
-      this.get_generated_code_relative_path(),
-      modular,
-      context,
-    );
-    const json_content = { cid: this.state.cid };
-    const code_path = this.get_generated_code_absolute_path();
-    await mkdir(dirname(code_path), { recursive: true });
-    await writeFile(code_path, await pprint(loc));
-    await writeFile(this.get_proxy_path(), proxy_code);
-    await writeFile(this.get_json_path(), JSON.stringify(json_content));
-    this.state = { type: "fresh" };
+    try {
+      const helpers: preexpand_helpers = {
+        manager: {
+          resolve_import(loc) {
+            assert(loc.t.tag === "string");
+            const import_path = loc.t.content;
+            debug(loc, `resolving '${import_path}'`);
+          },
+        },
+        inspect(loc, reason, k) {
+          return k();
+        },
+      };
+      const { loc, unit: _unit, context, modular } = await expand(helpers);
+      const proxy_code = generate_proxy_code(
+        this.get_generated_code_relative_path(),
+        modular,
+        context,
+      );
+      const json_content = { cid: this.state.cid };
+      const code_path = this.get_generated_code_absolute_path();
+      await mkdir(dirname(code_path), { recursive: true });
+      await writeFile(code_path, await pprint(loc));
+      await writeFile(this.get_proxy_path(), proxy_code);
+      await writeFile(this.get_json_path(), JSON.stringify(json_content));
+      this.state = { type: "fresh" };
+    } catch (error) {
+      if (error instanceof StxError) {
+      }
+      console.error(error);
+      this.state = { type: "error", reason: String(error) };
+    }
   }
 }
 
