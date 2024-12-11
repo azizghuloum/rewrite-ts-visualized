@@ -67,14 +67,8 @@ export function gen_binding({
   );
 }
 
-function preexpand_lexical_declaration({
-  loc,
-  lexical,
-  context,
-  counter,
-  unit,
-}: goodies): Promise<goodies> {
-  function after_vars({ loc, lexical, context, counter, unit }: goodies): goodies {
+function lexical_declaration({ loc, lexical, context, counter, unit }: goodies): Promise<goodies> {
+  async function after_vars({ loc, lexical, context, counter, unit }: goodies): Promise<goodies> {
     if (loc.t.type === "atom" && loc.t.tag === "other") {
       switch (loc.t.content) {
         case ";":
@@ -93,28 +87,16 @@ function preexpand_lexical_declaration({
     }
     syntax_error(loc, "expected a ',' or a ';'");
   }
-  function get_vars(
-    ls: Loc,
-    lexical: lexical_extension,
-    context: Context,
-    counter: number,
-  ): goodies {
+  async function get_vars(ls: Loc, lexical: lexical_extension, context: Context, counter: number) {
     if (ls.t.type === "list" && ls.t.tag === "variable_declarator") {
       return go_down(
         ls,
         (loc) => {
-          const goodies = gen_binding({
-            loc,
-            lexical,
-            counter,
-            context,
-            unit,
-            sort: "value",
-          });
+          const goodies = gen_binding({ loc, lexical, counter, context, unit, sort: "value" });
           return go_right(
             ls,
             (loc) => after_vars({ ...goodies, loc }),
-            (loc) => ({ ...goodies, loc }),
+            (loc) => Promise.resolve({ ...goodies, loc }),
           );
         },
         syntax_error,
@@ -123,49 +105,41 @@ function preexpand_lexical_declaration({
       syntax_error(ls, `expected a variable declaration; found ${ls.t.tag}`);
     }
   }
-
-  function main(loc: Loc) {
-    return go_down(
-      loc,
-      (loc) =>
-        get_vars(
-          skip_required(skip_optional(loc, "export"), ["let", "const"]),
-          lexical,
-          context,
-          counter,
-        ),
-      syntax_error,
-    );
-  }
-
-  return Promise.resolve(main(loc));
+  return go_down(
+    loc,
+    (loc) =>
+      get_vars(
+        skip_required(skip_optional(loc, "export"), ["let", "const"]),
+        lexical,
+        context,
+        counter,
+      ),
+    syntax_error,
+  );
 }
 
-function preexpand_type_alias_declaration({
+function type_alias_declaration({
   loc,
   lexical,
   context,
   counter,
   unit,
 }: goodies): Promise<goodies> {
-  function after_type(loc: Loc) {
+  async function after_type(loc: Loc) {
     assert(loc.t.type === "atom" && loc.t.tag === "identifier", "expected an identifier");
     const gs = gen_binding({ loc, lexical, counter, context, unit, sort: "type" });
     return { ...gs, loc: go_up(loc) };
   }
-  function main() {
-    return go_down(
-      loc,
-      (loc) => after_type(skip_required(skip_optional(loc, "export"), ["type"])),
-      syntax_error,
-    );
-  }
-  return Promise.resolve(main());
+  return go_down(
+    loc,
+    (loc) => after_type(skip_required(skip_optional(loc, "export"), ["type"])),
+    syntax_error,
+  );
 }
 
 type preexpand_list_handler = (goodies: goodies) => Promise<goodies>;
 
 export const preexpand_list_handlers: { [k in list_tag]?: preexpand_list_handler } = {
-  lexical_declaration: preexpand_lexical_declaration,
-  type_alias_declaration: preexpand_type_alias_declaration,
+  lexical_declaration,
+  type_alias_declaration,
 };
