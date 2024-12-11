@@ -11,6 +11,7 @@ import { parse } from "../src/parse";
 import { pprint } from "../src/pprint";
 import { StxError, syntax_error } from "../src/stx-error";
 import { preexpand_helpers } from "../src/preexpand-helpers";
+import { source_file } from "../src/ast";
 
 type ExampleProps = {
   code: string;
@@ -91,7 +92,11 @@ function Example({ code, onChange }: ExampleProps) {
   type expand = (helpers: preexpand_helpers) => Promise<{ loc: Loc }>;
   function init_state(code: string): [State, expand] {
     const patterns = core_patterns(parse);
-    const [loc0, expand] = initial_step(parse(code), "example", patterns);
+    const source_file: source_file = {
+      package: { name: "@rewrite-ts/example", version: "0.0.0" },
+      path: "example",
+    };
+    const [loc0, expand] = initial_step(parse(code, source_file), "example", patterns);
     return [initial_state(loc0), expand];
   }
   const [state, setState] = useState(init_state(code)[0]);

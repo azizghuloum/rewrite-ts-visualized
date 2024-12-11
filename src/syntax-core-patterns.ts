@@ -1,5 +1,5 @@
 import { assert } from "./assert";
-import { AST } from "./ast";
+import { AST, source_file, src } from "./ast";
 import { LL, llappend, llmap, llreduce, llreverse, ll_to_array } from "./llhelpers";
 import { syntax_error } from "./stx-error";
 import {
@@ -556,9 +556,13 @@ export const core_handlers: { [k: string]: handler } = {
   define_rewrite_rules,
 };
 
-export const core_patterns = (parse: (code: string) => AST) => {
+export const core_patterns = (parse: (code: string, source_file: source_file) => AST) => {
   const pattern = (code: string) => {
-    const ast = parse(code);
+    const src: source_file = {
+      package: { name: "rewrite-ts", version: "0.0.0" },
+      path: "internal-patterns",
+    };
+    const ast = parse(code, src);
     assert(ast.type === "list" && ast.tag === "program");
     const bodies = ast.content;
     assert(bodies !== null);

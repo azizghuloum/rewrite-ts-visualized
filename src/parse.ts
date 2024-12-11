@@ -1,4 +1,4 @@
-import { AST } from "./ast";
+import { AST, source_file, src } from "./ast";
 import { list_tag } from "./tags";
 import { array_to_ll, LL, llappend } from "./llhelpers";
 import TS, { SyntaxKind } from "typescript";
@@ -29,7 +29,7 @@ const splice_middle: { [k in SyntaxKind]?: list_tag } = {
   [SyntaxKind.NamedImports]: "named_imports",
 };
 
-function left_associate(op: string, [head, tail]: [AST, LL<AST>]): AST {
+function left_associate(op: string, [head, tail]: [AST, LL<AST>], src: src): AST {
   function f(head: AST, tail: LL<AST>): AST {
     if (tail === null) {
       return head;
@@ -38,7 +38,10 @@ function left_associate(op: string, [head, tail]: [AST, LL<AST>]): AST {
       assert(t0.content === op);
       assert(t1 !== null);
       const [t2, t3] = t1;
-      return f({ type: "list", tag: "binary_expression", content: [head, [t0, [t2, null]]] }, t3);
+      return f(
+        { type: "list", tag: "binary_expression", content: [head, [t0, [t2, null]]], src },
+        t3,
+      );
     }
   }
   if (head.content === op) {
@@ -49,19 +52,20 @@ function left_associate(op: string, [head, tail]: [AST, LL<AST>]): AST {
   }
 }
 
-function absurdly(node: TS.Node, src: TS.SourceFile): AST {
-  const children = node.getChildren(src);
+function absurdly(node: TS.Node, source: TS.SourceFile, f: source_file): AST {
+  const src: src = { p: node.pos, e: node.end, f };
+  const children = node.getChildren(source);
   if (children.length === 0 && node.kind !== SyntaxKind.SyntaxList) {
-    const content = node.getText(src);
+    const content = node.getText(source);
     switch (node.kind) {
       case SyntaxKind.NumericLiteral:
-        return { type: "atom", tag: "number", content };
+        return { type: "atom", tag: "number", content, src };
       case SyntaxKind.StringLiteral:
-        return { type: "atom", tag: "string", content };
+        return { type: "atom", tag: "string", content, src };
       case SyntaxKind.Identifier:
-        return { type: "atom", tag: "identifier", content };
+        return { type: "atom", tag: "identifier", content, src };
       case SyntaxKind.RegularExpressionLiteral:
-        return { type: "atom", tag: "regex", content };
+        return { type: "atom", tag: "regex", content, src };
       case SyntaxKind.OpenParenToken:
       case SyntaxKind.CloseParenToken:
       case SyntaxKind.EqualsGreaterThanToken:
@@ -93,19 +97,19 @@ function absurdly(node: TS.Node, src: TS.SourceFile): AST {
       case SyntaxKind.NullKeyword:
       case SyntaxKind.StringKeyword:
       case SyntaxKind.NumberKeyword:
-        return { type: "atom", tag: "other", content };
+        return { type: "atom", tag: "other", content, src };
       case SyntaxKind.EndOfFileToken:
-        return { type: "atom", tag: "other", content };
+        return { type: "atom", tag: "other", content, src };
       default: {
-        throw new Error(`unknown atom '${TS.SyntaxKind[node.kind]}':'${node.getText(src)}'`);
+        throw new Error(`unknown atom '${TS.SyntaxKind[node.kind]}':'${node.getText(source)}'`);
       }
     }
   } else {
-    const ls = children.filter((x) => x.kind !== null).map((x) => absurdly(x, src));
+    const ls = children.filter((x) => x.kind !== null).map((x) => absurdly(x, source, f));
     const content = array_to_ll(ls);
     {
       const tag = pass_through[node.kind];
-      if (tag) return { type: "list", tag, content };
+      if (tag) return { type: "list", tag, content, src };
     }
     {
       const tag = splice_middle[node.kind];
@@ -116,6 +120,7 @@ function absurdly(node: TS.Node, src: TS.SourceFile): AST {
           type: "list",
           tag,
           content: [ls[0], llappend(ls[1].content, [ls[2], null])],
+          src,
         };
       }
     }
@@ -141,7 +146,7 @@ function absurdly(node: TS.Node, src: TS.SourceFile): AST {
             ],
           };
         } else {
-          return { type: "list", tag: "ERROR", content };
+          return { type: "list", tag: "ERROR", content, src };
         }
       }
       case SyntaxKind.CallExpression: {
@@ -151,6 +156,7 @@ function absurdly(node: TS.Node, src: TS.SourceFile): AST {
           type: "list",
           tag: "call_expression",
           content: [ls[0], [ls[1], llappend(ls[2].content, [ls[3], null])]],
+          src,
         };
       }
       case SyntaxKind.ArrowFunction: {
@@ -161,8 +167,9 @@ function absurdly(node: TS.Node, src: TS.SourceFile): AST {
           type: "list",
           tag: "formal_parameters",
           content: [lt, llappend(fmls.content, [rt, null])],
+          src,
         };
-        return { type: "list", tag: "arrow_function", content: [args, [ar, [body, null]]] };
+        return { type: "list", tag: "arrow_function", content: [args, [ar, [body, null]]], src };
       }
       case SyntaxKind.ShorthandPropertyAssignment:
       case SyntaxKind.LiteralType:
@@ -174,7 +181,7 @@ function absurdly(node: TS.Node, src: TS.SourceFile): AST {
         if (ls.length === 1) {
           return ls[0];
         } else {
-          return { type: "list", tag: "type_parameter", content };
+          return { type: "list", tag: "type_parameter", content, src };
         }
       }
       case SyntaxKind.SourceFile: {
@@ -182,26 +189,26 @@ function absurdly(node: TS.Node, src: TS.SourceFile): AST {
         assert(ls[1].content === "", ls[1]);
         const fst = ls[0];
         assert(fst.tag === "syntax_list", fst);
-        return { type: "list", tag: "program", content: fst.content };
+        return { type: "list", tag: "program", content: fst.content, src };
       }
       case SyntaxKind.VariableDeclarationList: {
         assert(ls.length === 2, ls);
         const [kwd, decls] = ls;
         assert(decls.tag === "syntax_list");
-        return { type: "list", tag: "lexical_declaration", content: [kwd, decls.content] };
+        return { type: "list", tag: "lexical_declaration", content: [kwd, decls.content], src };
       }
       case SyntaxKind.Parameter: {
         if (ls.length === 1) {
           return ls[0];
         } else {
-          return { type: "list", tag: "required_parameter", content };
+          return { type: "list", tag: "required_parameter", content, src };
         }
       }
       case SyntaxKind.ExportSpecifier: {
         if (ls.length === 1) {
           return ls[0];
         } else {
-          return { type: "list", tag: "export_specifier", content };
+          return { type: "list", tag: "export_specifier", content, src };
         }
       }
       case SyntaxKind.UnionType: {
@@ -209,18 +216,18 @@ function absurdly(node: TS.Node, src: TS.SourceFile): AST {
         const x = ls[0];
         assert(x.tag === "syntax_list");
         assert(x.content !== null);
-        return left_associate("|", x.content);
+        return left_associate("|", x.content, src);
       }
       case SyntaxKind.IntersectionType: {
         assert(ls.length === 1);
         const x = ls[0];
         assert(x.tag === "syntax_list");
         assert(x.content !== null);
-        return left_associate("&", x.content);
+        return left_associate("&", x.content, src);
       }
       case SyntaxKind.AsExpression: {
         assert(ls.length === 3);
-        return { type: "list", tag: "binary_expression", content };
+        return { type: "list", tag: "binary_expression", content, src };
       }
       case SyntaxKind.TypeAliasDeclaration: {
         assert(content !== null);
@@ -230,9 +237,10 @@ function absurdly(node: TS.Node, src: TS.SourceFile): AST {
             type: "list",
             tag: "type_alias_declaration",
             content: llappend(fst.content, rest),
+            src,
           };
         } else {
-          return { type: "list", tag: "type_alias_declaration", content };
+          return { type: "list", tag: "type_alias_declaration", content, src };
         }
       }
       default:
@@ -243,17 +251,17 @@ function absurdly(node: TS.Node, src: TS.SourceFile): AST {
   }
 }
 
-export function parse(code: string): AST {
+export function parse(code: string, f: source_file): AST {
   try {
     const options: TS.CreateSourceFileOptions = {
       languageVersion: TS.ScriptTarget.ESNext,
       jsDocParsingMode: TS.JSDocParsingMode.ParseNone,
     };
     const src = TS.createSourceFile("code.tsx", code, options);
-    const ast = absurdly(src, src);
+    const ast = absurdly(src, src, f);
     return ast;
   } catch (err) {
     console.error(err);
-    return { type: "list", tag: "ERROR", content: null };
+    return { type: "list", tag: "ERROR", content: null, src: false };
   }
 }

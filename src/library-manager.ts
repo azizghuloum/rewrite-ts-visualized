@@ -9,10 +9,11 @@ import { pprint } from "./pprint";
 import { generate_proxy_code } from "./proxy-code";
 import { debug, StxError } from "./stx-error";
 import { preexpand_helpers } from "./preexpand-helpers";
+import { source_file } from "./ast";
 
 type module_state =
   | { type: "initial" }
-  | { type: "stale"; cid: string; pkg: Package }
+  | { type: "stale"; cid: string; pkg: Package; base: string }
   | { type: "fresh" }
   | { type: "error"; reason: string };
 
@@ -70,7 +71,7 @@ class Module {
     assert(my_mtime !== undefined);
     //console.log({ cid, my_mtime, json_path });
     if (my_mtime >= (json_mtime ?? 0)) {
-      this.state = { type: "stale", cid, pkg };
+      this.state = { type: "stale", cid, pkg, base };
     } else {
       console.error("TODO: check dependencies");
       this.state = { type: "fresh" };
@@ -82,7 +83,11 @@ class Module {
     console.log(`expanding ${this.state.cid}`);
     const code = await fs.readFile(this.path, { encoding: "utf-8" });
     const patterns = core_patterns(parse);
-    const [_loc0, expand] = initial_step(parse(code), this.state.cid, patterns);
+    const source_file: source_file = {
+      package: { name: this.state.pkg.name, version: this.state.pkg.version },
+      path: this.state.base,
+    };
+    const [_loc0, expand] = initial_step(parse(code, source_file), this.state.cid, patterns);
     try {
       const helpers: preexpand_helpers = {
         manager: {
