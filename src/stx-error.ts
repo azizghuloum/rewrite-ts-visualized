@@ -1,4 +1,3 @@
-import { join } from "path";
 import { assert } from "./assert";
 import { Loc, STX } from "./syntax-structures";
 import { isolate, unisolate } from "./zipper";
@@ -48,7 +47,7 @@ export async function print_stx_error(error: StxError, library_manager: LibraryM
   for (const x of ls) {
     const pkg = library_manager.get_package(x.f.package.name, x.f.package.version);
     assert(pkg !== undefined);
-    const full_path = join(pkg.dir, x.f.path);
+    const full_path = pkg.dir + "/" + x.f.path;
     const code = await fs.readFile(full_path, { encoding: "utf8" });
     const pos0 = indexToPosition(code, x.p + 1, { oneBased: true });
     const pos1 = indexToPosition(code, x.e, { oneBased: true });
