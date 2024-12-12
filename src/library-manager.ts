@@ -7,7 +7,7 @@ import { core_patterns } from "./syntax-core-patterns";
 import { initial_step } from "./expander";
 import { pprint } from "./pprint";
 import { generate_proxy_code } from "./proxy-code";
-import { debug, StxError } from "./stx-error";
+import { debug, print_stx_error, StxError } from "./stx-error";
 import { preexpand_helpers } from "./preexpand-helpers";
 import { source_file } from "./ast";
 
@@ -116,8 +116,10 @@ class Module {
       this.state = { type: "fresh" };
     } catch (error) {
       if (error instanceof StxError) {
+        await print_stx_error(error, this.library_manager);
+      } else {
+        console.error(error);
       }
-      console.error(error);
       this.state = { type: "error", reason: String(error) };
     }
   }
@@ -142,6 +144,10 @@ export class LibraryManager {
   ensureUpToDate(path: string) {
     const mod = (this.modules[path] ??= new Module(path, this));
     mod.ensureUpToDate();
+  }
+
+  get_package(name: string, version: string): Package | undefined {
+    return Object.values(this.packages).find((x) => x.name === name && x.version === version);
   }
 
   async findPackage(path: string): Promise<[Package, string]> {

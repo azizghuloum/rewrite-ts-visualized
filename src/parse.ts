@@ -53,7 +53,7 @@ function left_associate(op: string, [head, tail]: [AST, LL<AST>], src: src): AST
 }
 
 function absurdly(node: TS.Node, source: TS.SourceFile, f: source_file): AST {
-  const src: src = { p: node.pos, e: node.end, f };
+  const src: src = { type: "origin", p: node.pos, e: node.end, f };
   const children = node.getChildren(source);
   if (children.length === 0 && node.kind !== SyntaxKind.SyntaxList) {
     const content = node.getText(source);

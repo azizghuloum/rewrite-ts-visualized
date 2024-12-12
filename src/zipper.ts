@@ -88,7 +88,7 @@ export function change_splicing(loc: Loc, list: [STX, LL<STX>]): Loc {
 }
 
 function mkstx(tag: list_tag, content: LL<STX>): STX {
-  return { type: "list", tag, wrap: undefined, content };
+  return { type: "list", tag, wrap: undefined, content, src: false };
 }
 
 export function go_next<S>(loc: Loc, sk: (loc: Loc) => S, fk: (loc: Loc) => S): S {

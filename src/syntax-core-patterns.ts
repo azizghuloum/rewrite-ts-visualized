@@ -1,5 +1,5 @@
 import { assert } from "./assert";
-import { AST, source_file, src } from "./ast";
+import { AST, source_file } from "./ast";
 import { LL, llappend, llmap, llreduce, llreverse, ll_to_array } from "./llhelpers";
 import { syntax_error } from "./stx-error";
 import {
@@ -260,6 +260,7 @@ const splice: handler = async (loc, context, unit, counter, lexical) => {
     tag: "slice",
     wrap: undefined,
     content: body_code,
+    src: false,
   };
   return {
     loc: change(unification.loc, mkzipper(result)),
@@ -363,7 +364,11 @@ const using_rewrite_rules: handler = async (
     (x, y) => bound_id_equal(x, y),
   );
   const [rib_id, new_counter] = new_rib_id(orig_counter);
-  const do_wrap = push_wrap({ marks: null, subst: [{ rib_id, cu_id: orig_unit.cu_id }, null] });
+  const do_wrap = push_wrap({
+    marks: null,
+    subst: [{ rib_id, cu_id: orig_unit.cu_id }, null],
+    aes: null,
+  });
   const [new_rib, final_counter, final_context] = clauses.reduce(
     (ac: [Rib, number, Context], [lhs, rhs]) => {
       assert(lhs.type === "atom" && lhs.wrap !== undefined);
@@ -436,6 +441,7 @@ function search_and_replace(stx: STX, subst: subst, loc: Loc): LL<STX> {
             llappend,
             null as LL<STX>,
           ),
+          src: stx.src,
         },
         null,
       ];
@@ -451,7 +457,11 @@ export async function apply_syntax_rules(
   unit: CompilationUnit,
   orig_counter: number,
 ): Promise<{ loc: Loc; counter: number }> {
-  const do_antimark = push_wrap({ marks: [antimark, null], subst: [shift, null] });
+  const do_antimark = push_wrap({
+    marks: [antimark, null],
+    subst: [shift, null],
+    aes: [false, null],
+  });
   const { loc, subst, template } = find_clause(orig_loc, clauses, unit);
   const antimarked_subst: subst = subst.map(([lhs, rhs]) => [lhs, llmap(rhs, do_antimark)]);
   const expressionls = search_and_replace(template, antimarked_subst, loc);
@@ -459,7 +469,7 @@ export async function apply_syntax_rules(
   if (expressionls[1] !== null) syntax_error(loc, "splicing error of more than one thing");
   const expression = expressionls[0];
   const [mark, new_counter] = new_mark(orig_counter);
-  const do_mark = push_wrap({ marks: [mark, null], subst: [shift, null] });
+  const do_mark = push_wrap({ marks: [mark, null], subst: [shift, null], aes: [loc.t, null] });
   const new_loc = change(loc, mkzipper(do_mark(expression)));
   return { loc: new_loc, counter: new_counter };
 }
@@ -519,7 +529,13 @@ const define_rewrite_rules: handler = async (
   const final_unit = extend_unit(orig_unit, lexical);
   const final_loc = change(
     loc,
-    mkzipper({ type: "list", tag: "slice", wrap: { marks: null, subst: null }, content: null }),
+    mkzipper({
+      type: "list",
+      tag: "slice",
+      wrap: { marks: null, subst: null, aes: [loc.t, null] },
+      content: null,
+      src: false,
+    }),
   );
   return {
     loc: final_loc,

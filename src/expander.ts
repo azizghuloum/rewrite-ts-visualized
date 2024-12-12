@@ -89,12 +89,14 @@ async function expand_program(
       tag: "export_declaration",
       wrap: empty_wrap,
       content: array_to_ll([export_keyword, lt_brace_keyword, rt_brace_keyword]),
+      src: false,
     };
     const empty_program: STX = {
       type: "list",
       tag: "program",
       wrap: empty_wrap,
       content: array_to_ll([empty_export]),
+      src: false,
     };
     return { loc: mkzipper(empty_program), unit, context, modular };
   }
@@ -291,7 +293,7 @@ async function expand_concise_body(
 function rewrap(loc: Loc, rib_id: string, cu_id: string): Loc {
   return {
     type: "loc",
-    t: push_wrap({ marks: null, subst: [{ rib_id, cu_id }, null] })(loc.t),
+    t: push_wrap({ marks: null, subst: [{ rib_id, cu_id }, null], aes: null })(loc.t),
     p: loc.p,
   };
 }
@@ -590,7 +592,11 @@ function expand_arrow_function(
       return in_isolation(
         body,
         async (body) => {
-          const wrap: Wrap = { marks: null, subst: [{ rib_id, cu_id: unit.cu_id }, null] };
+          const wrap: Wrap = {
+            marks: null,
+            subst: [{ rib_id, cu_id: unit.cu_id }, null],
+            aes: null,
+          };
           const loc = wrap_loc(body, wrap);
           const new_unit = extend_unit(pgs.unit, pgs.lexical); // params are in rib
           return expand_concise_body(
@@ -650,6 +656,7 @@ function expand_type_parameters(
                 loc: wrap_loc(loc, {
                   marks: null,
                   subst: [{ rib_id: lexical.rib_id, cu_id: unit.cu_id }, null],
+                  aes: null,
                 }),
                 counter,
                 unit,
@@ -793,13 +800,14 @@ function expand_expr({
   );
 }
 
-const empty_wrap: Wrap = { marks: null, subst: null };
+const empty_wrap: Wrap = { marks: null, subst: null, aes: null };
 
 const export_keyword: STX = {
   type: "atom",
   tag: "other",
   content: "export",
   wrap: empty_wrap,
+  src: false,
 };
 
 const lt_brace_keyword: STX = {
@@ -807,6 +815,7 @@ const lt_brace_keyword: STX = {
   tag: "other",
   content: "{",
   wrap: empty_wrap,
+  src: false,
 };
 
 const rt_brace_keyword: STX = {
@@ -814,6 +823,7 @@ const rt_brace_keyword: STX = {
   tag: "other",
   content: "}",
   wrap: empty_wrap,
+  src: false,
 };
 
 function insert_export_keyword({ loc, modular }: { loc: Loc; modular: modular_extension }): {
@@ -890,6 +900,7 @@ async function postexpand_type_alias_declaration(
                   wrap_loc(loc, {
                     marks: null,
                     subst: [{ rib_id: lexical.rib_id, cu_id: unit.cu_id }, null],
+                    aes: null,
                   }),
                   counter,
                   unit,
@@ -1085,8 +1096,9 @@ function rename(loc: Loc, new_name: string): Loc {
   const new_id: STX = {
     type: "atom",
     tag: "identifier",
-    wrap: { marks: null, subst: null },
+    wrap: { marks: null, subst: null, aes: null },
     content: new_name,
+    src: loc.t,
   };
   return change(loc, { type: "loc", t: new_id, p: { type: "top" } });
 }

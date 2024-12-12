@@ -3,6 +3,7 @@ import { AST } from "./ast";
 import { LL, llappend } from "./llhelpers";
 import { core_handlers } from "./syntax-core-patterns";
 import {
+  AE,
   antimark,
   Binding,
   CompilationUnit,
@@ -173,6 +174,14 @@ function llcancel<X>(ls1: [X, LL<X>], ls2: [X, LL<X>]): LL<X> {
   return f(ls1[0], ls1[1]);
 }
 
+function merge_aes(ls1: LL<AE>, ls2: LL<AE>): LL<AE> {
+  if (ls1 !== null && ls2 !== null && ls2[0] === false) {
+    return llcancel(ls1, ls2);
+  } else {
+    return llappend(ls1, ls2);
+  }
+}
+
 function merge_wraps(outerwrap: Wrap, innerwrap?: Wrap): Wrap {
   if (innerwrap === undefined) return outerwrap;
   if (is_top_marked(outerwrap)) {
@@ -184,11 +193,13 @@ function merge_wraps(outerwrap: Wrap, innerwrap?: Wrap): Wrap {
     return {
       marks: llcancel(outerwrap.marks, innerwrap.marks),
       subst: llcancel(outerwrap.subst, innerwrap.subst),
+      aes: merge_aes(outerwrap.aes, innerwrap.aes),
     };
   } else {
     return {
       marks: llappend(outerwrap.marks, innerwrap.marks),
       subst: llappend(outerwrap.subst, innerwrap.subst),
+      aes: merge_aes(outerwrap.aes, innerwrap.aes),
     };
   }
 }
@@ -203,6 +214,7 @@ export function push_wrap(outerwrap: Wrap): (stx: AST | STX) => STX {
           wrap,
           tag: stx.tag,
           content: stx.content,
+          src: stx,
         };
       }
       case "atom": {
@@ -211,6 +223,7 @@ export function push_wrap(outerwrap: Wrap): (stx: AST | STX) => STX {
           wrap,
           tag: stx.tag,
           content: stx.content,
+          src: stx,
         };
       }
     }
@@ -266,13 +279,13 @@ export function init_top_level(
 } {
   const [rib_id, counter] = new_rib_id(0);
   const marks: Marks = [cu_id, top_marks];
-  const top_wrap: Wrap = { marks, subst: [{ rib_id, cu_id }, null] };
-  const outer_top_wrap: Wrap = { marks: top_marks, subst: [{ rib_id, cu_id }, null] };
+  const top_wrap: Wrap = { marks, subst: [{ rib_id, cu_id }, null], aes: null };
+  const outer_top_wrap: Wrap = { marks: top_marks, subst: [{ rib_id, cu_id }, null], aes: null };
   function wrap(ast: AST): STX {
-    return { ...ast, wrap: top_wrap };
+    return { ...ast, wrap: top_wrap, src: ast };
   }
   function outer_wrap(ast: AST): STX {
-    return { ...ast, wrap: outer_top_wrap };
+    return { ...ast, wrap: outer_top_wrap, src: ast };
   }
   const globals = get_globals("es2024.full");
   const rib: Rib = {

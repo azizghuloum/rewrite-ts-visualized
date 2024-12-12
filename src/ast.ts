@@ -6,6 +6,7 @@ export type no_source = false;
 export type source_file = { package: { name: string; version: string }; path: string };
 
 export type source = {
+  type: "origin";
   p: number;
   e: number;
   f: source_file;

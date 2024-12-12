@@ -15,11 +15,14 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@babel/code-frame": "^7.26.2",
     "@codemirror/lang-javascript": "^6.2.2",
+    "@types/babel__code-frame": "^7.0.6",
     "@types/json-stable-stringify": "^1.1.0",
     "@types/node": "^22.10.1",
     "@uiw/codemirror-theme-abcdef": "^4.23.6",
     "@uiw/react-codemirror": "^4.23.6",
+    "index-to-position": "^1.0.0",
     "json-stable-stringify": "^1.1.1",
     "prettier": "^3.4.2",
     "react": "^19.0.0",
