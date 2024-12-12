@@ -10,6 +10,7 @@ import { generate_proxy_code } from "./proxy-code";
 import { debug, print_stx_error, StxError } from "./stx-error";
 import { preexpand_helpers } from "./preexpand-helpers";
 import { source_file } from "./ast";
+import { normalize } from "node:path";
 
 type module_state =
   | { type: "initial" }
@@ -91,9 +92,11 @@ class Module {
     try {
       const helpers: preexpand_helpers = {
         manager: {
-          resolve_import(loc) {
+          resolve_import: async (loc) => {
             assert(loc.t.tag === "string");
-            const import_path = loc.t.content;
+            const import_path = JSON.parse(loc.t.content);
+            const mod = await this.library_manager.do_import(import_path, this.path);
+            console.log(mod);
             debug(loc, `resolving '${import_path}'`);
           },
         },
@@ -141,9 +144,10 @@ export class LibraryManager {
   private modules: { [path: string]: Module } = {};
   private packages: { [dir: string]: Package } = {};
 
-  ensureUpToDate(path: string) {
+  async ensureUpToDate(path: string) {
     const mod = (this.modules[path] ??= new Module(path, this));
-    mod.ensureUpToDate();
+    await mod.ensureUpToDate();
+    return mod;
   }
 
   get_package(name: string, version: string): Package | undefined {
@@ -171,5 +175,23 @@ export class LibraryManager {
         throw err;
       }
     }
+  }
+
+  async do_import(import_path: string, importer_path: string) {
+    function is_relative(path: string): boolean {
+      return path.startsWith("./") || path.startsWith("../");
+    }
+    function join_relative(import_path: string, importer_path: string): string {
+      const path = dirname(importer_path) + "/" + import_path;
+      return normalize(path);
+    }
+    function find_absolute_path(import_path: string): string {
+      throw new Error("TODO find_absolute_path");
+    }
+    const actual_path = is_relative(import_path)
+      ? join_relative(import_path, importer_path)
+      : find_absolute_path(import_path);
+    const mod = await this.ensureUpToDate(actual_path);
+    return mod;
   }
 }
