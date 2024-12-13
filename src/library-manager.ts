@@ -1,5 +1,5 @@
 import { assert } from "./assert";
-import fs, { mkdir, writeFile } from "node:fs/promises";
+import fs from "node:fs/promises";
 import { dirname, basename, join } from "node:path";
 import { mtime } from "./fs-helpers";
 import { parse } from "./parse";
@@ -7,10 +7,12 @@ import { core_patterns } from "./syntax-core-patterns";
 import { initial_step } from "./expander";
 import { pprint } from "./pprint";
 import { generate_proxy_code } from "./proxy-code";
-import { debug, print_stx_error, StxError } from "./stx-error";
+import { debug, print_stx_error, StxError, syntax_error } from "./stx-error";
 import { preexpand_helpers } from "./preexpand-helpers";
 import { source_file } from "./ast";
 import { normalize } from "node:path";
+import { Loc } from "./syntax-structures";
+import { Resolution } from "./stx";
 
 type module_state =
   | { type: "initial" }
@@ -21,8 +23,8 @@ type module_state =
 class Module {
   private path: string;
   private library_manager: LibraryManager;
-
   private state: module_state = { type: "initial" };
+  private imported_modules: Module[] = [];
 
   constructor(path: string, library_manager: LibraryManager) {
     this.path = path;
@@ -95,12 +97,11 @@ class Module {
           resolve_import: async (loc) => {
             assert(loc.t.tag === "string");
             const import_path = JSON.parse(loc.t.content);
-            const mod = await this.library_manager.do_import(import_path, this.path);
-            console.log(mod);
-            debug(loc, `resolving '${import_path}'`);
+            const mod = this.get_imported_modules_for_path(import_path, loc);
+            return mod;
           },
         },
-        inspect(loc, reason, k) {
+        inspect(_loc, _reason, k) {
           return k();
         },
       };
@@ -112,10 +113,10 @@ class Module {
       );
       const json_content = { cid: this.state.cid };
       const code_path = this.get_generated_code_absolute_path();
-      await mkdir(dirname(code_path), { recursive: true });
-      await writeFile(code_path, await pprint(loc));
-      await writeFile(this.get_proxy_path(), proxy_code);
-      await writeFile(this.get_json_path(), JSON.stringify(json_content));
+      await fs.mkdir(dirname(code_path), { recursive: true });
+      await fs.writeFile(code_path, await pprint(loc));
+      await fs.writeFile(this.get_proxy_path(), proxy_code);
+      await fs.writeFile(this.get_json_path(), JSON.stringify(json_content));
       this.state = { type: "fresh" };
     } catch (error) {
       if (error instanceof StxError) {
@@ -125,6 +126,25 @@ class Module {
       }
       this.state = { type: "error", reason: String(error) };
     }
+  }
+
+  async resolve_exported_identifier(name: string, loc: Loc): Promise<Resolution[]> {
+    debug(loc, `TODO resolve_identifier ${name}`);
+  }
+
+  private get_imported_modules_for_path(import_path: string, loc: Loc): Module {
+    const mod = this.library_manager.do_import(import_path, this.path);
+    if (this.imported_modules.includes(mod)) return mod;
+    const self = this;
+    function check(mod: Module) {
+      if (mod === self) {
+        syntax_error(loc, `circular import`);
+      }
+      mod.imported_modules.forEach(check);
+    }
+    check(mod);
+    this.imported_modules.push(mod);
+    return mod;
   }
 }
 
@@ -144,8 +164,13 @@ export class LibraryManager {
   private modules: { [path: string]: Module } = {};
   private packages: { [dir: string]: Package } = {};
 
-  async ensureUpToDate(path: string) {
+  private get_or_create_module(path: string) {
     const mod = (this.modules[path] ??= new Module(path, this));
+    return mod;
+  }
+
+  async ensureUpToDate(path: string) {
+    const mod = this.get_or_create_module(path);
     await mod.ensureUpToDate();
     return mod;
   }
@@ -177,7 +202,7 @@ export class LibraryManager {
     }
   }
 
-  async do_import(import_path: string, importer_path: string) {
+  do_import(import_path: string, importer_path: string) {
     function is_relative(path: string): boolean {
       return path.startsWith("./") || path.startsWith("../");
     }
@@ -191,7 +216,7 @@ export class LibraryManager {
     const actual_path = is_relative(import_path)
       ? join_relative(import_path, importer_path)
       : find_absolute_path(import_path);
-    const mod = await this.ensureUpToDate(actual_path);
+    const mod = this.get_or_create_module(actual_path);
     return mod;
   }
 }

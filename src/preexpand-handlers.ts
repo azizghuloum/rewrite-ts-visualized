@@ -1,5 +1,5 @@
 import { assert } from "./assert";
-import { preexpand_helpers } from "./preexpand-helpers";
+import { imported_module, preexpand_helpers } from "./preexpand-helpers";
 import { extend_context_lexical, extend_rib, lexical_extension } from "./stx";
 import { debug, syntax_error } from "./stx-error";
 import { CompilationUnit, Context, Loc } from "./syntax-structures";
@@ -139,22 +139,34 @@ function type_alias_declaration({
 }
 
 const import_declaration: preexpand_list_handler = ({ loc, ...goodies }, helpers) => {
-  async function handle_import_name(loc: Loc) {
+  async function handle_import_from_file(loc: Loc) {
     if (loc.t.tag !== "string") syntax_error(loc, "expected a string literal for import");
-    const x = await helpers.manager.resolve_import(loc);
-    debug(loc, "done import", x);
+    const mod = await helpers.manager.resolve_import(loc);
+    return mod;
+  }
+  async function handle_named_imports(loc: Loc, mod: imported_module): Promise<goodies> {
+    debug(loc, "handle named_imports");
+  }
+  async function handle_imports(loc: Loc, mod: imported_module): Promise<goodies> {
+    switch (loc.t.tag) {
+      case "named_imports":
+        return go_down(loc, (loc) => handle_named_imports(loc, mod), syntax_error);
+      default:
+        syntax_error(loc, `unexpected ${loc.t.tag} in import`);
+    }
   }
   async function handle_import_clause(loc: Loc): Promise<goodies> {
     if (loc.t.tag === "import_clause") {
-      const stuff = await handle_import_name(
+      const mod = await handle_import_from_file(
         skip_required(
           go_right(loc, (loc) => loc, syntax_error),
           ["from"],
         ),
       );
-      syntax_error(loc, "done?!?");
+      return go_down(loc, (loc) => handle_imports(loc, mod), syntax_error);
+    } else {
+      syntax_error(loc, "expected an import clause");
     }
-    syntax_error(loc, "here");
   }
   return go_down(loc, (loc) => handle_import_clause(skip_required(loc, ["import"])), syntax_error);
 };

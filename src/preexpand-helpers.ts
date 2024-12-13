@@ -4,7 +4,7 @@ import { Loc } from "./syntax-structures";
 type inspect = <T>(loc: Loc, reason: string, k: () => Promise<T>) => Promise<T>;
 
 export type imported_module = {
-  resolve_identifier: (name: string) => Promise<Resolution[]>;
+  resolve_exported_identifier: (name: string, loc: Loc) => Promise<Resolution[]>;
 };
 
 export type manager = {

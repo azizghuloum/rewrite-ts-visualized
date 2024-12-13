@@ -14,7 +14,6 @@ const pass_through: { [k in SyntaxKind]?: list_tag } = {
   [SyntaxKind.VariableDeclaration]: "variable_declarator",
   [SyntaxKind.ExportDeclaration]: "export_declaration",
   [SyntaxKind.EmptyStatement]: "empty_statement",
-  [SyntaxKind.ImportSpecifier]: "import_specifier",
   [SyntaxKind.ImportClause]: "import_clause",
   [SyntaxKind.ImportDeclaration]: "import_declaration",
   [SyntaxKind.NamespaceImport]: "namespace_import",
@@ -27,6 +26,13 @@ const splice_middle: { [k in SyntaxKind]?: list_tag } = {
   [SyntaxKind.Block]: "statement_block",
   [SyntaxKind.NamedExports]: "named_exports",
   [SyntaxKind.NamedImports]: "named_imports",
+};
+
+const remove_singleton_identifier: { [k in SyntaxKind]?: list_tag } = {
+  [SyntaxKind.TypeParameter]: "type_parameter",
+  [SyntaxKind.Parameter]: "required_parameter",
+  [SyntaxKind.ExportSpecifier]: "export_specifier",
+  [SyntaxKind.ImportSpecifier]: "import_specifier",
 };
 
 function left_associate(op: string, [head, tail]: [AST, LL<AST>], src: src): AST {
@@ -108,6 +114,16 @@ function absurdly(node: TS.Node, source: TS.SourceFile, f: source_file): AST {
     const ls = children.filter((x) => x.kind !== null).map((x) => absurdly(x, source, f));
     const content = array_to_ll(ls);
     {
+      const tag = remove_singleton_identifier[node.kind];
+      if (tag) {
+        if (ls.length === 1 && ls[0].tag === "identifier") {
+          return ls[0];
+        } else {
+          return { type: "list", tag, content, src };
+        }
+      }
+    }
+    {
       const tag = pass_through[node.kind];
       if (tag) return { type: "list", tag, content, src };
     }
@@ -177,13 +193,6 @@ function absurdly(node: TS.Node, source: TS.SourceFile, f: source_file): AST {
         assert(ls.length === 1, { kind: SyntaxKind[node.kind], ls });
         return ls[0];
       }
-      case SyntaxKind.TypeParameter: {
-        if (ls.length === 1) {
-          return ls[0];
-        } else {
-          return { type: "list", tag: "type_parameter", content, src };
-        }
-      }
       case SyntaxKind.SourceFile: {
         assert(ls.length === 2, ls);
         assert(ls[1].content === "", ls[1]);
@@ -196,20 +205,6 @@ function absurdly(node: TS.Node, source: TS.SourceFile, f: source_file): AST {
         const [kwd, decls] = ls;
         assert(decls.tag === "syntax_list");
         return { type: "list", tag: "lexical_declaration", content: [kwd, decls.content], src };
-      }
-      case SyntaxKind.Parameter: {
-        if (ls.length === 1) {
-          return ls[0];
-        } else {
-          return { type: "list", tag: "required_parameter", content, src };
-        }
-      }
-      case SyntaxKind.ExportSpecifier: {
-        if (ls.length === 1) {
-          return ls[0];
-        } else {
-          return { type: "list", tag: "export_specifier", content, src };
-        }
       }
       case SyntaxKind.UnionType: {
         assert(ls.length === 1);
