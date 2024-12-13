@@ -8,11 +8,10 @@ import { initial_step } from "./expander";
 import { pprint } from "./pprint";
 import { generate_proxy_code } from "./proxy-code";
 import { debug, print_stx_error, StxError, syntax_error } from "./stx-error";
-import { preexpand_helpers } from "./preexpand-helpers";
+import { imported_module, import_resolution, preexpand_helpers } from "./preexpand-helpers";
 import { source_file } from "./ast";
 import { normalize } from "node:path";
 import { Loc } from "./syntax-structures";
-import { Resolution } from "./stx";
 
 type module_state =
   | { type: "initial" }
@@ -20,7 +19,7 @@ type module_state =
   | { type: "fresh" }
   | { type: "error"; reason: string };
 
-class Module {
+class Module implements imported_module {
   private path: string;
   private library_manager: LibraryManager;
   private state: module_state = { type: "initial" };
@@ -128,7 +127,7 @@ class Module {
     }
   }
 
-  async resolve_exported_identifier(name: string, loc: Loc): Promise<Resolution[]> {
+  async resolve_exported_identifier(name: string, loc: Loc): Promise<import_resolution[]> {
     debug(loc, `TODO resolve_identifier ${name}`);
   }
 
