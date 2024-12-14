@@ -1,6 +1,6 @@
 import { assert } from "./assert";
 import { imported_module, preexpand_helpers } from "./preexpand-helpers";
-import { extend_context_lexical, extend_rib, lexical_extension } from "./stx";
+import { extend_context_lexical, extend_rib, extend_unit, lexical_extension } from "./stx";
 import { debug, syntax_error } from "./stx-error";
 import { CompilationUnit, Context, Loc } from "./syntax-structures";
 import { list_tag } from "./tags";
@@ -144,8 +144,36 @@ const import_declaration: preexpand_list_handler = ({ loc, ...goodies }, helpers
     const mod = await helpers.manager.resolve_import(loc);
     return mod;
   }
+  async function after_var(loc: Loc, mod: imported_module): Promise<goodies> {
+    switch (loc.t.content) {
+      case "}":
+        return { loc: go_up(loc), ...goodies };
+      case ",":
+        return go_right(loc, (loc) => handle_named_import(loc, mod), syntax_error);
+      default:
+        syntax_error(loc);
+    }
+  }
+  async function handle_named_import(loc0: Loc, mod: imported_module): Promise<goodies> {
+    switch (loc0.t.tag) {
+      case "identifier": {
+        const bindings = await mod.resolve_exported_identifier(loc0.t.content, loc0);
+        const { loc, counter, unit, context, lexical } = await go_right(
+          loc0,
+          (loc) => after_var(loc, mod),
+          syntax_error,
+        );
+        assert(lexical.extensible);
+        const { rib, rib_id } = lexical;
+        debug(loc, "got goodies", rib);
+      }
+      default:
+        syntax_error(loc, `unexpected ${loc.t.tag} in import context`);
+    }
+  }
   async function handle_named_imports(loc: Loc, mod: imported_module): Promise<goodies> {
-    debug(loc, "handle named_imports");
+    if (loc.t.content !== "{") syntax_error(loc);
+    return go_right(loc, (loc) => handle_named_import(loc, mod), syntax_error);
   }
   async function handle_imports(loc: Loc, mod: imported_module): Promise<goodies> {
     switch (loc.t.tag) {

@@ -8,6 +8,7 @@ import {
   Binding,
   CompilationUnit,
   Context,
+  Loc,
   Marks,
   new_rib_id,
   Rib,

@@ -8,15 +8,27 @@ import { initial_step } from "./expander";
 import { pprint } from "./pprint";
 import { generate_proxy_code } from "./proxy-code";
 import { debug, print_stx_error, StxError, syntax_error } from "./stx-error";
-import { imported_module, import_resolution, preexpand_helpers } from "./preexpand-helpers";
+import {
+  imported_module,
+  import_resolution,
+  preexpand_helpers,
+  get_exported_identifiers_from_rib,
+} from "./preexpand-helpers";
 import { source_file } from "./ast";
 import { normalize } from "node:path";
 import { Loc } from "./syntax-structures";
+import stringify from "json-stringify-pretty-compact";
 
 type module_state =
   | { type: "initial" }
-  | { type: "stale"; cid: string; pkg: Package; base: string }
-  | { type: "fresh" }
+  | { type: "stale"; cid: string; pkg: Package; pkg_relative_path: string }
+  | {
+      type: "fresh";
+      cid: string;
+      pkg: Package;
+      pkg_relative_path: string;
+      exported_identifiers: { [name: string]: import_resolution[] };
+    }
   | { type: "error"; reason: string };
 
 class Module implements imported_module {
@@ -65,18 +77,27 @@ class Module implements imported_module {
   async initialize() {
     assert(this.state.type === "initial");
     console.log(`initializing ${this.path}`);
-    const [pkg, base] = await this.library_manager.findPackage(this.path);
-    const cid = `${base} ${pkg.name} ${pkg.version}`;
+    const [pkg, pkg_relative_path] = await this.library_manager.findPackage(this.path);
+    const cid = `${pkg_relative_path} ${pkg.name} ${pkg.version}`;
     const json_path = this.get_json_path();
     const json_mtime = await mtime(json_path);
     const my_mtime = await mtime(this.path);
     assert(my_mtime !== undefined);
     //console.log({ cid, my_mtime, json_path });
     if (my_mtime >= (json_mtime ?? 0)) {
-      this.state = { type: "stale", cid, pkg, base };
+      this.state = { type: "stale", cid, pkg, pkg_relative_path };
     } else {
+      const json = JSON.parse(await fs.readFile(json_path, { encoding: "utf8" }));
+      assert(json.cid === cid);
+      assert(json.exported_identifiers !== undefined, `no exported_identifiers in ${json_path}`);
       console.error("TODO: check dependencies");
-      this.state = { type: "fresh" };
+      this.state = {
+        type: "fresh",
+        cid,
+        pkg,
+        pkg_relative_path,
+        exported_identifiers: json.exported_identifiers,
+      };
     }
   }
 
@@ -87,7 +108,7 @@ class Module implements imported_module {
     const patterns = core_patterns(parse);
     const source_file: source_file = {
       package: { name: this.state.pkg.name, version: this.state.pkg.version },
-      path: this.state.base,
+      path: this.state.pkg_relative_path,
     };
     const [_loc0, expand] = initial_step(parse(code, source_file), this.state.cid, patterns);
     try {
@@ -105,18 +126,23 @@ class Module implements imported_module {
         },
       };
       const { loc, unit: _unit, context, modular } = await expand(helpers);
+      assert(modular.extensible);
       const proxy_code = generate_proxy_code(
         this.get_generated_code_relative_path(),
         modular,
         context,
       );
-      const json_content = { cid: this.state.cid };
+      const exported_identifiers = get_exported_identifiers_from_rib(
+        modular.explicit,
+        this.state.cid,
+      );
+      const json_content = { cid: this.state.cid, exported_identifiers };
       const code_path = this.get_generated_code_absolute_path();
       await fs.mkdir(dirname(code_path), { recursive: true });
       await fs.writeFile(code_path, await pprint(loc));
       await fs.writeFile(this.get_proxy_path(), proxy_code);
-      await fs.writeFile(this.get_json_path(), JSON.stringify(json_content));
-      this.state = { type: "fresh" };
+      await fs.writeFile(this.get_json_path(), stringify(json_content));
+      this.state = { ...this.state, type: "fresh", ...json_content };
     } catch (error) {
       if (error instanceof StxError) {
         await print_stx_error(error, this.library_manager);
@@ -128,7 +154,15 @@ class Module implements imported_module {
   }
 
   async resolve_exported_identifier(name: string, loc: Loc): Promise<import_resolution[]> {
-    debug(loc, `TODO resolve_identifier ${name}`);
+    await this.ensureUpToDate();
+    const state = this.state;
+    if (state.type !== "fresh") syntax_error(loc, "module has errors");
+    const { exported_identifiers } = state;
+    const resolutions = exported_identifiers[name];
+    if (!resolutions || resolutions.length === 0) {
+      syntax_error(loc, `module does not export such identifier`);
+    }
+    return resolutions;
   }
 
   private get_imported_modules_for_path(import_path: string, loc: Loc): Module {
@@ -209,7 +243,7 @@ export class LibraryManager {
       const path = dirname(importer_path) + "/" + import_path;
       return normalize(path);
     }
-    function find_absolute_path(import_path: string): string {
+    function find_absolute_path(_import_path: string): string {
       throw new Error("TODO find_absolute_path");
     }
     const actual_path = is_relative(import_path)

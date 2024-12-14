@@ -24,6 +24,7 @@
     "@uiw/react-codemirror": "^4.23.6",
     "index-to-position": "^1.0.0",
     "json-stable-stringify": "^1.1.1",
+    "json-stringify-pretty-compact": "^4.0.0",
     "prettier": "^3.4.2",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
