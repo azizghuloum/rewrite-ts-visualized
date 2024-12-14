@@ -8,6 +8,7 @@ import { pprint } from "./src/pprint";
 import { StxError, syntax_error } from "./src/stx-error";
 import { preexpand_helpers } from "./src/preexpand-helpers";
 import { source_file } from "./src/ast";
+import { get_globals, init_global_context } from "./src/global-module";
 
 const test_dir = __dirname + "/tests";
 const md_dir = __dirname + "/examples";
@@ -15,13 +16,18 @@ const md_dir = __dirname + "/examples";
 async function compile_script(filename: string, test_name: string) {
   const code = await readFile(filename, { encoding: "utf-8" });
   const patterns = core_patterns(parse);
+  const globals = get_globals("es2024.full");
+  const global_macros = Object.keys(patterns);
+  const [global_unit, global_context] = init_global_context(patterns, globals);
   const helpers: preexpand_helpers = {
     manager: {
       resolve_import(loc) {
         syntax_error(loc, "import not supported in tests");
       },
     },
-    inspect(loc, reason, k) {
+    global_unit,
+    global_context,
+    inspect(_loc, _reason, k) {
       return k();
     },
   };
@@ -29,7 +35,7 @@ async function compile_script(filename: string, test_name: string) {
     package: { name: "@rewrite-ts/test", version: "0.0.0" },
     path: filename,
   };
-  const [_loc0, expand] = initial_step(parse(code, source_file), test_name, patterns);
+  const [_loc0, expand] = initial_step(parse(code, source_file), test_name, globals, global_macros);
   const result = await (async () => {
     try {
       const { loc } = await expand(helpers);

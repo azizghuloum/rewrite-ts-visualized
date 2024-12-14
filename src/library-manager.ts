@@ -3,21 +3,21 @@ import fs from "node:fs/promises";
 import { dirname, basename, join } from "node:path";
 import { mtime } from "./fs-helpers";
 import { parse } from "./parse";
-import { core_patterns } from "./syntax-core-patterns";
 import { initial_step } from "./expander";
 import { pprint } from "./pprint";
 import { generate_proxy_code } from "./proxy-code";
-import { debug, print_stx_error, StxError, syntax_error } from "./stx-error";
+import { print_stx_error, StxError, syntax_error } from "./stx-error";
 import {
   imported_module,
   import_resolution,
   preexpand_helpers,
   get_exported_identifiers_from_rib,
 } from "./preexpand-helpers";
-import { source_file } from "./ast";
+import { AST, source_file } from "./ast";
 import { normalize } from "node:path";
-import { Loc } from "./syntax-structures";
+import { CompilationUnit, Context, Loc } from "./syntax-structures";
 import stringify from "json-stringify-pretty-compact";
+import { init_global_context } from "./global-module";
 
 type module_state =
   | { type: "initial" }
@@ -31,15 +31,30 @@ type module_state =
     }
   | { type: "error"; reason: string };
 
-class Module implements imported_module {
+class RtsModule implements imported_module {
   private path: string;
   private library_manager: LibraryManager;
   private state: module_state = { type: "initial" };
-  private imported_modules: Module[] = [];
+  private globals: string[];
+  private global_macros: string[];
+  private global_unit: CompilationUnit;
+  private global_context: Context;
+  public imported_modules: imported_module[] = [];
 
-  constructor(path: string, library_manager: LibraryManager) {
+  constructor(
+    path: string,
+    library_manager: LibraryManager,
+    globals: string[],
+    global_macros: string[],
+    global_unit: CompilationUnit,
+    global_context: Context,
+  ) {
     this.path = path;
     this.library_manager = library_manager;
+    this.globals = globals;
+    this.global_macros = global_macros;
+    this.global_unit = global_unit;
+    this.global_context = global_context;
   }
 
   async ensureUpToDate(): Promise<void> {
@@ -105,12 +120,16 @@ class Module implements imported_module {
     assert(this.state.type === "stale");
     console.log(`expanding ${this.state.cid}`);
     const code = await fs.readFile(this.path, { encoding: "utf-8" });
-    const patterns = core_patterns(parse);
     const source_file: source_file = {
       package: { name: this.state.pkg.name, version: this.state.pkg.version },
       path: this.state.pkg_relative_path,
     };
-    const [_loc0, expand] = initial_step(parse(code, source_file), this.state.cid, patterns);
+    const [_loc0, expand] = initial_step(
+      parse(code, source_file),
+      this.state.cid,
+      this.globals,
+      this.global_macros,
+    );
     try {
       const helpers: preexpand_helpers = {
         manager: {
@@ -121,6 +140,8 @@ class Module implements imported_module {
             return mod;
           },
         },
+        global_unit: this.global_unit,
+        global_context: this.global_context,
         inspect(_loc, _reason, k) {
           return k();
         },
@@ -132,10 +153,7 @@ class Module implements imported_module {
         modular,
         context,
       );
-      const exported_identifiers = get_exported_identifiers_from_rib(
-        modular.explicit,
-        this.state.cid,
-      );
+      const exported_identifiers = get_exported_identifiers_from_rib(modular.explicit);
       const json_content = { cid: this.state.cid, exported_identifiers };
       const code_path = this.get_generated_code_absolute_path();
       await fs.mkdir(dirname(code_path), { recursive: true });
@@ -165,11 +183,11 @@ class Module implements imported_module {
     return resolutions;
   }
 
-  private get_imported_modules_for_path(import_path: string, loc: Loc): Module {
+  private get_imported_modules_for_path(import_path: string, loc: Loc): imported_module {
     const mod = this.library_manager.do_import(import_path, this.path);
     if (this.imported_modules.includes(mod)) return mod;
     const self = this;
-    function check(mod: Module) {
+    function check(mod: imported_module) {
       if (mod === self) {
         syntax_error(loc, `circular import`);
       }
@@ -194,11 +212,30 @@ class Package {
 }
 
 export class LibraryManager {
-  private modules: { [path: string]: Module } = {};
+  private globals: string[];
+  private global_macros: string[];
+  private global_unit: CompilationUnit;
+  private global_context: Context;
+  private modules: { [path: string]: imported_module } = {};
   private packages: { [dir: string]: Package } = {};
 
+  constructor(patterns: { [k: string]: AST }, globals: string[]) {
+    this.globals = globals;
+    this.global_macros = Object.keys(patterns);
+    const [global_unit, global_context] = init_global_context(patterns, globals);
+    this.global_unit = global_unit;
+    this.global_context = global_context;
+  }
+
   private get_or_create_module(path: string) {
-    const mod = (this.modules[path] ??= new Module(path, this));
+    const mod = (this.modules[path] ??= new RtsModule(
+      path,
+      this,
+      this.globals,
+      this.global_macros,
+      this.global_unit,
+      this.global_context,
+    ));
     return mod;
   }
 

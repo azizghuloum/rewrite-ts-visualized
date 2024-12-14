@@ -36,7 +36,9 @@ function test() {
 test();
 */
 
-export type Env = { [name: string]: [LL<Mark>, string][] };
+export type Label = { cuid: string; name: string };
+
+export type Env = { [name: string]: [LL<Mark>, Label][] };
 
 export type Rib = { type: "rib"; types_env: Env; normal_env: Env };
 

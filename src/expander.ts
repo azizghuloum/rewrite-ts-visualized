@@ -6,7 +6,6 @@ import {
   extend_unit,
   init_top_level,
   resolve,
-  CorePatterns,
   push_wrap,
   lexical_extension,
   modular_extension,
@@ -31,16 +30,18 @@ import { preexpand_helpers } from "./preexpand-helpers";
 export function initial_step(
   ast: AST,
   cu_id: string,
-  patterns: CorePatterns,
+  globals: string[],
+  global_macros: string[],
 ): [
   Loc,
   (
     helpers: preexpand_helpers,
   ) => Promise<{ loc: Loc; unit: CompilationUnit; context: Context; modular: modular_extension }>,
 ] {
-  const { stx, counter, unit, context, rib, rib_id } = init_top_level(ast, cu_id, patterns);
+  const { stx, counter, unit, rib, rib_id } = init_top_level(ast, cu_id, globals, global_macros);
   const initial_loc: Loc = mkzipper(stx);
   const lexical: lexical_extension = { extensible: true, rib, rib_id };
+  const context: Context = {};
   return [
     initial_loc,
     (helpers: preexpand_helpers) =>
@@ -165,6 +166,8 @@ async function handle_core_syntax(
   unit: CompilationUnit,
   counter: number,
   lexical: lexical_extension,
+  global_unit: CompilationUnit,
+  global_context: Context,
 ): Promise<{
   loc: Loc;
   counter: number;
@@ -174,7 +177,7 @@ async function handle_core_syntax(
 }> {
   const handler = core_handlers[name];
   assert(handler !== undefined);
-  return handler(loc, context, unit, counter, lexical);
+  return handler(loc, context, unit, counter, lexical, global_unit, global_context);
 }
 
 const atom_handlers_table: { [tag in atom_tag]: "next" | "stop" } = {
@@ -330,7 +333,15 @@ async function preexpand_forms(
       case "identifier": {
         assert(loc.t.type === "atom" && loc.t.tag === "identifier", loc.t);
         const { content, wrap } = loc.t;
-        const resolution = resolve(content, wrap, context, unit, sort_env[sort]);
+        const resolution = resolve(
+          content,
+          wrap,
+          context,
+          unit,
+          sort_env[sort],
+          helpers.global_unit,
+          helpers.global_context,
+        );
         switch (resolution.type) {
           case "unbound":
             return next(loc);
@@ -344,25 +355,35 @@ async function preexpand_forms(
               case "core_syntax": {
                 const { name } = binding;
                 return helpers.inspect(loc, "core form", () =>
-                  handle_core_syntax(loc, name, context, unit, counter, lexical).then(
-                    ({ loc, counter, unit, context, lexical }) =>
-                      helpers.inspect(loc, `core output`, () =>
-                        preexpand_forms(loc, lexical, counter, unit, context, sort, helpers),
-                      ),
+                  handle_core_syntax(
+                    loc,
+                    name,
+                    context,
+                    unit,
+                    counter,
+                    lexical,
+                    helpers.global_unit,
+                    helpers.global_context,
+                  ).then(({ loc, counter, unit, context, lexical }) =>
+                    helpers.inspect(loc, `core output`, () =>
+                      preexpand_forms(loc, lexical, counter, unit, context, sort, helpers),
+                    ),
                   ),
                 );
               }
               case "syntax_rules_transformer": {
                 const { clauses } = binding;
                 return helpers.inspect(loc, `transformer form`, () =>
-                  apply_syntax_rules(loc, clauses, unit, counter).then(({ loc, counter }) => {
-                    const rewrapped = lexical.extensible
-                      ? rewrap(loc, lexical.rib_id, unit.cu_id)
-                      : loc;
-                    return helpers.inspect(rewrapped, `transformer output`, () =>
-                      preexpand_forms(rewrapped, lexical, counter, unit, context, sort, helpers),
-                    );
-                  }),
+                  apply_syntax_rules(loc, clauses, unit, counter, helpers.global_unit).then(
+                    ({ loc, counter }) => {
+                      const rewrapped = lexical.extensible
+                        ? rewrap(loc, lexical.rib_id, unit.cu_id)
+                        : loc;
+                      return helpers.inspect(rewrapped, `transformer output`, () =>
+                        preexpand_forms(rewrapped, lexical, counter, unit, context, sort, helpers),
+                      );
+                    },
+                  ),
                 );
               }
               default:
@@ -920,7 +941,15 @@ async function postexpand_type_alias_declaration(
     return go_right(loc, async (loc) => {
       assert(loc.t.tag === "identifier");
       const { content, wrap } = loc.t;
-      const resolution = resolve(content, wrap, context, unit, "types_env");
+      const resolution = resolve(
+        content,
+        wrap,
+        context,
+        unit,
+        "types_env",
+        helpers.global_unit,
+        helpers.global_context,
+      );
       assert(resolution.type === "bound");
       assert(resolution.binding.type === "type");
       const new_name = resolution.binding.name;
@@ -1002,7 +1031,15 @@ async function postexpand_lexical_declaration(
   ): Promise<{ loc: Loc; modular: modular_extension }> {
     assert(loc.t.tag === "identifier");
     const { content, wrap } = loc.t;
-    const resolution = resolve(content, wrap, context, unit, "normal_env");
+    const resolution = resolve(
+      content,
+      wrap,
+      context,
+      unit,
+      "normal_env",
+      helpers.global_unit,
+      helpers.global_context,
+    );
     assert(resolution.type === "bound");
     assert(resolution.binding.type === "lexical");
     const new_name = resolution.binding.name;
@@ -1135,7 +1172,15 @@ async function postexpand_body(
         const { tag, content, wrap } = loc.t;
         switch (tag) {
           case "identifier": {
-            const resolution = resolve(content, wrap, context, unit, sort_env[sort]);
+            const resolution = resolve(
+              content,
+              wrap,
+              context,
+              unit,
+              sort_env[sort],
+              helpers.global_unit,
+              helpers.global_context,
+            );
             switch (resolution.type) {
               case "bound": {
                 const { binding } = resolution;

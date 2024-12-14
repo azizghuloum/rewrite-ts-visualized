@@ -1,6 +1,6 @@
 import { assert } from "./assert";
 import { imported_module, preexpand_helpers } from "./preexpand-helpers";
-import { extend_context_lexical, extend_rib, extend_unit, lexical_extension } from "./stx";
+import { extend_context_lexical, extend_rib, lexical_extension } from "./stx";
 import { debug, syntax_error } from "./stx-error";
 import { CompilationUnit, Context, Loc } from "./syntax-structures";
 import { list_tag } from "./tags";
@@ -43,8 +43,10 @@ export function gen_binding({
   assert(lexical.extensible);
   const { rib, rib_id } = lexical;
   const env_type = { type: "types_env" as const, value: "normal_env" as const }[sort];
+  const cuid = unit.cu_id;
   return extend_rib(
     rib,
+    cuid,
     stx.content,
     stx.wrap.marks,
     counter,
@@ -53,7 +55,7 @@ export function gen_binding({
       extend_context_lexical(
         context,
         counter,
-        label,
+        label.name,
         { type: "type" as const, value: "lexical" as const }[sort],
         stx.content,
         ({ context, counter, name }) => ({

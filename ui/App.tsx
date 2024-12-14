@@ -12,6 +12,7 @@ import { pprint } from "../src/pprint";
 import { StxError, syntax_error } from "../src/stx-error";
 import { preexpand_helpers } from "../src/preexpand-helpers";
 import { source_file } from "../src/ast";
+import { get_globals, init_global_context } from "../src/global-module";
 
 type ExampleProps = {
   code: string;
@@ -90,15 +91,23 @@ function StepperView({ step, step_number }: { step: Step; step_number: number })
 
 function Example({ code, onChange }: ExampleProps) {
   type expand = (helpers: preexpand_helpers) => Promise<{ loc: Loc }>;
+  const globals = get_globals("es2024.full");
+  const patterns = core_patterns(parse);
+  const global_macros = Object.keys(patterns);
   function init_state(code: string): [State, expand] {
-    const patterns = core_patterns(parse);
     const source_file: source_file = {
       package: { name: "@rewrite-ts/example", version: "0.0.0" },
       path: "example",
     };
-    const [loc0, expand] = initial_step(parse(code, source_file), "example", patterns);
+    const [loc0, expand] = initial_step(
+      parse(code, source_file),
+      "example",
+      globals,
+      global_macros,
+    );
     return [initial_state(loc0), expand];
   }
+  const [global_unit, global_context] = init_global_context(patterns, globals);
   const [state, setState] = useState(init_state(code)[0]);
   useEffect(() => {
     setState((_old_state) => {
@@ -122,6 +131,8 @@ function Example({ code, onChange }: ExampleProps) {
             syntax_error(loc, `import is not supported in gui`);
           },
         },
+        global_unit,
+        global_context,
         inspect(loc, reason, k) {
           record({ name: "Inspect", loc, error: undefined, info: reason });
           return k();
