@@ -20,6 +20,7 @@ import {
 } from "./syntax-structures";
 import { globals_cuid, init_global_unit } from "./global-module";
 import { syntax_error } from "./stx-error";
+import { preexpand_helpers } from "./preexpand-helpers";
 
 function is_top_marked(wrap: Wrap): boolean {
   function loop_marks(marks: Marks): boolean {
@@ -40,7 +41,7 @@ function id_to_label(
   subst: Subst,
   unit: CompilationUnit,
   resolution_type: "normal_env" | "types_env",
-  global_unit: CompilationUnit,
+  helpers: preexpand_helpers,
 ): Label | undefined {
   function lookup(marks: Marks | null, subst: Subst): Label | undefined {
     if (marks === null) throw new Error("missing marks");
@@ -54,7 +55,7 @@ function id_to_label(
         }
         return rib;
       } else if (cu_id === globals_cuid) {
-        const unit = global_unit;
+        const unit = helpers.global_unit;
         const rib = unit.store[rib_id];
         assert(rib !== undefined, `missing rib in global unit`);
         return rib;
@@ -87,10 +88,9 @@ export function resolve(
   context: Context,
   unit: CompilationUnit,
   resolution_type: "normal_env" | "types_env",
-  global_unit: CompilationUnit,
-  global_context: Context,
+  helpers: preexpand_helpers,
 ): Resolution {
-  const label = id_to_label(name, marks, subst, unit, resolution_type, global_unit);
+  const label = id_to_label(name, marks, subst, unit, resolution_type, helpers);
   if (label === undefined) {
     return { type: "unbound" };
   }
@@ -103,7 +103,7 @@ export function resolve(
       return { type: "error", reason: "out of context" };
     }
   } else if (label.cuid === globals_cuid) {
-    const binding = global_context[label.name];
+    const binding = helpers.global_context[label.name];
     assert(binding !== undefined);
     return { type: "bound", binding, label };
   } else {
@@ -119,10 +119,10 @@ export function free_id_equal(
   wrap2: Wrap,
   unit: CompilationUnit,
   resolution_type: "normal_env" | "types_env",
-  global_unit: CompilationUnit,
+  helpers: preexpand_helpers,
 ): boolean {
-  const label1 = id_to_label(name1, wrap1.marks, wrap1.subst, unit, resolution_type, global_unit);
-  const label2 = id_to_label(name2, wrap2.marks, wrap2.subst, unit, resolution_type, global_unit);
+  const label1 = id_to_label(name1, wrap1.marks, wrap1.subst, unit, resolution_type, helpers);
+  const label2 = id_to_label(name2, wrap2.marks, wrap2.subst, unit, resolution_type, helpers);
   if (label1 === undefined && label2 === undefined) {
     return name1 === name2;
   } else {
