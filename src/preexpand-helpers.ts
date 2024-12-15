@@ -12,6 +12,9 @@ export type imported_module = {
   imported_modules: imported_module[];
   resolve_exported_identifier: (name: string, loc: Loc) => Promise<import_resolution[]>;
   ensureUpToDate(): Promise<void>;
+  get_cid(): Promise<string>;
+  find_module_by_cid(cid: string): Promise<imported_module | undefined>;
+  resolve_label(name: string): Promise<Binding>;
 };
 
 export type manager = {

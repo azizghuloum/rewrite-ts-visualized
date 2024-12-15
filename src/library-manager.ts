@@ -15,9 +15,11 @@ import {
 } from "./preexpand-helpers";
 import { AST, source_file } from "./ast";
 import { normalize } from "node:path";
-import { CompilationUnit, Context, Loc } from "./syntax-structures";
+import { Binding, CompilationUnit, Context, Loc } from "./syntax-structures";
 import stringify from "json-stringify-pretty-compact";
 import { init_global_context } from "./global-module";
+
+const cookie = "rewrite-ts-002";
 
 type module_state =
   | { type: "initial" }
@@ -28,6 +30,7 @@ type module_state =
       pkg: Package;
       pkg_relative_path: string;
       exported_identifiers: { [name: string]: import_resolution[] };
+      context: Context;
     }
   | { type: "error"; reason: string };
 
@@ -98,22 +101,27 @@ class RtsModule implements imported_module {
     const json_mtime = await mtime(json_path);
     const my_mtime = await mtime(this.path);
     assert(my_mtime !== undefined);
-    //console.log({ cid, my_mtime, json_path });
     if (my_mtime >= (json_mtime ?? 0)) {
       this.state = { type: "stale", cid, pkg, pkg_relative_path };
-    } else {
-      const json = JSON.parse(await fs.readFile(json_path, { encoding: "utf8" }));
-      assert(json.cid === cid);
-      assert(json.exported_identifiers !== undefined, `no exported_identifiers in ${json_path}`);
-      console.error("TODO: check dependencies");
-      this.state = {
-        type: "fresh",
-        cid,
-        pkg,
-        pkg_relative_path,
-        exported_identifiers: json.exported_identifiers,
-      };
+      return;
     }
+    const json = JSON.parse(await fs.readFile(json_path, { encoding: "utf8" }));
+    if (json.cookie !== cookie) {
+      this.state = { type: "stale", cid, pkg, pkg_relative_path };
+      return;
+    }
+    assert(json.cid === cid);
+    assert(json.exported_identifiers !== undefined, `no exported_identifiers in ${json_path}`);
+    assert(json.context !== undefined, `no exported_identifiers in ${json_path}`);
+    console.error("TODO: check dependencies");
+    this.state = {
+      type: "fresh",
+      cid,
+      pkg,
+      pkg_relative_path,
+      exported_identifiers: json.exported_identifiers,
+      context: json.context,
+    };
   }
 
   async recompile() {
@@ -140,7 +148,9 @@ class RtsModule implements imported_module {
             return mod;
           },
           resolve_label: async (label) => {
-            throw new Error(`TODO resolve_label ${label.name} ${label.cuid}`);
+            const mod = await this.find_module_by_cid(label.cuid);
+            if (!mod) throw new Error(`cannot find module with cuid = ${label.cuid}`);
+            return mod.resolve_label(label.name);
           },
         },
         global_unit: this.global_unit,
@@ -157,7 +167,12 @@ class RtsModule implements imported_module {
         context,
       );
       const exported_identifiers = get_exported_identifiers_from_rib(modular.explicit);
-      const json_content = { cid: this.state.cid, exported_identifiers };
+      const json_content = {
+        cid: this.state.cid,
+        cookie,
+        exported_identifiers,
+        context,
+      };
       const code_path = this.get_generated_code_absolute_path();
       await fs.mkdir(dirname(code_path), { recursive: true });
       await fs.writeFile(code_path, await pprint(loc));
@@ -184,6 +199,38 @@ class RtsModule implements imported_module {
       syntax_error(loc, `module does not export such identifier`);
     }
     return resolutions;
+  }
+
+  async get_cid(): Promise<string> {
+    //await this.ensureUpToDate();
+    switch (this.state.type) {
+      case "fresh":
+      case "stale":
+        return this.state.cid;
+      default:
+        throw new Error(`invalid state`);
+    }
+  }
+
+  async find_module_by_cid(cid: string): Promise<imported_module | undefined> {
+    if ((await this.get_cid()) === cid) return this;
+    for (const m of this.imported_modules) {
+      const r = await m.find_module_by_cid(cid);
+      if (r) return r;
+    }
+    return undefined;
+  }
+
+  async resolve_label(name: string): Promise<Binding> {
+    assert(this.state.type === "fresh");
+    const context = this.state.context;
+    const binding = context[name];
+    switch (binding.type) {
+      case "lexical":
+        return { type: "imported_lexical", cuid: this.state.cid, name: binding.name };
+      default:
+        throw new Error(`unhandled binding type ${binding.type}`);
+    }
   }
 
   private get_imported_modules_for_path(import_path: string, loc: Loc): imported_module {

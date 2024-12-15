@@ -353,6 +353,7 @@ async function preexpand_forms(
               case "lexical":
               case "type":
               case "ts":
+              case "imported_lexical":
                 return next(loc);
               case "core_syntax": {
                 const { name } = binding;
@@ -1243,15 +1244,33 @@ async function postexpand_body(
             const resolution = await resolve(content, wrap, context, unit, sort_env[sort], helpers);
             switch (resolution.type) {
               case "bound": {
-                const { binding } = resolution;
+                const { binding, label } = resolution;
                 switch (binding.type) {
                   case "ts":
                   case "type":
                   case "lexical": {
                     return cont(rename(loc, binding.name), modular, imp, counter);
                   }
+                  case "imported_lexical": {
+                    const existing = (imp[label.cuid] ?? {})[label.name];
+                    if (existing) {
+                      return cont(rename(loc, existing.new_name), modular, imp, counter);
+                    } else {
+                      const { name } = binding;
+                      const new_name = `${name}_${counter}`;
+                      const new_counter = counter + 1;
+                      const new_imp: import_req = {
+                        ...imp,
+                        [label.cuid]: {
+                          ...(imp[label.cuid] ?? {}),
+                          [label.name]: { type: "value", new_name },
+                        },
+                      };
+                      return cont(rename(loc, new_name), modular, new_imp, new_counter);
+                    }
+                  }
                   default: {
-                    debug(loc, `unhandled ${binding.type}`);
+                    debug(loc, `unhandled ${binding.type} in postexpand_body`);
                   }
                 }
               }
