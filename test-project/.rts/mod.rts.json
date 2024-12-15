@@ -4,8 +4,10 @@
     "x": [
       {
         "type": "value",
-        "label": "l1",
-        "cuid": "test-project/mod.rts rewrite-ts-visualized 0.0.0"
+        "label": {
+          "cuid": "test-project/mod.rts rewrite-ts-visualized 0.0.0",
+          "name": "l1"
+        }
       }
     ]
   }

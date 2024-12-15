@@ -963,6 +963,7 @@ async function postexpand_type_alias_declaration(
         wrap.marks,
         resolution.label,
         "types_env",
+        loc,
       );
       return { loc: new_loc, modular: new_modular };
     });
@@ -1057,6 +1058,7 @@ async function postexpand_lexical_declaration(
         wrap.marks,
         resolution.label,
         "normal_env",
+        loc,
       ),
     };
   }

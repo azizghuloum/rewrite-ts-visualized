@@ -1,10 +1,16 @@
 import { assert } from "./assert";
 import { imported_module, preexpand_helpers } from "./preexpand-helpers";
-import { extend_context_lexical, extend_rib, lexical_extension } from "./stx";
-import { debug, syntax_error } from "./stx-error";
-import { CompilationUnit, Context, Loc } from "./syntax-structures";
+import {
+  extend_context_lexical,
+  extend_rib,
+  extend_unit,
+  lexical_extension,
+  rib_push,
+} from "./stx";
+import { syntax_error } from "./stx-error";
+import { CompilationUnit, Context, Loc, STX } from "./syntax-structures";
 import { list_tag } from "./tags";
-import { go_down, go_right, go_up } from "./zipper";
+import { change, go_down, go_right, go_up, mkzipper } from "./zipper";
 
 export type goodies = {
   loc: Loc;
@@ -159,7 +165,9 @@ const import_declaration: preexpand_list_handler = ({ loc, ...goodies }, helpers
   async function handle_named_import(loc0: Loc, mod: imported_module): Promise<goodies> {
     switch (loc0.t.tag) {
       case "identifier": {
-        const bindings = await mod.resolve_exported_identifier(loc0.t.content, loc0);
+        const name = loc0.t.content;
+        const wrap = loc0.t.wrap;
+        const resolutions = await mod.resolve_exported_identifier(name, loc0);
         const { loc, counter, unit, context, lexical } = await go_right(
           loc0,
           (loc) => after_var(loc, mod),
@@ -167,7 +175,20 @@ const import_declaration: preexpand_list_handler = ({ loc, ...goodies }, helpers
         );
         assert(lexical.extensible);
         const { rib, rib_id } = lexical;
-        debug(loc, "got goodies", rib);
+        const new_rib = resolutions.reduce((rib, resolution) => {
+          assert(typeof resolution.label !== "string");
+          return rib_push(
+            rib,
+            name,
+            wrap.marks,
+            resolution.label,
+            { type: "types_env" as const, value: "normal_env" as const }[resolution.type],
+            loc0,
+          );
+        }, rib);
+        const new_lexical: lexical_extension = { extensible: true, rib: new_rib, rib_id };
+        const new_unit = extend_unit(unit, new_lexical);
+        return { loc, counter, unit: new_unit, context, lexical: new_lexical };
       }
       default:
         syntax_error(loc, `unexpected ${loc.t.tag} in import context`);
@@ -198,7 +219,18 @@ const import_declaration: preexpand_list_handler = ({ loc, ...goodies }, helpers
       syntax_error(loc, "expected an import clause");
     }
   }
-  return go_down(loc, (loc) => handle_import_clause(skip_required(loc, ["import"])), syntax_error);
+  const empty_slice: STX = {
+    type: "list",
+    tag: "slice",
+    content: null,
+    src: loc.t,
+    wrap: undefined,
+  };
+  return go_down(
+    loc,
+    (loc) => handle_import_clause(skip_required(loc, ["import"])),
+    syntax_error,
+  ).then(({ ...gs }) => ({ ...gs, loc: change(loc, mkzipper(empty_slice)) }));
 };
 
 type preexpand_list_handler = (goodies: goodies, helpers: preexpand_helpers) => Promise<goodies>;

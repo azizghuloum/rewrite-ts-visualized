@@ -1,1 +1,23 @@
-{"cid":"rtsc/testing-file-extensions.rts rewrite-ts-visualized 0.0.0","exported_identifiers":{"x":[{"type":"value","label":"l3"}],"t_global":[{"type":"type","label":"l8"}]}}
+{
+  "cid": "rtsc/testing-file-extensions.rts rewrite-ts-visualized 0.0.0",
+  "exported_identifiers": {
+    "x": [
+      {
+        "type": "value",
+        "label": {
+          "cuid": "rtsc/testing-file-extensions.rts rewrite-ts-visualized 0.0.0",
+          "name": "l3"
+        }
+      }
+    ],
+    "t_global": [
+      {
+        "type": "type",
+        "label": {
+          "cuid": "rtsc/testing-file-extensions.rts rewrite-ts-visualized 0.0.0",
+          "name": "l8"
+        }
+      }
+    ]
+  }
+}

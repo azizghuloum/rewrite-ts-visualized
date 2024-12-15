@@ -8,6 +8,7 @@ import {
   CompilationUnit,
   Context,
   Label,
+  Loc,
   Marks,
   new_rib_id,
   Rib,
@@ -18,6 +19,7 @@ import {
   Wrap,
 } from "./syntax-structures";
 import { globals_cuid, init_global_unit } from "./global-module";
+import { syntax_error } from "./stx-error";
 
 function is_top_marked(wrap: Wrap): boolean {
   function loop_marks(marks: Marks): boolean {
@@ -64,7 +66,12 @@ function id_to_label(
     const ls = rib[resolution_type][name];
     const entry = ls?.find(([ms, _]) => same_marks(ms, marks));
     if (entry === undefined) return lookup(marks, subst[1]);
-    return entry[1];
+    const label = entry[1];
+    if (typeof label === "string") {
+      console.error(rib);
+      throw new Error(`invalid label`);
+    }
+    return label;
   }
   return lookup(marks, subst);
 }
@@ -135,6 +142,25 @@ export function rib_push(
   marks: Marks,
   label: Label,
   env_type: "normal_env" | "types_env",
+  loc: Loc,
+): Rib {
+  const env = rib[env_type];
+  const entry = env[name] ?? [];
+  if (entry.find((x) => same_marks(x[0], marks))) {
+    syntax_error(loc, `${name} is already defined in ${env_type}`);
+  }
+  return {
+    ...rib,
+    [env_type]: { ...env, [name]: [...entry, [marks, label]] },
+  };
+}
+
+export function rib_push_no_check(
+  rib: Rib,
+  name: string,
+  marks: Marks,
+  label: Label,
+  env_type: "normal_env" | "types_env",
 ): Rib {
   const env = rib[env_type];
   const entry = env[name] ?? [];
@@ -161,7 +187,7 @@ export function extend_rib<S>(
   }
   const label: Label = { cuid, name: `l${counter}` };
   const new_counter = counter + 1;
-  const new_rib = rib_push(rib, name, marks, label, env_type);
+  const new_rib = rib_push_no_check(rib, name, marks, label, env_type);
   return sk({ rib: new_rib, counter: new_counter, label });
 }
 
@@ -308,13 +334,14 @@ export function extend_modular(
   marks: Marks,
   label: Label,
   env_type: "types_env" | "normal_env",
+  loc: Loc,
 ): modular_extension {
   if (modular.extensible) {
     const { implicit, explicit } = modular;
     return {
       extensible: true,
-      implicit: rib_push(implicit, name, marks, label, env_type),
-      explicit: exporting ? rib_push(explicit, name, marks, label, env_type) : explicit,
+      implicit: rib_push(implicit, name, marks, label, env_type, loc),
+      explicit: exporting ? rib_push(explicit, name, marks, label, env_type, loc) : explicit,
     };
   } else {
     assert(!exporting);
