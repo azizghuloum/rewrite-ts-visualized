@@ -4,6 +4,7 @@ import {
   extend_context_lexical,
   extend_rib,
   extend_unit,
+  import_req,
   lexical_extension,
   rib_push,
 } from "./stx";

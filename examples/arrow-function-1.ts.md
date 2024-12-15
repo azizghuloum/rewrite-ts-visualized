@@ -14,7 +14,7 @@ const h = (x) => x((x) => f(x));
 
 ```typescript
 export const f_2 = (x_8) => x_8;
-export const g_4 = (x_8) => f_2(x_8);
-export const h_6 = (x_8) => x_8((x_9) => f_2(x_9));
+export const g_4 = (x_9) => f_2(x_9);
+export const h_6 = (x_10) => x_10((x_11) => f_2(x_11));
 ```
 

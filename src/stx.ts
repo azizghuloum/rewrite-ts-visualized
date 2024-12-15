@@ -316,6 +316,10 @@ export type modular_extension =
   | { extensible: true; implicit: Rib; explicit: Rib }
   | { extensible: false };
 
+export type import_req = {
+  [cuid: string]: { [label: string]: { type: "type" | "value"; new_name: string } };
+};
+
 export function extend_unit(unit: CompilationUnit, extension: lexical_extension): CompilationUnit {
   if (extension.extensible) {
     const { rib_id, rib } = extension;
