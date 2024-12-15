@@ -130,6 +130,9 @@ function Example({ code, onChange }: ExampleProps) {
           resolve_import(loc) {
             syntax_error(loc, `import is not supported in gui`);
           },
+          resolve_label(_label) {
+            throw new Error(`resolving labels is not supported in gui`);
+          },
         },
         global_unit,
         global_context,

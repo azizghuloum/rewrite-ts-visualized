@@ -82,14 +82,14 @@ export type Resolution =
   | { type: "bound"; binding: Binding; label: Label }
   | { type: "error"; reason: string };
 
-export function resolve(
+export async function resolve(
   name: string,
   { marks, subst }: Wrap,
   context: Context,
   unit: CompilationUnit,
   resolution_type: "normal_env" | "types_env",
   helpers: preexpand_helpers,
-): Resolution {
+): Promise<Resolution> {
   const label = id_to_label(name, marks, subst, unit, resolution_type, helpers);
   if (label === undefined) {
     return { type: "unbound" };
@@ -108,7 +108,8 @@ export function resolve(
     return { type: "bound", binding, label };
   } else {
     // label imported from somewhere else
-    throw new Error(`TODO, imported label ${name} ${label.cuid} ${unit.cu_id}`);
+    const binding = await helpers.manager.resolve_label(label);
+    return { type: "bound", binding, label };
   }
 }
 

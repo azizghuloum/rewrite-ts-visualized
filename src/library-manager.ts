@@ -139,6 +139,9 @@ class RtsModule implements imported_module {
             const mod = this.get_imported_modules_for_path(import_path, loc);
             return mod;
           },
+          resolve_label: async (label) => {
+            throw new Error(`TODO resolve_label ${label.name} ${label.cuid}`);
+          },
         },
         global_unit: this.global_unit,
         global_context: this.global_context,

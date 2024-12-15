@@ -332,7 +332,7 @@ async function preexpand_forms(
       case "identifier": {
         assert(loc.t.type === "atom" && loc.t.tag === "identifier", loc.t);
         const { content, wrap } = loc.t;
-        const resolution = resolve(content, wrap, context, unit, sort_env[sort], helpers);
+        const resolution = await resolve(content, wrap, context, unit, sort_env[sort], helpers);
         switch (resolution.type) {
           case "unbound":
             return next(loc);
@@ -924,7 +924,7 @@ async function postexpand_type_alias_declaration(
     return go_right(loc, async (loc) => {
       assert(loc.t.tag === "identifier");
       const { content, wrap } = loc.t;
-      const resolution = resolve(content, wrap, context, unit, "types_env", helpers);
+      const resolution = await resolve(content, wrap, context, unit, "types_env", helpers);
       assert(resolution.type === "bound");
       assert(resolution.binding.type === "type");
       const new_name = resolution.binding.name;
@@ -1007,7 +1007,7 @@ async function postexpand_lexical_declaration(
   ): Promise<{ loc: Loc; modular: modular_extension }> {
     assert(loc.t.tag === "identifier");
     const { content, wrap } = loc.t;
-    const resolution = resolve(content, wrap, context, unit, "normal_env", helpers);
+    const resolution = await resolve(content, wrap, context, unit, "normal_env", helpers);
     assert(resolution.type === "bound");
     assert(resolution.binding.type === "lexical");
     const new_name = resolution.binding.name;
@@ -1141,7 +1141,7 @@ async function postexpand_body(
         const { tag, content, wrap } = loc.t;
         switch (tag) {
           case "identifier": {
-            const resolution = resolve(content, wrap, context, unit, sort_env[sort], helpers);
+            const resolution = await resolve(content, wrap, context, unit, sort_env[sort], helpers);
             switch (resolution.type) {
               case "bound": {
                 const { binding } = resolution;

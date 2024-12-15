@@ -1,5 +1,5 @@
 import { assert } from "./assert";
-import { CompilationUnit, Context, Label, Loc, Rib } from "./syntax-structures";
+import { Binding, CompilationUnit, Context, Label, Loc, Rib } from "./syntax-structures";
 
 type inspect = <T>(loc: Loc, reason: string, k: () => Promise<T>) => Promise<T>;
 
@@ -16,6 +16,7 @@ export type imported_module = {
 
 export type manager = {
   resolve_import: (loc: Loc) => Promise<imported_module>;
+  resolve_label: (label: Label) => Promise<Binding>;
 };
 
 export type preexpand_helpers = {
