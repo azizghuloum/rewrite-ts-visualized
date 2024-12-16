@@ -19,7 +19,7 @@ import { Binding, CompilationUnit, Context, Loc } from "./syntax-structures";
 import stringify from "json-stringify-pretty-compact";
 import { init_global_context } from "./global-module";
 
-const cookie = "rewrite-ts-007";
+const cookie = "rewrite-ts-008";
 
 type module_state =
   | { type: "initial" }

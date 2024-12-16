@@ -50,22 +50,21 @@ export function initial_step(
   const modular: modular_extension = { extensible: true, explicit: empty_rib, implicit: empty_rib };
   const context: Context = {};
   const imp: import_req = {};
+  const data = { loc: initial_loc, unit, context, imp, counter, lexical, modular };
   return [
     initial_loc,
     (helpers: preexpand_helpers) =>
-      expand_program(initial_loc, unit, context, imp, counter, lexical, helpers, modular).then(
-        async ({ loc, unit, context, modular, imp }) => {
-          const import_code = await generate_imports(imp, helpers);
-          assert(loc.t.tag === "program");
-          assert(loc.p.type === "top");
-          const new_program: STX = {
-            ...loc.t,
-            wrap: empty_wrap,
-            content: llappend(array_to_ll(import_code), loc.t.content),
-          };
-          return { loc: mkzipper(new_program), unit, context, modular };
-        },
-      ),
+      expand_program({ ...data, helpers }).then(async ({ loc, imp, ...data }) => {
+        const import_code = await generate_imports(imp, helpers);
+        assert(loc.t.tag === "program");
+        assert(loc.p.type === "top");
+        const new_program: STX = {
+          ...loc.t,
+          wrap: empty_wrap,
+          content: llappend(array_to_ll(import_code), loc.t.content),
+        };
+        return { loc: mkzipper(new_program), ...data };
+      }),
   ];
 }
 
@@ -133,16 +132,7 @@ async function generate_imports(imp: import_req, helpers: preexpand_helpers): Pr
   return Promise.all(Object.entries(imp).map(([cuid, bindings]) => generate(cuid, bindings)));
 }
 
-async function expand_program(
-  loc: Loc,
-  unit: CompilationUnit,
-  context: Context,
-  imp: import_req,
-  counter: number,
-  lexical: lexical_extension,
-  helpers: preexpand_helpers,
-  modular: modular_extension,
-): Promise<{
+async function expand_program({ loc, ...data }: data): Promise<{
   loc: Loc;
   unit: CompilationUnit;
   context: Context;
@@ -152,27 +142,16 @@ async function expand_program(
   async function expand(loc: Loc) {
     return preexpand_body({
       loc,
-      lexical,
-      unit,
-      context,
-      counter,
       sort: "value",
-      helpers,
-      imp,
-      modular,
-    }).then(({ loc, lexical, counter, context, unit }) => {
+      ...data,
+    }).then(({ loc, lexical, unit, ...new_data }) => {
       // rib is filled
       // context is filled also
       const new_unit = extend_unit(unit, lexical);
-      const modular: modular_extension = {
-        extensible: true,
-        explicit: { type: "rib", normal_env: {}, types_env: {} },
-        implicit: { type: "rib", normal_env: {}, types_env: {} },
-      };
-      return helpers.inspect(loc, "After preexpanding the program", () =>
-        postexpand_program(loc, modular, new_unit, counter, context, imp, helpers, lexical).then(
-          ({ loc, modular, imp, counter }) => {
-            return { loc, unit: new_unit, context, modular, imp, counter };
+      return data.helpers.inspect(loc, "After preexpanding the program", () =>
+        postexpand_program({ loc, ...data, ...new_data, unit: new_unit, lexical }).then(
+          ({ loc, ...new_new_data }) => {
+            return { ...new_data, ...new_new_data, loc, unit: new_unit };
           },
         ),
       );
@@ -193,7 +172,7 @@ async function expand_program(
       content: array_to_ll([empty_export]),
       src: false,
     };
-    return { loc: mkzipper(empty_program), unit, context, modular, imp, counter };
+    return { loc: mkzipper(empty_program), ...data };
   }
   if (loc.t.tag !== "program") syntax_error(loc, "expected a program");
   return go_down(loc, expand, expand_empty_program);
@@ -510,16 +489,16 @@ function find_form(loc: Loc): ffrv {
   return find_form(loc);
 }
 
-function postexpand_program(
-  loc: Loc,
-  modular: modular_extension,
-  unit: CompilationUnit,
-  counter: number,
-  context: Context,
-  imp: import_req,
-  helpers: preexpand_helpers,
-  lexical: lexical_extension,
-): Promise<{ loc: Loc; modular: modular_extension; counter: number; imp: import_req }> {
+function postexpand_program({
+  loc,
+  modular,
+  unit,
+  counter,
+  context,
+  imp,
+  helpers,
+  lexical,
+}: data): Promise<{ loc: Loc; modular: modular_extension; counter: number; imp: import_req }> {
   assert(loc.t.tag === "program");
   return go_down(loc, (loc) =>
     postexpand_body(loc, modular, unit, counter, context, imp, "value", helpers, lexical),
