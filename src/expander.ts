@@ -194,18 +194,10 @@ async function expand_program(
   return go_down(loc, expand, expand_empty_program);
 }
 
-const preexpand_body: walkerplus<{ sort: "type" | "value" }> = async ({
-  loc,
-  lexical,
-  unit,
-  context,
-  counter,
-  sort,
-  ...data
-}) =>
+const preexpand_body: walkerplus<{ sort: "type" | "value" }> = async ({ loc, sort, ...data }) =>
   in_isolation(
     loc,
-    (loc) => preexpand_forms(loc, lexical, counter, unit, context, sort, data.helpers),
+    (loc) => preexpand_forms({ loc, sort, ...data }),
     (loc, data) =>
       go_next(
         loc,
@@ -237,7 +229,7 @@ async function preexpand_body_curly(
   }
   return in_isolation(
     loc,
-    (loc) => preexpand_forms(loc, lexical, counter, unit, context, sort, helpers),
+    (loc) => preexpand_forms({ loc, lexical, counter, unit, context, sort, helpers }),
     (loc, { lexical, context, counter, unit }) => {
       return go_right(
         loc,
@@ -369,7 +361,7 @@ async function expand_concise_body(
           (loc) => debug(loc, "???"),
         ),
       )
-    : preexpand_forms(loc, lexical, counter, unit, context, sort, helpers));
+    : preexpand_forms({ loc, lexical, counter, unit, context, sort, helpers }));
   const new_unit = extend_unit(gs.unit, gs.lexical);
   return postexpand_body(
     gs.loc,
@@ -391,24 +383,9 @@ function rewrap(loc: Loc, rib_id: string, cu_id: string): Loc {
   };
 }
 
-async function preexpand_forms(
-  loc: Loc,
-  lexical: lexical_extension,
-  counter: number,
-  unit: CompilationUnit,
-  context: Context,
-  sort: "type" | "value",
-  helpers: preexpand_helpers,
-): Promise<goodies> {
+const preexpand_forms: walkerplus<{ sort: "type" | "value" }> = async ({ loc, sort, ...data }) => {
   function done(loc: Loc): Promise<goodies> {
-    return Promise.resolve({
-      loc,
-      lexical,
-      context,
-      counter,
-      unit,
-      helpers,
-    });
+    return Promise.resolve({ loc, ...data });
   }
   function next(loc: Loc): Promise<goodies> {
     return go_next(loc, (loc) => h(find_form(loc)), done);
@@ -424,7 +401,14 @@ async function preexpand_forms(
       case "identifier": {
         assert(loc.t.type === "atom" && loc.t.tag === "identifier", loc.t);
         const { content, wrap } = loc.t;
-        const resolution = await resolve(content, wrap, context, unit, sort_env[sort], helpers);
+        const resolution = await resolve(
+          content,
+          wrap,
+          data.context,
+          data.unit,
+          sort_env[sort],
+          data.helpers,
+        );
         switch (resolution.type) {
           case "unbound":
             return next(loc);
@@ -438,25 +422,40 @@ async function preexpand_forms(
                 return next(loc);
               case "core_syntax": {
                 const { name } = binding;
-                return helpers.inspect(loc, "core form", () =>
-                  handle_core_syntax(loc, name, context, unit, counter, lexical, helpers).then(
-                    ({ loc, counter, unit, context, lexical }) =>
-                      helpers.inspect(loc, `core output`, () =>
-                        preexpand_forms(loc, lexical, counter, unit, context, sort, helpers),
-                      ),
+                return data.helpers.inspect(loc, "core form", () =>
+                  handle_core_syntax(
+                    loc,
+                    name,
+                    data.context,
+                    data.unit,
+                    data.counter,
+                    data.lexical,
+                    data.helpers,
+                  ).then(({ loc, counter, unit, context, lexical }) =>
+                    data.helpers.inspect(loc, `core output`, () =>
+                      preexpand_forms({
+                        loc,
+                        lexical,
+                        counter,
+                        unit,
+                        context,
+                        sort,
+                        helpers: data.helpers,
+                      }),
+                    ),
                   ),
                 );
               }
               case "syntax_rules_transformer": {
                 const { clauses } = binding;
-                return helpers.inspect(loc, `transformer form`, () =>
-                  apply_syntax_rules(loc, clauses, unit, counter, helpers).then(
+                return data.helpers.inspect(loc, `transformer form`, () =>
+                  apply_syntax_rules(loc, clauses, data.unit, data.counter, data.helpers).then(
                     ({ loc, counter }) => {
-                      const rewrapped = lexical.extensible
-                        ? rewrap(loc, lexical.rib_id, unit.cu_id)
+                      const rewrapped = data.lexical.extensible
+                        ? rewrap(loc, data.lexical.rib_id, data.unit.cu_id)
                         : loc;
-                      return helpers.inspect(rewrapped, `transformer output`, () =>
-                        preexpand_forms(rewrapped, lexical, counter, unit, context, sort, helpers),
+                      return data.helpers.inspect(rewrapped, `transformer output`, () =>
+                        preexpand_forms({ loc: rewrapped, ...data, counter, sort }),
                       );
                     },
                   ),
@@ -478,13 +477,12 @@ async function preexpand_forms(
         assert(loc.t.type === "list");
         const h = preexpand_list_handlers[loc.t.tag];
         if (h) {
-          return h({ loc, lexical, counter, unit, context, helpers }, helpers).then(
-            ({ loc, lexical, counter, unit, context }) =>
-              go_next(
-                loc,
-                (loc) => preexpand_forms(loc, lexical, counter, unit, context, sort, helpers),
-                (loc) => Promise.resolve({ loc, lexical, counter, unit, context, helpers }),
-              ),
+          return h({ loc, ...data }, data.helpers).then(({ loc, ...data }) =>
+            go_next(
+              loc,
+              (loc) => preexpand_forms({ loc, sort, ...data }),
+              (loc) => Promise.resolve({ loc, ...data }),
+            ),
           );
         }
         switch (loc.t.tag) {
@@ -504,7 +502,7 @@ async function preexpand_forms(
     }
   }
   return h(find_form(loc));
-}
+};
 
 type ffrv =
   | { type: "done"; loc: Loc }
@@ -920,15 +918,15 @@ function expand_expr(
   return in_isolation(
     loc,
     async (loc) => {
-      return preexpand_forms(
+      return preexpand_forms({
         loc,
-        { extensible: false },
+        lexical: { extensible: false },
         counter,
         unit,
         context,
         sort,
         helpers,
-      ).then(({ loc, unit, counter, context }) =>
+      }).then(({ loc, unit, counter, context }) =>
         postexpand_body(
           loc,
           { extensible: false },
