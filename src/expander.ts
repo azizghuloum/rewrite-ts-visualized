@@ -27,7 +27,7 @@ import { debug, in_isolation, syntax_error } from "./stx-error";
 import { array_to_ll, join_separated, llappend } from "./llhelpers";
 import { gen_binding, preexpand_list_handlers } from "./preexpand-handlers";
 import { preexpand_helpers } from "./preexpand-helpers";
-import { data, goodies, swalker, walker, walkerplus } from "./data";
+import { data, swalker, walker, walkerplus } from "./data";
 
 export function initial_step(
   ast: AST,
@@ -720,30 +720,17 @@ const expand_type_parameters: walker = ({ loc, ...data }) => {
             if (loc.t.content !== "extends") syntax_error(loc, "expected 'extends'");
             assert(lexical.extensible);
             return go_right(loc, (loc) =>
-              expand_expr(
-                wrap_loc(loc, {
+              expand_expr({
+                loc: wrap_loc(loc, {
                   marks: null,
                   subst: [{ rib_id: lexical.rib_id, cu_id: data.unit.cu_id }, null],
                   aes: null,
                 }),
-                data.counter,
-                data.unit,
-                data.context,
-                data.imp,
-                "type",
-                data.helpers,
+                sort: "type",
                 lexical,
-              ).then(({ loc, counter, unit, context, imp, ...data }) =>
-                go_right(loc, syntax_error, () =>
-                  post_after_var({
-                    loc: go_up(loc),
-                    counter,
-                    unit,
-                    context,
-                    imp,
-                    ...data,
-                  }),
-                ),
+                ...data,
+              }).then(({ loc, ...data }) =>
+                go_right(loc, syntax_error, () => post_after_var({ loc: go_up(loc), ...data })),
               ),
             );
           });
@@ -753,7 +740,7 @@ const expand_type_parameters: walker = ({ loc, ...data }) => {
     }
   };
 
-  const pre_after_var: walker = ({ loc, lexical, counter, unit, context, imp, ...data }) => {
+  const pre_after_var: walker = ({ loc, lexical, counter, unit, ...data }) => {
     assert(lexical.extensible);
     return go_right(
       loc,
@@ -761,7 +748,7 @@ const expand_type_parameters: walker = ({ loc, ...data }) => {
         if (loc.t.content !== ",") syntax_error(loc, "expected a comma ','");
         return go_right(
           loc,
-          (loc) => pre_var({ loc, lexical, counter, unit, context, imp, ...data }),
+          (loc) => pre_var({ loc, lexical, counter, unit, ...data }),
           (loc) => debug(loc, "cant go past commma?"),
         );
       },
@@ -772,8 +759,6 @@ const expand_type_parameters: walker = ({ loc, ...data }) => {
             lexical,
             counter,
             unit: extend_unit(unit, lexical),
-            context,
-            imp,
             ...data,
           }),
         ),
@@ -823,16 +808,16 @@ const expand_type_parameters: walker = ({ loc, ...data }) => {
   return go_right(loc, (loc) => start({ loc, ...data }), syntax_error);
 };
 
-function expand_expr(
-  loc: Loc,
-  counter: number,
-  unit: CompilationUnit,
-  context: Context,
-  imp: import_req,
-  sort: "type" | "value",
-  helpers: preexpand_helpers,
-  lexical: lexical_extension,
-): Promise<Omit<goodies, "modular">> {
+const expand_expr: walkerplus<{ sort: "type" | "value" }> = ({
+  loc,
+  counter,
+  unit,
+  context,
+  imp,
+  sort,
+  helpers,
+  lexical,
+}) => {
   return in_isolation(
     loc,
     async (loc) => {
@@ -869,7 +854,7 @@ function expand_expr(
     },
     (loc, data) => ({ loc, ...data }),
   );
-}
+};
 
 const empty_wrap: Wrap = { marks: null, subst: null, aes: null };
 
@@ -995,7 +980,7 @@ async function postexpand_type_alias_declaration(
     context: Context,
     imp: import_req,
   ): Promise<{ loc: Loc; imp: import_req; counter: number }> {
-    return expand_expr(loc, counter, unit, context, imp, "type", helpers, lexical).then(
+    return expand_expr({ loc, counter, unit, context, imp, sort: "type", helpers, lexical }).then(
       ({ loc, unit: _unit, counter, context: _context, imp }) => {
         function done(loc: Loc) {
           return { loc: go_up(loc), imp, counter };
@@ -1112,7 +1097,7 @@ async function postexpand_lexical_declaration(
     assert(loc.t.content === "=");
     return go_right(
       loc,
-      (loc) => expand_expr(loc, counter, unit, context, imp, "value", helpers, lexical),
+      (loc) => expand_expr({ loc, counter, unit, context, imp, sort: "value", helpers, lexical }),
       (loc) => syntax_error(loc, "expected an expression following the '=' sign"),
     );
   }
@@ -1123,7 +1108,7 @@ async function postexpand_lexical_declaration(
     return go_right(
       loc,
       (loc) =>
-        expand_expr(loc, counter, unit, context, imp, "type", helpers, lexical).then(
+        expand_expr({ loc, counter, unit, context, imp, sort: "type", helpers, lexical }).then(
           ({ loc, counter, unit: _ignored_unit, context: _ignored_context, imp }) =>
             go_right(loc, handle_value_initializer, (loc) =>
               Promise.resolve({ loc, imp, counter }),
