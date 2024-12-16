@@ -226,17 +226,7 @@ const preexpand_body_curly: walker = async ({ loc, ...data }) =>
         },
       );
 
-async function handle_core_syntax(
-  loc: Loc,
-  name: string,
-  context: Context,
-  unit: CompilationUnit,
-  counter: number,
-  lexical: lexical_extension,
-  helpers: preexpand_helpers,
-  imp: import_req,
-  modular: modular_extension,
-): Promise<{
+async function handle_core_syntax({ name, ...data }: data & { name: string }): Promise<{
   loc: Loc;
   counter: number;
   unit: CompilationUnit;
@@ -245,7 +235,7 @@ async function handle_core_syntax(
 }> {
   const handler = core_handlers[name];
   assert(handler !== undefined);
-  return handler({ loc, context, unit, counter, lexical, helpers, imp, modular });
+  return handler(data);
 }
 
 const atom_handlers_table: { [tag in atom_tag]: "next" | "stop" } = {
@@ -398,29 +388,9 @@ const preexpand_forms: walkerplus<{ sort: "type" | "value" }> = async ({ loc, so
               case "core_syntax": {
                 const { name } = binding;
                 return data.helpers.inspect(loc, "core form", () =>
-                  handle_core_syntax(
-                    loc,
-                    name,
-                    data.context,
-                    data.unit,
-                    data.counter,
-                    data.lexical,
-                    data.helpers,
-                    data.imp,
-                    data.modular,
-                  ).then(({ loc, counter, unit, context, lexical }) =>
+                  handle_core_syntax({ ...data, loc, name }).then(({ loc, ...new_data }) =>
                     data.helpers.inspect(loc, `core output`, () =>
-                      preexpand_forms({
-                        loc,
-                        lexical,
-                        counter,
-                        unit,
-                        context,
-                        sort,
-                        helpers: data.helpers,
-                        imp: data.imp,
-                        modular: data.modular,
-                      }),
+                      preexpand_forms({ loc, sort, ...data, ...new_data }),
                     ),
                   ),
                 );
