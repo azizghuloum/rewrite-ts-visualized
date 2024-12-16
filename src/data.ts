@@ -9,12 +9,12 @@ export type goodies = {
   counter: number;
   unit: CompilationUnit;
   helpers: preexpand_helpers;
+  imp: import_req;
 };
 
 export type data = goodies;
 
 //export type data = {
-//  imp: import_req;
 //  modular: modular_extension;
 //};
 

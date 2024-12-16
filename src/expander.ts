@@ -147,25 +147,32 @@ async function expand_program(
   imp: import_req;
 }> {
   async function expand(loc: Loc) {
-    return preexpand_body({ loc, lexical, unit, context, counter, sort: "value", helpers }).then(
-      ({ loc, lexical, counter, context, unit }) => {
-        // rib is filled
-        // context is filled also
-        const new_unit = extend_unit(unit, lexical);
-        const modular: modular_extension = {
-          extensible: true,
-          explicit: { type: "rib", normal_env: {}, types_env: {} },
-          implicit: { type: "rib", normal_env: {}, types_env: {} },
-        };
-        return helpers.inspect(loc, "After preexpanding the program", () =>
-          postexpand_program(loc, modular, new_unit, counter, context, imp, helpers).then(
-            ({ loc, modular, imp, counter }) => {
-              return { loc, unit: new_unit, context, modular, imp, counter };
-            },
-          ),
-        );
-      },
-    );
+    return preexpand_body({
+      loc,
+      lexical,
+      unit,
+      context,
+      counter,
+      sort: "value",
+      helpers,
+      imp,
+    }).then(({ loc, lexical, counter, context, unit }) => {
+      // rib is filled
+      // context is filled also
+      const new_unit = extend_unit(unit, lexical);
+      const modular: modular_extension = {
+        extensible: true,
+        explicit: { type: "rib", normal_env: {}, types_env: {} },
+        implicit: { type: "rib", normal_env: {}, types_env: {} },
+      };
+      return helpers.inspect(loc, "After preexpanding the program", () =>
+        postexpand_program(loc, modular, new_unit, counter, context, imp, helpers).then(
+          ({ loc, modular, imp, counter }) => {
+            return { loc, unit: new_unit, context, modular, imp, counter };
+          },
+        ),
+      );
+    });
   }
   async function expand_empty_program() {
     const empty_rib: Rib = { type: "rib", normal_env: {}, types_env: {} };
@@ -319,14 +326,15 @@ async function expand_concise_body(
   helpers: preexpand_helpers,
 ): Promise<{ loc: Loc; imp: import_req; counter: number }> {
   const gs = await (loc.t.type === "list" && loc.t.tag === "statement_block"
-    ? preexpand_block({ loc, lexical, counter, unit, context, helpers }).then(({ loc, ...gs }) =>
-        go_down(
-          loc,
-          (loc) => ({ ...gs, loc }),
-          (loc) => debug(loc, "???"),
-        ),
+    ? preexpand_block({ loc, lexical, counter, unit, context, helpers, imp }).then(
+        ({ loc, ...gs }) =>
+          go_down(
+            loc,
+            (loc) => ({ ...gs, loc }),
+            (loc) => debug(loc, "???"),
+          ),
       )
-    : preexpand_forms({ loc, lexical, counter, unit, context, sort, helpers }));
+    : preexpand_forms({ loc, lexical, counter, unit, context, sort, helpers, imp }));
   const new_unit = extend_unit(gs.unit, gs.lexical);
   return postexpand_body(
     gs.loc,
@@ -406,6 +414,7 @@ const preexpand_forms: walkerplus<{ sort: "type" | "value" }> = async ({ loc, so
                         context,
                         sort,
                         helpers: data.helpers,
+                        imp: data.imp,
                       }),
                     ),
                   ),
@@ -442,7 +451,7 @@ const preexpand_forms: walkerplus<{ sort: "type" | "value" }> = async ({ loc, so
         assert(loc.t.type === "list");
         const h = preexpand_list_handlers[loc.t.tag];
         if (h) {
-          return h({ loc, ...data }, data.helpers).then(({ loc, ...data }) =>
+          return h({ loc, ...data }).then(({ loc, ...data }) =>
             go_next(
               loc,
               (loc) => preexpand_forms({ loc, sort, ...data }),
@@ -645,7 +654,7 @@ function expand_arrow_function(
         rib_id,
         rib: { type: "rib", normal_env: {}, types_env: {} },
       };
-      const pgs = extract_parameters({ loc, lexical, counter, context, unit, helpers });
+      const pgs = extract_parameters({ loc, lexical, counter, context, unit, helpers, imp });
       const arr = go_right(pgs.loc, itself, invalid_form);
       check_punct(arr, "=>");
       const body = go_right(arr, itself, invalid_form);
@@ -684,16 +693,9 @@ function expand_type_parameters(
   context: Context,
   imp: import_req,
   helpers: preexpand_helpers,
-): Promise<goodies & { imp: import_req }> {
-  type T = Promise<goodies & { imp: import_req }>;
-  function post_after_var({
-    loc,
-    lexical,
-    counter,
-    unit,
-    context,
-    imp,
-  }: goodies & { imp: import_req }): T {
+): Promise<goodies> {
+  type T = Promise<goodies>;
+  function post_after_var({ loc, lexical, counter, unit, context, imp }: goodies): T {
     return go_right(
       loc,
       (loc) => {
@@ -710,14 +712,7 @@ function expand_type_parameters(
     );
   }
 
-  function post_var({
-    loc,
-    lexical,
-    counter,
-    unit,
-    context,
-    imp,
-  }: goodies & { imp: import_req }): T {
+  function post_var({ loc, lexical, counter, unit, context, imp }: goodies): T {
     switch (loc.t.tag) {
       case "identifier":
         return post_after_var({ loc, lexical, counter, unit, context, imp, helpers });
@@ -761,14 +756,7 @@ function expand_type_parameters(
     }
   }
 
-  function pre_after_var({
-    loc,
-    lexical,
-    counter,
-    unit,
-    context,
-    imp,
-  }: goodies & { imp: import_req }): T {
+  function pre_after_var({ loc, lexical, counter, unit, context, imp }: goodies): T {
     assert(lexical.extensible);
     return go_right(
       loc,
@@ -795,14 +783,7 @@ function expand_type_parameters(
     );
   }
 
-  function pre_var({
-    loc,
-    lexical,
-    counter,
-    unit,
-    context,
-    imp,
-  }: goodies & { imp: import_req }): T {
+  function pre_var({ loc, lexical, counter, unit, context, ...data }: goodies): T {
     switch (loc.t.tag) {
       case "identifier":
         const { name, ...gs } = gen_binding({
@@ -812,7 +793,7 @@ function expand_type_parameters(
           context,
           unit,
           sort: "type",
-          helpers,
+          ...data,
         });
         return pre_after_var({ ...gs, loc: rename(loc, name), imp });
       case "type_parameter":
@@ -825,7 +806,7 @@ function expand_type_parameters(
             context,
             unit,
             sort: "type",
-            helpers,
+            ...data,
           });
           return pre_after_var({ ...gs, loc: go_up(rename(loc, name)), imp });
         });
@@ -847,19 +828,12 @@ function expand_type_parameters(
     );
   }
 
-  async function end({
-    loc,
-    lexical,
-    unit,
-    context,
-    counter,
-    imp,
-  }: goodies & { imp: import_req }): T {
+  async function end({ loc, ...data }: goodies): T {
     return go_right(
       loc,
       (loc) => {
         assert(loc.t.content === ">");
-        return { loc, lexical, unit, counter, context, imp, helpers };
+        return { loc, ...data };
       },
       syntax_error,
     );
@@ -877,7 +851,7 @@ function expand_expr(
   imp: import_req,
   sort: "type" | "value",
   helpers: preexpand_helpers,
-): Promise<Omit<goodies, "lexical" | "modular"> & { imp: import_req }> {
+): Promise<Omit<goodies, "lexical" | "modular">> {
   return in_isolation(
     loc,
     async (loc) => {
@@ -889,6 +863,7 @@ function expand_expr(
         context,
         sort,
         helpers,
+        imp,
       }).then(({ loc, unit, counter, context }) =>
         postexpand_body(
           loc,

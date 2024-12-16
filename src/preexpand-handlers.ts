@@ -1,6 +1,6 @@
 import { assert } from "./assert";
-import { goodies } from "./data";
-import { imported_module, preexpand_helpers } from "./preexpand-helpers";
+import { data, goodies, walker } from "./data";
+import { imported_module } from "./preexpand-helpers";
 import {
   extend_context_lexical,
   extend_rib,
@@ -36,7 +36,7 @@ export function gen_binding({
   context,
   unit,
   sort,
-  helpers,
+  ...data
 }: goodies & { sort: "type" | "value" }): Omit<goodies, "loc"> & { name: string } {
   const stx = loc.t;
   assert(stx.type === "atom" && stx.tag === "identifier", stx);
@@ -64,7 +64,7 @@ export function gen_binding({
           counter,
           name,
           unit,
-          helpers,
+          ...data,
         }),
       ),
     (reason) => syntax_error(loc, reason),
@@ -164,23 +164,23 @@ function type_alias_declaration({
   );
 }
 
-const import_declaration: preexpand_list_handler = async ({ loc, ...goodies }, helpers) => {
+const import_declaration: walker = async ({ loc, helpers, ...data }) => {
   async function handle_import_from_file(loc: Loc) {
     if (loc.t.tag !== "string") syntax_error(loc, "expected a string literal for import");
     const mod = await helpers.manager.resolve_import(loc);
     return mod;
   }
-  async function after_var(loc: Loc, mod: imported_module): Promise<goodies> {
+  async function after_var(loc: Loc, mod: imported_module): Promise<data> {
     switch (loc.t.content) {
       case "}":
-        return { loc: go_up(loc), ...goodies };
+        return { loc: go_up(loc), helpers, ...data };
       case ",":
         return go_right(loc, (loc) => handle_named_import(loc, mod), syntax_error);
       default:
         syntax_error(loc);
     }
   }
-  async function handle_named_import(loc0: Loc, mod: imported_module): Promise<goodies> {
+  async function handle_named_import(loc0: Loc, mod: imported_module): Promise<data> {
     switch (loc0.t.tag) {
       case "identifier": {
         const name = loc0.t.content;
@@ -206,17 +206,17 @@ const import_declaration: preexpand_list_handler = async ({ loc, ...goodies }, h
         }, rib);
         const new_lexical: lexical_extension = { extensible: true, rib: new_rib, rib_id };
         const new_unit = extend_unit(unit, new_lexical);
-        return { loc, counter, unit: new_unit, context, lexical: new_lexical, helpers };
+        return { loc, ...data, counter, unit: new_unit, context, lexical: new_lexical, helpers };
       }
       default:
         syntax_error(loc, `unexpected ${loc.t.tag} in import context`);
     }
   }
-  async function handle_named_imports(loc: Loc, mod: imported_module): Promise<goodies> {
+  async function handle_named_imports(loc: Loc, mod: imported_module): Promise<data> {
     if (loc.t.content !== "{") syntax_error(loc);
     return go_right(loc, (loc) => handle_named_import(loc, mod), syntax_error);
   }
-  async function handle_imports(loc: Loc, mod: imported_module): Promise<goodies> {
+  async function handle_imports(loc: Loc, mod: imported_module): Promise<data> {
     switch (loc.t.tag) {
       case "named_imports":
         return go_down(loc, (loc) => handle_named_imports(loc, mod), syntax_error);
@@ -224,7 +224,7 @@ const import_declaration: preexpand_list_handler = async ({ loc, ...goodies }, h
         syntax_error(loc, `unexpected ${loc.t.tag} in import`);
     }
   }
-  async function handle_import_clause(loc: Loc): Promise<goodies> {
+  async function handle_import_clause(loc: Loc): Promise<data> {
     if (loc.t.tag === "import_clause") {
       const mod = await handle_import_from_file(
         skip_required(
@@ -251,9 +251,7 @@ const import_declaration: preexpand_list_handler = async ({ loc, ...goodies }, h
   ).then(({ ...gs }) => ({ ...gs, loc: change(loc, mkzipper(empty_slice)) }));
 };
 
-type preexpand_list_handler = (goodies: goodies, helpers: preexpand_helpers) => Promise<goodies>;
-
-export const preexpand_list_handlers: { [k in list_tag]?: preexpand_list_handler } = {
+export const preexpand_list_handlers: { [k in list_tag]?: walker } = {
   lexical_declaration,
   type_alias_declaration,
   import_declaration,
