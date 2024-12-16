@@ -39,7 +39,7 @@ export type list_tag =
   | "import_specifier"
   | "named_imports"
   | "import_clause"
-  | "import_statement"
+  | "import_declaration"
   | "namespace_import"
   | "type_annotation"
   | "property_signature"

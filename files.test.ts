@@ -5,7 +5,10 @@ import { parse } from "./src/parse";
 import { core_patterns } from "./src/syntax-core-patterns";
 import { initial_step } from "./src/expander";
 import { pprint } from "./src/pprint";
-import { StxError } from "./src/stx-error";
+import { StxError, syntax_error } from "./src/stx-error";
+import { preexpand_helpers } from "./src/preexpand-helpers";
+import { source_file } from "./src/ast";
+import { get_globals, init_global_context } from "./src/global-module";
 
 const test_dir = __dirname + "/tests";
 const md_dir = __dirname + "/examples";
@@ -13,10 +16,35 @@ const md_dir = __dirname + "/examples";
 async function compile_script(filename: string, test_name: string) {
   const code = await readFile(filename, { encoding: "utf-8" });
   const patterns = core_patterns(parse);
-  const [loc0, expand] = initial_step(parse(code), test_name, patterns);
+  const globals = get_globals("es2024.full");
+  const global_macros = Object.keys(patterns);
+  const [global_unit, global_context] = init_global_context(patterns, globals);
+  const helpers: preexpand_helpers = {
+    manager: {
+      resolve_import(loc) {
+        syntax_error(loc, "import not supported in tests");
+      },
+      resolve_label(_label) {
+        throw new Error("resolving labels is not supported in tests");
+      },
+      get_import_path(_cuid) {
+        throw new Error(`imports are not supported in tests`);
+      },
+    },
+    global_unit,
+    global_context,
+    inspect(_loc, _reason, k) {
+      return k();
+    },
+  };
+  const source_file: source_file = {
+    package: { name: "@rewrite-ts/test", version: "0.0.0" },
+    path: filename,
+  };
+  const [_loc0, expand] = initial_step(parse(code, source_file), test_name, globals, global_macros);
   const result = await (async () => {
     try {
-      const { loc } = await expand((loc, reason, k) => k());
+      const { loc } = await expand(helpers);
       return { name: "DONE", loc, error: undefined };
     } catch (err) {
       if (err instanceof StxError) {

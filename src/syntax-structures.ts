@@ -36,7 +36,9 @@ function test() {
 test();
 */
 
-export type Env = { [name: string]: [LL<Mark>, string][] };
+export type Label = { cuid: string; name: string };
+
+export type Env = { [name: string]: [LL<Mark>, Label][] };
 
 export type Rib = { type: "rib"; types_env: Env; normal_env: Env };
 
@@ -59,12 +61,14 @@ export type RibRef = { rib_id: string; cu_id: string };
 
 export type Subst = LL<Shift | RibRef>;
 
-export type Wrap = { marks: Marks; subst: Subst };
+export type AE = false | STX | AST;
+
+export type Wrap = { marks: Marks; subst: Subst; aes: LL<AE> };
 
 export type STX =
-  | { type: "list"; tag: list_tag; wrap: Wrap; content: LL<STX | AST> }
-  | { type: "list"; tag: list_tag; wrap: undefined; content: LL<STX> }
-  | { type: "atom"; tag: atom_tag; wrap: Wrap; content: string };
+  | { type: "list"; tag: list_tag; wrap: Wrap; content: LL<STX | AST>; src: AE }
+  | { type: "list"; tag: list_tag; wrap: undefined; content: LL<STX>; src: AE }
+  | { type: "atom"; tag: atom_tag; wrap: Wrap; content: string; src: AE };
 
 export type Loc = TaggedReconstructiveZipper.Loc<list_tag, STX>;
 
@@ -73,6 +77,7 @@ export type Binding =
   | { type: "type"; name: string }
   | { type: "core_syntax"; name: string; pattern: STX }
   | { type: "syntax_rules_transformer"; clauses: { pattern: Loc; template: STX }[] }
+  | { type: "imported_lexical"; name: string; cuid: string }
   | { type: "ts"; name: string };
 
 export type Context = { [label: string]: Binding };

@@ -1,5 +1,4 @@
 import { assert } from "./assert";
-import { ll_to_array } from "./llhelpers";
 import { modular_extension } from "./stx";
 import { Context, Env } from "./syntax-structures";
 
@@ -17,7 +16,7 @@ function extract_bindings(
     );
     assert(a[original_name] === undefined, `duplicate export of '${original_name}'`);
     const [_marks, label] = ls[0];
-    const binding = context[label];
+    const binding = context[label.name];
     assert(binding !== undefined);
     assert(binding.type === binding_type);
     const new_name = binding.name;

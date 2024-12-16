@@ -1,1 +1,113 @@
-{"cid":"rtsc/testing-file-extensions.rts rewrite-ts-visualized 0.0.0"}
+{
+  "cid": "rtsc/testing-file-extensions.rts rewrite-ts-visualized 0.0.0",
+  "cookie": "rewrite-ts-007",
+  "exported_identifiers": {
+    "x": [
+      {
+        "type": "value",
+        "label": {
+          "cuid": "rtsc/testing-file-extensions.rts rewrite-ts-visualized 0.0.0",
+          "name": "l3"
+        }
+      }
+    ],
+    "t_global": [
+      {
+        "type": "type",
+        "label": {
+          "cuid": "rtsc/testing-file-extensions.rts rewrite-ts-visualized 0.0.0",
+          "name": "l8"
+        }
+      }
+    ]
+  },
+  "context": {
+    "l1": {"type": "lexical", "name": "y_2"},
+    "l3": {"type": "lexical", "name": "x_4"},
+    "l5": {
+      "type": "syntax_rules_transformer",
+      "clauses": [
+        {
+          "pattern": {
+            "type": "loc",
+            "t": {
+              "type": "atom",
+              "wrap": {
+                "marks": [
+                  "rtsc/testing-file-extensions.rts rewrite-ts-visualized 0.0.0",
+                  ["top", null]
+                ],
+                "subst": [
+                  {
+                    "rib_id": "r0",
+                    "cu_id": "rtsc/testing-file-extensions.rts rewrite-ts-visualized 0.0.0"
+                  },
+                  null
+                ],
+                "aes": null
+              },
+              "tag": "identifier",
+              "content": "foo",
+              "src": {
+                "type": "atom",
+                "tag": "identifier",
+                "content": "foo",
+                "src": {
+                  "type": "origin",
+                  "p": 61,
+                  "e": 65,
+                  "f": {
+                    "package": {
+                      "name": "rewrite-ts-visualized",
+                      "version": "0.0.0"
+                    },
+                    "path": "rtsc/testing-file-extensions.rts"
+                  }
+                }
+              }
+            },
+            "p": {"type": "top"}
+          },
+          "template": {
+            "type": "atom",
+            "wrap": {
+              "marks": [
+                "rtsc/testing-file-extensions.rts rewrite-ts-visualized 0.0.0",
+                ["top", null]
+              ],
+              "subst": [
+                {
+                  "rib_id": "r0",
+                  "cu_id": "rtsc/testing-file-extensions.rts rewrite-ts-visualized 0.0.0"
+                },
+                null
+              ],
+              "aes": null
+            },
+            "tag": "identifier",
+            "content": "x",
+            "src": {
+              "type": "atom",
+              "tag": "identifier",
+              "content": "x",
+              "src": {
+                "type": "origin",
+                "p": 66,
+                "e": 68,
+                "f": {
+                  "package": {
+                    "name": "rewrite-ts-visualized",
+                    "version": "0.0.0"
+                  },
+                  "path": "rtsc/testing-file-extensions.rts"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "l6": {"type": "type", "name": "t_local_7"},
+    "l8": {"type": "type", "name": "t_global_9"}
+  }
+}

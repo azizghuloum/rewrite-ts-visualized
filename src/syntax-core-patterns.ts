@@ -1,5 +1,5 @@
 import { assert } from "./assert";
-import { AST } from "./ast";
+import { AST, source_file } from "./ast";
 import { LL, llappend, llmap, llreduce, llreverse, ll_to_array } from "./llhelpers";
 import { syntax_error } from "./stx-error";
 import {
@@ -23,6 +23,7 @@ import {
   STX,
 } from "./syntax-structures";
 import { go_next, go_down, mkzipper, stx_list_content, go_up, change } from "./zipper";
+import { preexpand_helpers } from "./preexpand-helpers";
 
 type handler = (
   loc: Loc,
@@ -30,6 +31,7 @@ type handler = (
   unit: CompilationUnit,
   counter: number,
   lexical: lexical_extension,
+  helpers: preexpand_helpers,
 ) => Promise<{
   loc: Loc;
   counter: number;
@@ -80,24 +82,30 @@ export type subst = [STX, LL<STX>][];
 
 export type unification = { loc: Loc; subst: subst };
 
-const merge_subst: (s1: subst | null, s2: subst | null, unit: CompilationUnit) => subst | null = (
-  s1,
-  s2,
-  unit,
-) => {
+const merge_subst: (
+  s1: subst | null,
+  s2: subst | null,
+  unit: CompilationUnit,
+  helpers: preexpand_helpers,
+) => subst | null = (s1, s2, unit, helpers) => {
   if (s1 === null || s2 === null) return null;
   if (s1.length === 0) return s2;
   if (s2.length === 0) return s1;
   const [a, ...b] = s1;
-  return merge_subst(b, extend_subst(a, s2, unit), unit);
+  return merge_subst(b, extend_subst(a, s2, unit, helpers), unit, helpers);
 };
 
-const same_lhs: (x: STX, y: STX, unit: CompilationUnit) => boolean = (x, y, unit) => {
+const same_lhs: (x: STX, y: STX, unit: CompilationUnit, helpers: preexpand_helpers) => boolean = (
+  x,
+  y,
+  unit,
+  helpers,
+) => {
   assert(typeof x.content === "string");
   assert(typeof y.content === "string");
   assert(x.wrap !== undefined);
   assert(y.wrap !== undefined);
-  return free_id_equal(x.content, x.wrap, y.content, y.wrap, unit, "normal_env");
+  return free_id_equal(x.content, x.wrap, y.content, y.wrap, unit, "normal_env", helpers);
 };
 
 const same_rhs: (x: LL<STX>, y: LL<STX>) => boolean = (_x, _y) => {
@@ -108,9 +116,10 @@ const extend_subst: (
   [lhs, rhs]: [STX, LL<STX>],
   subst: subst,
   unit: CompilationUnit,
-) => subst | null = ([lhs, rhs], s, unit) => {
+  helpers: preexpand_helpers,
+) => subst | null = ([lhs, rhs], s, unit, helpers) => {
   if (lhs.content === "_") return s; // drop underscore vars from matching
-  const x = s.find((x) => same_lhs(x[0], lhs, unit));
+  const x = s.find((x) => same_lhs(x[0], lhs, unit, helpers));
   if (!x) return [[lhs, rhs], ...s];
   if (same_rhs(x[1], rhs)) {
     return s;
@@ -123,19 +132,21 @@ const merge_unification: (
   u1: unification,
   s2: subst,
   unit: CompilationUnit,
-) => unification | null = (u1, s2, unit) => {
-  const s = merge_subst(u1.subst, s2, unit);
+  helpers: preexpand_helpers,
+) => unification | null = (u1, s2, unit, helpers) => {
+  const s = merge_subst(u1.subst, s2, unit, helpers);
   if (s === null) return null;
   return { loc: u1.loc, subst: s };
 };
 
-const unify_left: (pat: LL<STX>, code: LL<STX>, unit: CompilationUnit) => subst | null = (
-  pat,
-  code,
-  unit,
-) => {
+const unify_left: (
+  pat: LL<STX>,
+  code: LL<STX>,
+  unit: CompilationUnit,
+  helpers: preexpand_helpers,
+) => subst | null = (pat, code, unit, helpers) => {
   if (pat === null && code === null) return [];
-  return unify_right(llreverse(pat), llreverse(code), unit);
+  return unify_right(llreverse(pat), llreverse(code), unit, helpers);
   //console.log({ pat, code });
   //throw new Error("unify_left");
 };
@@ -153,11 +164,12 @@ const lltake: <A>(n: number, ls: LL<A>) => LL<A> = (n, ls) =>
 const lldrop: <A>(n: number, ls: LL<A>) => LL<A> = (n, ls) =>
   n === 0 ? ls : (assert(ls !== null), lldrop(n - 1, ls[1]));
 
-const unify_right: (kwdls: LL<STX>, codels: LL<STX>, unit: CompilationUnit) => subst | null = (
-  kwdls,
-  codels,
-  unit,
-) => {
+const unify_right: (
+  kwdls: LL<STX>,
+  codels: LL<STX>,
+  unit: CompilationUnit,
+  helpers: preexpand_helpers,
+) => subst | null = (kwdls, codels, unit, helpers) => {
   function f(count: number, kwdls: LL<STX>, codels: LL<STX>): subst | null {
     //console.log({ count, kwdls, codels });
     if (kwdls === null) {
@@ -175,14 +187,14 @@ const unify_right: (kwdls: LL<STX>, codels: LL<STX>, unit: CompilationUnit) => s
         assert(lllength(rest_patterns) === lllength(rests));
         const s1 = f(0, rest_patterns, rests);
         if (s1 === null) return null;
-        return extend_subst([fst_pattern, fsts], s1, unit);
+        return extend_subst([fst_pattern, fsts], s1, unit, helpers);
       } else {
         if (codels === null) return null;
         const fsts: LL<STX> = [codels[0], null];
         const rests = codels[1];
         const s1 = f(count - 1, rest_patterns, rests);
         if (s1 === null) return null;
-        return extend_subst([fst_pattern, fsts], s1, unit);
+        return extend_subst([fst_pattern, fsts], s1, unit, helpers);
       }
     }
     if (codels === null) return null;
@@ -198,10 +210,15 @@ const unify_right: (kwdls: LL<STX>, codels: LL<STX>, unit: CompilationUnit) => s
       if (fst_code.type !== "list" || fst_code.tag !== fst_pattern.tag) {
         return null;
       }
-      const s1 = unify_right(stx_list_content(fst_pattern), stx_list_content(fst_code), unit);
+      const s1 = unify_right(
+        stx_list_content(fst_pattern),
+        stx_list_content(fst_code),
+        unit,
+        helpers,
+      );
       if (s1 === null) return null;
       const s2 = f(count, rest_patterns, rest_codes);
-      return merge_subst(s1, s2, unit);
+      return merge_subst(s1, s2, unit, helpers);
     }
     const invalid: never = fst_pattern;
     throw invalid;
@@ -209,23 +226,24 @@ const unify_right: (kwdls: LL<STX>, codels: LL<STX>, unit: CompilationUnit) => s
   return f(count_ids(kwdls), kwdls, codels);
 };
 
-const unify_paths: (kwd: Path, loc: Loc, unit: CompilationUnit) => unification | null = (
-  kwd,
-  loc,
-  unit,
-) => {
+const unify_paths: (
+  kwd: Path,
+  loc: Loc,
+  unit: CompilationUnit,
+  helpers: preexpand_helpers,
+) => unification | null = (kwd, loc, unit, helpers) => {
   const p = loc.p;
   if (kwd.type === "node" && p.type === "node") {
     if (kwd.tag !== p.tag) return null;
-    const s1 = unify_left(kwd.l, p.l, unit);
+    const s1 = unify_left(kwd.l, p.l, unit, helpers);
     if (!s1) return null;
-    const s2 = unify_right(kwd.r, p.r, unit);
+    const s2 = unify_right(kwd.r, p.r, unit, helpers);
     if (!s2) return null;
-    const s3 = merge_subst(s1, s2, unit);
+    const s3 = merge_subst(s1, s2, unit, helpers);
     if (!s3) return null;
-    const u4 = unify_paths(kwd.p, go_up(loc), unit);
+    const u4 = unify_paths(kwd.p, go_up(loc), unit, helpers);
     if (!u4) return null;
-    return merge_unification(u4, s3, unit);
+    return merge_unification(u4, s3, unit, helpers);
   } else if (kwd.type === "top") {
     return { loc, subst: [] };
   } else {
@@ -235,21 +253,21 @@ const unify_paths: (kwd: Path, loc: Loc, unit: CompilationUnit) => unification |
 
 export const core_pattern_match: (
   loc: Loc,
-  context: Context,
   unit: CompilationUnit,
   name: keyof ReturnType<typeof core_patterns>,
-) => Promise<unification | null> = async (loc, context, unit, name) => {
-  const binding = context[`global.${name}`];
+  helpers: preexpand_helpers,
+) => Promise<unification | null> = async (loc, unit, name, helpers) => {
+  const binding = helpers.global_context[`global.${name}`];
   assert(binding && binding.type === "core_syntax", `core pattern for ${name} is undefined`);
   const pattern = binding.pattern;
   const kwd = find_identifier_by_name(mkzipper(pattern), name);
   assert(kwd !== null, `keyword ${name} does not include itself in its pattern`);
-  const unification = unify_paths(kwd.p, loc, unit);
+  const unification = unify_paths(kwd.p, loc, unit, helpers);
   return unification;
 };
 
-const splice: handler = async (loc, context, unit, counter, lexical) => {
-  const unification = await core_pattern_match(loc, context, unit, "splice");
+const splice: handler = async (loc, context, unit, counter, lexical, helpers) => {
+  const unification = await core_pattern_match(loc, unit, "splice", helpers);
   assert(unification !== null);
   const { subst } = unification;
   assert(subst.length === 1);
@@ -260,6 +278,7 @@ const splice: handler = async (loc, context, unit, counter, lexical) => {
     tag: "slice",
     wrap: undefined,
     content: body_code,
+    src: false,
   };
   return {
     loc: change(unification.loc, mkzipper(result)),
@@ -270,7 +289,12 @@ const splice: handler = async (loc, context, unit, counter, lexical) => {
   };
 };
 
-function literal_binding(name: string, subst: subst, unit: CompilationUnit): boolean {
+function literal_binding(
+  name: string,
+  subst: subst,
+  unit: CompilationUnit,
+  helpers: preexpand_helpers,
+): boolean {
   const x = subst.find(([lhs]) => lhs.content === name);
   assert(x !== undefined);
   const lhs = x[0];
@@ -278,7 +302,7 @@ function literal_binding(name: string, subst: subst, unit: CompilationUnit): boo
   if (rhsls === null || rhsls[1] !== null) return false;
   const rhs = rhsls[0];
   if (!is_id(rhs)) return false;
-  return same_lhs(lhs, rhs, unit);
+  return same_lhs(lhs, rhs, unit, helpers);
 }
 
 function parse_array(stx: STX, loc: Loc): LL<STX> {
@@ -338,16 +362,13 @@ const using_rewrite_rules: handler = async (
   orig_unit,
   orig_counter,
   orig_lexical,
+  helpers,
 ) => {
-  const unification = await core_pattern_match(
-    orig_loc,
-    orig_context,
-    orig_unit,
-    "using_rewrite_rules",
-  );
+  const unification = await core_pattern_match(orig_loc, orig_unit, "using_rewrite_rules", helpers);
   if (!unification) syntax_error(orig_loc);
   const { subst, loc } = unification;
-  if (!literal_binding("rewrite", subst, orig_unit)) syntax_error(loc, ".rewrite expected");
+  if (!literal_binding("rewrite", subst, orig_unit, helpers))
+    syntax_error(loc, ".rewrite expected");
   const expression_binding = subst.find(([lhs]) => lhs.content === "expression");
   const clauses_binding = subst.find(([lhs]) => lhs.content === "clauses");
   assert(expression_binding !== undefined);
@@ -363,12 +384,18 @@ const using_rewrite_rules: handler = async (
     (x, y) => bound_id_equal(x, y),
   );
   const [rib_id, new_counter] = new_rib_id(orig_counter);
-  const do_wrap = push_wrap({ marks: null, subst: [{ rib_id, cu_id: orig_unit.cu_id }, null] });
+  const cuid = orig_unit.cu_id;
+  const do_wrap = push_wrap({
+    marks: null,
+    subst: [{ rib_id, cu_id: cuid }, null],
+    aes: null,
+  });
   const [new_rib, final_counter, final_context] = clauses.reduce(
     (ac: [Rib, number, Context], [lhs, rhs]) => {
       assert(lhs.type === "atom" && lhs.wrap !== undefined);
       return extend_rib(
         ac[0],
+        cuid,
         lhs.content,
         lhs.wrap.marks,
         ac[1],
@@ -376,7 +403,7 @@ const using_rewrite_rules: handler = async (
         ({ rib, counter, label }) => [
           rib,
           counter,
-          extend_context(ac[2], label, {
+          extend_context(ac[2], label.name, {
             type: "syntax_rules_transformer",
             clauses: rhs.map(({ pattern, template }) => ({
               pattern,
@@ -406,9 +433,10 @@ function find_clause(
   loc: Loc,
   clauses: syntax_rules_clause[],
   unit: CompilationUnit,
+  helpers: preexpand_helpers,
 ): { loc: Loc; subst: subst; template: STX } {
   for (const { pattern, template } of clauses) {
-    const unification = unify_paths(pattern.p, loc, unit);
+    const unification = unify_paths(pattern.p, loc, unit, helpers);
     if (unification) return { ...unification, template };
   }
   syntax_error(loc, "invalid syntax (no pattern matched)");
@@ -436,6 +464,7 @@ function search_and_replace(stx: STX, subst: subst, loc: Loc): LL<STX> {
             llappend,
             null as LL<STX>,
           ),
+          src: stx.src,
         },
         null,
       ];
@@ -450,16 +479,21 @@ export async function apply_syntax_rules(
   clauses: syntax_rules_clause[],
   unit: CompilationUnit,
   orig_counter: number,
+  helpers: preexpand_helpers,
 ): Promise<{ loc: Loc; counter: number }> {
-  const do_antimark = push_wrap({ marks: [antimark, null], subst: [shift, null] });
-  const { loc, subst, template } = find_clause(orig_loc, clauses, unit);
+  const do_antimark = push_wrap({
+    marks: [antimark, null],
+    subst: [shift, null],
+    aes: [false, null],
+  });
+  const { loc, subst, template } = find_clause(orig_loc, clauses, unit, helpers);
   const antimarked_subst: subst = subst.map(([lhs, rhs]) => [lhs, llmap(rhs, do_antimark)]);
   const expressionls = search_and_replace(template, antimarked_subst, loc);
   if (expressionls === null) syntax_error(loc, "splicing error of empty slice");
   if (expressionls[1] !== null) syntax_error(loc, "splicing error of more than one thing");
   const expression = expressionls[0];
   const [mark, new_counter] = new_mark(orig_counter);
-  const do_mark = push_wrap({ marks: [mark, null], subst: [shift, null] });
+  const do_mark = push_wrap({ marks: [mark, null], subst: [shift, null], aes: [loc.t, null] });
   const new_loc = change(loc, mkzipper(do_mark(expression)));
   return { loc: new_loc, counter: new_counter };
 }
@@ -470,14 +504,15 @@ const define_rewrite_rules: handler = async (
   orig_unit,
   orig_counter,
   orig_lexical,
+  helpers,
 ) => {
   if (orig_lexical.extensible === false)
     syntax_error(orig_loc, "cannot define rules in nondefinition context");
   const unification = await core_pattern_match(
     orig_loc,
-    orig_context,
     orig_unit,
     "define_rewrite_rules",
+    helpers,
   );
   if (!unification) syntax_error(orig_loc);
   const { subst, loc } = unification;
@@ -489,11 +524,13 @@ const define_rewrite_rules: handler = async (
       .map((x) => parse_syntax_rules_clause(x, loc)),
     (x, y) => bound_id_equal(x, y),
   );
+  const cuid = orig_unit.cu_id;
   const [final_rib, final_counter, final_context] = clauses.reduce(
     (ac: [Rib, number, Context], [lhs, rhs]) => {
       assert(lhs.type === "atom" && lhs.wrap !== undefined);
       return extend_rib(
         ac[0],
+        cuid,
         lhs.content,
         lhs.wrap.marks,
         ac[1],
@@ -501,7 +538,7 @@ const define_rewrite_rules: handler = async (
         ({ rib, counter, label }) => [
           rib,
           counter,
-          extend_context(ac[2], label, {
+          extend_context(ac[2], label.name, {
             type: "syntax_rules_transformer",
             clauses: rhs,
           }),
@@ -519,7 +556,13 @@ const define_rewrite_rules: handler = async (
   const final_unit = extend_unit(orig_unit, lexical);
   const final_loc = change(
     loc,
-    mkzipper({ type: "list", tag: "slice", wrap: { marks: null, subst: null }, content: null }),
+    mkzipper({
+      type: "list",
+      tag: "slice",
+      wrap: { marks: null, subst: null, aes: [loc.t, null] },
+      content: null,
+      src: false,
+    }),
   );
   return {
     loc: final_loc,
@@ -556,9 +599,13 @@ export const core_handlers: { [k: string]: handler } = {
   define_rewrite_rules,
 };
 
-export const core_patterns = (parse: (code: string) => AST) => {
+export const core_patterns = (parse: (code: string, source_file: source_file) => AST) => {
   const pattern = (code: string) => {
-    const ast = parse(code);
+    const src: source_file = {
+      package: { name: "rewrite-ts", version: "0.0.0" },
+      path: "internal-patterns",
+    };
+    const ast = parse(code, src);
     assert(ast.type === "list" && ast.tag === "program");
     const bodies = ast.content;
     assert(bodies !== null);

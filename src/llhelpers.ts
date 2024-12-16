@@ -39,3 +39,9 @@ export function llreverse<X>(a: LL<X>): LL<X> {
   }
   return ll;
 }
+
+export function join_separated<X>(a: LL<X>, sep: X): LL<X> {
+  if (a === null) return a;
+  if (a[1] === null) return a;
+  return [a[0], [sep, join_separated(a[1], sep)]];
+}

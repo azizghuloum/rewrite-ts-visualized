@@ -1,12 +1,14 @@
 import { assert } from "./assert";
 import { AST } from "./ast";
 import { LL, llappend } from "./llhelpers";
-import { core_handlers } from "./syntax-core-patterns";
 import {
+  AE,
   antimark,
   Binding,
   CompilationUnit,
   Context,
+  Label,
+  Loc,
   Marks,
   new_rib_id,
   Rib,
@@ -14,10 +16,11 @@ import {
   STX,
   Subst,
   top_mark,
-  top_marks,
   Wrap,
 } from "./syntax-structures";
-import { stdlibs } from "./generated-stdlibs";
+import { globals_cuid, init_global_unit } from "./global-module";
+import { syntax_error } from "./stx-error";
+import { preexpand_helpers } from "./preexpand-helpers";
 
 function is_top_marked(wrap: Wrap): boolean {
   function loop_marks(marks: Marks): boolean {
@@ -38,48 +41,75 @@ function id_to_label(
   subst: Subst,
   unit: CompilationUnit,
   resolution_type: "normal_env" | "types_env",
-): string | undefined {
-  function lookup(marks: Marks | null, subst: Subst): string | undefined {
+  helpers: preexpand_helpers,
+): Label | undefined {
+  function lookup(marks: Marks | null, subst: Subst): Label | undefined {
     if (marks === null) throw new Error("missing marks");
     if (subst === null) return undefined; // unbound
     if (subst[0] === shift) return lookup(marks[1], subst[1]);
-    const env = (({ rib_id, cu_id }) => {
-      assert(cu_id === unit.cu_id, "unhandled imported rib?");
-      const rib = unit.store[rib_id];
-      if (rib === undefined) {
-        throw new Error(`missing rib '${rib_id}', unit:${Object.keys(unit.store).join(",")}`);
+    const rib = (({ rib_id, cu_id }) => {
+      if (cu_id === unit.cu_id) {
+        const rib = unit.store[rib_id];
+        if (rib === undefined) {
+          throw new Error(`missing rib '${rib_id}', unit:${Object.keys(unit.store).join(",")}`);
+        }
+        return rib;
+      } else if (cu_id === globals_cuid) {
+        const unit = helpers.global_unit;
+        const rib = unit.store[rib_id];
+        assert(rib !== undefined, `missing rib in global unit`);
+        return rib;
+      } else {
+        // need to resolve name, marks in imported rib?
+        throw new Error(`unhandled imported rib?  ${name} ${cu_id}, ${JSON.stringify(marks)}`);
       }
-      return rib[resolution_type];
     })(subst[0]);
-    const ls = env[name];
+    const ls = rib[resolution_type][name];
     const entry = ls?.find(([ms, _]) => same_marks(ms, marks));
     if (entry === undefined) return lookup(marks, subst[1]);
-    return entry[1];
+    const label = entry[1];
+    if (typeof label === "string") {
+      console.error(rib);
+      throw new Error(`invalid label`);
+    }
+    return label;
   }
   return lookup(marks, subst);
 }
 
 export type Resolution =
   | { type: "unbound" }
-  | { type: "bound"; binding: Binding; label: string }
+  | { type: "bound"; binding: Binding; label: Label }
   | { type: "error"; reason: string };
 
-export function resolve(
+export async function resolve(
   name: string,
   { marks, subst }: Wrap,
   context: Context,
   unit: CompilationUnit,
   resolution_type: "normal_env" | "types_env",
-): Resolution {
-  const label = id_to_label(name, marks, subst, unit, resolution_type);
+  helpers: preexpand_helpers,
+): Promise<Resolution> {
+  const label = id_to_label(name, marks, subst, unit, resolution_type, helpers);
   if (label === undefined) {
     return { type: "unbound" };
   }
-  const binding = context[label];
-  if (binding) {
+  if (label.cuid === unit.cu_id) {
+    // label defined in the current context
+    const binding = context[label.name];
+    if (binding) {
+      return { type: "bound", binding, label };
+    } else {
+      return { type: "error", reason: "out of context" };
+    }
+  } else if (label.cuid === globals_cuid) {
+    const binding = helpers.global_context[label.name];
+    assert(binding !== undefined);
     return { type: "bound", binding, label };
   } else {
-    return { type: "error", reason: "out of context" };
+    // label imported from somewhere else
+    const binding = await helpers.manager.resolve_label(label);
+    return { type: "bound", binding, label };
   }
 }
 
@@ -90,13 +120,14 @@ export function free_id_equal(
   wrap2: Wrap,
   unit: CompilationUnit,
   resolution_type: "normal_env" | "types_env",
+  helpers: preexpand_helpers,
 ): boolean {
-  const label1 = id_to_label(name1, wrap1.marks, wrap1.subst, unit, resolution_type);
-  const label2 = id_to_label(name2, wrap2.marks, wrap2.subst, unit, resolution_type);
+  const label1 = id_to_label(name1, wrap1.marks, wrap1.subst, unit, resolution_type, helpers);
+  const label2 = id_to_label(name2, wrap2.marks, wrap2.subst, unit, resolution_type, helpers);
   if (label1 === undefined && label2 === undefined) {
     return name1 === name2;
   } else {
-    return label1 === label2;
+    return label1?.cuid === label2?.cuid && label1?.name === label2?.name;
   }
 }
 
@@ -106,11 +137,30 @@ export function bound_id_equal(id1: STX, id2: STX): boolean {
   return id1.content === id2.content && same_marks(id1.wrap.marks, id2.wrap.marks);
 }
 
-function rib_push(
+export function rib_push(
   rib: Rib,
   name: string,
   marks: Marks,
-  label: string,
+  label: Label,
+  env_type: "normal_env" | "types_env",
+  loc: Loc,
+): Rib {
+  const env = rib[env_type];
+  const entry = env[name] ?? [];
+  if (entry.find((x) => same_marks(x[0], marks))) {
+    syntax_error(loc, `${name} is already defined in ${env_type}`);
+  }
+  return {
+    ...rib,
+    [env_type]: { ...env, [name]: [...entry, [marks, label]] },
+  };
+}
+
+export function rib_push_no_check(
+  rib: Rib,
+  name: string,
+  marks: Marks,
+  label: Label,
   env_type: "normal_env" | "types_env",
 ): Rib {
   const env = rib[env_type];
@@ -123,11 +173,12 @@ function rib_push(
 
 export function extend_rib<S>(
   rib: Rib,
+  cuid: string,
   name: string,
   marks: Marks,
   counter: number,
   env_type: "normal_env" | "types_env",
-  sk: (args: { rib: Rib; counter: number; label: string }) => S,
+  sk: (args: { rib: Rib; counter: number; label: Label }) => S,
   fk: (reason: string) => S,
 ): S {
   const env = rib[env_type];
@@ -135,9 +186,9 @@ export function extend_rib<S>(
   if (entry.find((x) => same_marks(x[0], marks))) {
     return fk(`${name} is already defined in ${env_type}`);
   }
-  const label = `l${counter}`;
+  const label: Label = { cuid, name: `l${counter}` };
   const new_counter = counter + 1;
-  const new_rib = rib_push(rib, name, marks, label, env_type);
+  const new_rib = rib_push_no_check(rib, name, marks, label, env_type);
   return sk({ rib: new_rib, counter: new_counter, label });
 }
 
@@ -173,6 +224,14 @@ function llcancel<X>(ls1: [X, LL<X>], ls2: [X, LL<X>]): LL<X> {
   return f(ls1[0], ls1[1]);
 }
 
+function merge_aes(ls1: LL<AE>, ls2: LL<AE>): LL<AE> {
+  if (ls1 !== null && ls2 !== null && ls2[0] === false) {
+    return llcancel(ls1, ls2);
+  } else {
+    return llappend(ls1, ls2);
+  }
+}
+
 function merge_wraps(outerwrap: Wrap, innerwrap?: Wrap): Wrap {
   if (innerwrap === undefined) return outerwrap;
   if (is_top_marked(outerwrap)) {
@@ -184,11 +243,13 @@ function merge_wraps(outerwrap: Wrap, innerwrap?: Wrap): Wrap {
     return {
       marks: llcancel(outerwrap.marks, innerwrap.marks),
       subst: llcancel(outerwrap.subst, innerwrap.subst),
+      aes: merge_aes(outerwrap.aes, innerwrap.aes),
     };
   } else {
     return {
       marks: llappend(outerwrap.marks, innerwrap.marks),
       subst: llappend(outerwrap.subst, innerwrap.subst),
+      aes: merge_aes(outerwrap.aes, innerwrap.aes),
     };
   }
 }
@@ -203,6 +264,7 @@ export function push_wrap(outerwrap: Wrap): (stx: AST | STX) => STX {
           wrap,
           tag: stx.tag,
           content: stx.content,
+          src: stx,
         };
       }
       case "atom": {
@@ -211,93 +273,38 @@ export function push_wrap(outerwrap: Wrap): (stx: AST | STX) => STX {
           wrap,
           tag: stx.tag,
           content: stx.content,
+          src: stx,
         };
       }
     }
   };
 }
 
-function init_global_context(
-  patterns: CorePatterns,
-  wrap: (ast: AST) => STX,
-  globals: string[],
-): Context {
-  type entry = [string, Binding];
-  const syntax_entries: entry[] = Object.entries(patterns).map(([name, pattern]) => [
-    `global.${name}`,
-    { type: "core_syntax", name, pattern: wrap(pattern) },
-  ]);
-  const global_entries: entry[] = globals.map((name) => [`global.${name}`, { type: "ts", name }]);
-  const context: Context = Object.fromEntries([...syntax_entries, ...global_entries]);
-  return context;
-}
-
 export type CorePatterns = { [k: string]: AST };
-
-function get_globals(lib: string) {
-  const globals: { [k: string]: string } = {};
-  function intern(names: string[] | undefined) {
-    names?.forEach((x) => (globals[x] = x));
-  }
-  function process(lib: string) {
-    const x = stdlibs[lib];
-    intern(x.class);
-    intern(x.interface);
-    intern(x.module);
-    intern(x.value);
-    intern(x.type);
-    x.include?.forEach(process);
-  }
-  process(lib);
-  return Object.keys(globals);
-}
 
 export function init_top_level(
   ast: AST,
-  cu_id: string,
-  patterns: CorePatterns,
+  cuid: string,
+  globals: string[],
+  global_macros: string[],
 ): {
   stx: STX;
   counter: number;
   unit: CompilationUnit;
-  context: Context;
   rib: Rib;
   rib_id: string;
 } {
   const [rib_id, counter] = new_rib_id(0);
-  const marks: Marks = [cu_id, top_marks];
-  const top_wrap: Wrap = { marks, subst: [{ rib_id, cu_id }, null] };
-  const outer_top_wrap: Wrap = { marks: top_marks, subst: [{ rib_id, cu_id }, null] };
+  const { top_wrap, rib, unit } = init_global_unit(cuid, rib_id, globals, global_macros);
   function wrap(ast: AST): STX {
-    return { ...ast, wrap: top_wrap };
+    return { ...ast, wrap: top_wrap, src: ast };
   }
-  function outer_wrap(ast: AST): STX {
-    return { ...ast, wrap: outer_top_wrap };
-  }
-  const globals = get_globals("es2024.full");
-  const rib: Rib = {
-    type: "rib",
-    types_env: Object.fromEntries([
-      ...Object.keys(core_handlers).map((name) => [name, [[marks, `global.${name}`]]]),
-    ]),
-    normal_env: Object.fromEntries([
-      ...Object.keys(core_handlers).map((name) => [name, [[marks, `global.${name}`]]]),
-      ...globals.map((name) => [name, [[marks, `global.${name}`]]]),
-    ]),
-  };
-  const unit: CompilationUnit = {
-    cu_id,
-    store: {
-      [rib_id]: rib,
-    },
-  };
   return {
     stx: wrap(ast),
     counter,
     unit,
     rib,
     rib_id,
-    context: init_global_context(patterns, outer_wrap, globals),
   };
 }
 
@@ -308,6 +315,10 @@ export type lexical_extension =
 export type modular_extension =
   | { extensible: true; implicit: Rib; explicit: Rib }
   | { extensible: false };
+
+export type import_req = {
+  [cuid: string]: { [label: string]: { type: "type" | "value"; new_name: string } };
+};
 
 export function extend_unit(unit: CompilationUnit, extension: lexical_extension): CompilationUnit {
   if (extension.extensible) {
@@ -326,15 +337,16 @@ export function extend_modular(
   exporting: boolean,
   name: string,
   marks: Marks,
-  label: string,
+  label: Label,
   env_type: "types_env" | "normal_env",
+  loc: Loc,
 ): modular_extension {
   if (modular.extensible) {
     const { implicit, explicit } = modular;
     return {
       extensible: true,
-      implicit: rib_push(implicit, name, marks, label, env_type),
-      explicit: exporting ? rib_push(explicit, name, marks, label, env_type) : explicit,
+      implicit: rib_push(implicit, name, marks, label, env_type, loc),
+      explicit: exporting ? rib_push(explicit, name, marks, label, env_type, loc) : explicit,
     };
   } else {
     assert(!exporting);

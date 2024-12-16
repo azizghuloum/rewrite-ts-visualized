@@ -4,8 +4,13 @@ import { basename, dirname, join } from "node:path";
 import TS from "typescript";
 import {} from "./testing-file-extensions.rts.ts";
 import { LibraryManager } from "../src/library-manager.ts";
+import { get_globals, init_global_context } from "../src/global-module.ts";
+import { core_patterns } from "../src/syntax-core-patterns.ts";
+import { parse } from "../src/parse.ts";
 
-const library_manager = new LibraryManager();
+const globals = get_globals("es2024.full");
+const patterns = core_patterns(parse);
+const library_manager = new LibraryManager(patterns, globals);
 
 const watch_reporter: TS.WatchStatusReporter = (diagnostics, _newline, _options, error_count) => {
   console.log(`rtsc: ${diagnostics.messageText}`);
