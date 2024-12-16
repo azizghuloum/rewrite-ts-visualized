@@ -11,6 +11,8 @@ export type goodies = {
   helpers: preexpand_helpers;
 };
 
+export type data = goodies;
+
 //export type data = {
 //  imp: import_req;
 //  modular: modular_extension;

@@ -206,27 +206,20 @@ const preexpand_body: walkerplus<{ sort: "type" | "value" }> = async ({ loc, sor
       ),
   );
 
-const preexpand_body_curly: walker = async ({ loc, ...data }) => {
-  if (loc.t.type === "atom" && loc.t.tag === "other" && loc.t.content === "}") {
-    return go_right(loc, syntax_error, () =>
-      Promise.resolve({
-        loc: go_up(loc),
-        ...data,
-      }),
-    );
-  }
-  return in_isolation(
-    loc,
-    (loc) => preexpand_forms({ loc, sort: "value", ...data }),
-    (loc, data) => {
-      return go_right(
+const preexpand_body_curly: walker = async ({ loc, ...data }) =>
+  loc.t.type === "atom" && loc.t.tag === "other" && loc.t.content === "}"
+    ? go_right(loc, syntax_error, () => ({ loc: go_up(loc), ...data }))
+    : in_isolation(
         loc,
-        (loc) => preexpand_body_curly({ loc, ...data }),
-        (loc) => syntax_error(loc, "no right"),
+        (loc) => preexpand_forms({ loc, sort: "value", ...data }),
+        (loc, data) => {
+          return go_right(
+            loc,
+            (loc) => preexpand_body_curly({ loc, ...data }),
+            (loc) => syntax_error(loc, "no right"),
+          );
+        },
       );
-    },
-  );
-};
 
 async function handle_core_syntax(
   loc: Loc,
@@ -305,29 +298,15 @@ const list_handlers_table: { [tag in list_tag]: "descend" | "stop" | "todo" } = 
   syntax_list: "descend",
 };
 
-async function preexpand_block(
-  loc: Loc,
-  lexical: lexical_extension,
-  counter: number,
-  unit: CompilationUnit,
-  context: Context,
-  helpers: preexpand_helpers,
-): Promise<goodies> {
+const preexpand_block: walker = async ({ loc, ...data }) => {
   assert(loc.t.type === "list" && loc.t.tag === "statement_block");
   const bodies = go_down(loc, itself, (loc) => syntax_error(loc, "no bodies"));
   assert(bodies.t.type === "atom" && bodies.t.tag === "other" && bodies.t.content === "{");
   const bodies_rest = go_right(bodies, itself, (loc) => syntax_error(loc, "no body rest"));
-  const gs = await preexpand_body_curly({
-    loc: bodies_rest,
-    lexical,
-    unit,
-    context,
-    counter,
-    helpers,
-  });
+  const gs = await preexpand_body_curly({ loc: bodies_rest, ...data });
   assert(gs.loc.t.type === "list" && gs.loc.t.tag === "statement_block");
   return gs;
-}
+};
 
 async function expand_concise_body(
   loc: Loc,
@@ -340,7 +319,7 @@ async function expand_concise_body(
   helpers: preexpand_helpers,
 ): Promise<{ loc: Loc; imp: import_req; counter: number }> {
   const gs = await (loc.t.type === "list" && loc.t.tag === "statement_block"
-    ? preexpand_block(loc, lexical, counter, unit, context, helpers).then(({ loc, ...gs }) =>
+    ? preexpand_block({ loc, lexical, counter, unit, context, helpers }).then(({ loc, ...gs }) =>
         go_down(
           loc,
           (loc) => ({ ...gs, loc }),
