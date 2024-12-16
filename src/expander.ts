@@ -27,7 +27,7 @@ import { debug, in_isolation, syntax_error } from "./stx-error";
 import { array_to_ll, join_separated, llappend } from "./llhelpers";
 import { gen_binding, preexpand_list_handlers } from "./preexpand-handlers";
 import { preexpand_helpers } from "./preexpand-helpers";
-import { goodies, walkerplus } from "./data";
+import { goodies, walker, walkerplus } from "./data";
 
 export function initial_step(
   ast: AST,
@@ -206,39 +206,27 @@ const preexpand_body: walkerplus<{ sort: "type" | "value" }> = async ({ loc, sor
       ),
   );
 
-async function preexpand_body_curly(
-  loc: Loc,
-  lexical: lexical_extension,
-  unit: CompilationUnit,
-  context: Context,
-  counter: number,
-  sort: "type" | "value",
-  helpers: preexpand_helpers,
-): Promise<goodies> {
+const preexpand_body_curly: walker = async ({ loc, ...data }) => {
   if (loc.t.type === "atom" && loc.t.tag === "other" && loc.t.content === "}") {
     return go_right(loc, syntax_error, () =>
       Promise.resolve({
         loc: go_up(loc),
-        context,
-        counter,
-        lexical,
-        unit,
-        helpers,
+        ...data,
       }),
     );
   }
   return in_isolation(
     loc,
-    (loc) => preexpand_forms({ loc, lexical, counter, unit, context, sort, helpers }),
-    (loc, { lexical, context, counter, unit }) => {
+    (loc) => preexpand_forms({ loc, sort: "value", ...data }),
+    (loc, data) => {
       return go_right(
         loc,
-        (loc) => preexpand_body_curly(loc, lexical, unit, context, counter, sort, helpers),
+        (loc) => preexpand_body_curly({ loc, ...data }),
         (loc) => syntax_error(loc, "no right"),
       );
     },
   );
-}
+};
 
 async function handle_core_syntax(
   loc: Loc,
@@ -323,22 +311,20 @@ async function preexpand_block(
   counter: number,
   unit: CompilationUnit,
   context: Context,
-  sort: "type" | "value",
   helpers: preexpand_helpers,
 ): Promise<goodies> {
   assert(loc.t.type === "list" && loc.t.tag === "statement_block");
   const bodies = go_down(loc, itself, (loc) => syntax_error(loc, "no bodies"));
   assert(bodies.t.type === "atom" && bodies.t.tag === "other" && bodies.t.content === "{");
   const bodies_rest = go_right(bodies, itself, (loc) => syntax_error(loc, "no body rest"));
-  const gs = await preexpand_body_curly(
-    bodies_rest,
+  const gs = await preexpand_body_curly({
+    loc: bodies_rest,
     lexical,
     unit,
     context,
     counter,
-    sort,
     helpers,
-  );
+  });
   assert(gs.loc.t.type === "list" && gs.loc.t.tag === "statement_block");
   return gs;
 }
@@ -354,7 +340,7 @@ async function expand_concise_body(
   helpers: preexpand_helpers,
 ): Promise<{ loc: Loc; imp: import_req; counter: number }> {
   const gs = await (loc.t.type === "list" && loc.t.tag === "statement_block"
-    ? preexpand_block(loc, lexical, counter, unit, context, sort, helpers).then(({ loc, ...gs }) =>
+    ? preexpand_block(loc, lexical, counter, unit, context, helpers).then(({ loc, ...gs }) =>
         go_down(
           loc,
           (loc) => ({ ...gs, loc }),
