@@ -166,7 +166,7 @@ async function expand_program(
         implicit: { type: "rib", normal_env: {}, types_env: {} },
       };
       return helpers.inspect(loc, "After preexpanding the program", () =>
-        postexpand_program(loc, modular, new_unit, counter, context, imp, helpers).then(
+        postexpand_program(loc, modular, new_unit, counter, context, imp, helpers, lexical).then(
           ({ loc, modular, imp, counter }) => {
             return { loc, unit: new_unit, context, modular, imp, counter };
           },
@@ -345,6 +345,7 @@ async function expand_concise_body(
     imp,
     sort,
     helpers,
+    lexical,
   );
 }
 
@@ -543,10 +544,11 @@ function postexpand_program(
   context: Context,
   imp: import_req,
   helpers: preexpand_helpers,
+  lexical: lexical_extension,
 ): Promise<{ loc: Loc; modular: modular_extension; counter: number; imp: import_req }> {
   assert(loc.t.tag === "program");
   return go_down(loc, (loc) =>
-    postexpand_body(loc, modular, unit, counter, context, imp, "value", helpers),
+    postexpand_body(loc, modular, unit, counter, context, imp, "value", helpers, lexical),
   );
 }
 
@@ -686,36 +688,29 @@ function expand_arrow_function(
   );
 }
 
-function expand_type_parameters(
-  loc: Loc,
-  unit: CompilationUnit,
-  orig_counter: number,
-  context: Context,
-  imp: import_req,
-  helpers: preexpand_helpers,
-): Promise<goodies> {
-  type T = Promise<goodies>;
-  function post_after_var({ loc, lexical, counter, unit, context, imp }: goodies): T {
+const expand_type_parameters: walker = ({ loc, ...data }) => {
+  //
+  const post_after_var: walker = ({ loc, ...data }) => {
     return go_right(
       loc,
       (loc) => {
         assert(loc.t.content === ",");
         return go_right(
           loc,
-          (loc) => post_var({ loc, lexical, counter, unit, context, imp, helpers }),
+          (loc) => post_var({ loc, ...data }),
           (loc) => {
             debug(loc, "cant go past commma2?");
           },
         );
       },
-      (loc) => end({ loc: go_up(loc), lexical, unit, counter, context, imp, helpers }),
+      (loc) => end({ loc: go_up(loc), ...data }),
     );
-  }
+  };
 
-  function post_var({ loc, lexical, counter, unit, context, imp }: goodies): T {
+  const post_var: walker = ({ loc, lexical, ...data }) => {
     switch (loc.t.tag) {
       case "identifier":
-        return post_after_var({ loc, lexical, counter, unit, context, imp, helpers });
+        return post_after_var({ loc, lexical, ...data });
       case "type_parameter":
         return go_down(loc, (loc) => {
           assert(loc.t.tag === "identifier");
@@ -726,25 +721,25 @@ function expand_type_parameters(
               expand_expr(
                 wrap_loc(loc, {
                   marks: null,
-                  subst: [{ rib_id: lexical.rib_id, cu_id: unit.cu_id }, null],
+                  subst: [{ rib_id: lexical.rib_id, cu_id: data.unit.cu_id }, null],
                   aes: null,
                 }),
-                counter,
-                unit,
-                context,
-                imp,
+                data.counter,
+                data.unit,
+                data.context,
+                data.imp,
                 "type",
-                helpers,
-              ).then(({ loc, counter, unit, context, imp }) =>
+                data.helpers,
+                lexical,
+              ).then(({ loc, counter, unit, context, imp, ...data }) =>
                 go_right(loc, syntax_error, () =>
                   post_after_var({
                     loc: go_up(loc),
-                    lexical,
                     counter,
                     unit,
                     context,
                     imp,
-                    helpers,
+                    ...data,
                   }),
                 ),
               ),
@@ -754,9 +749,9 @@ function expand_type_parameters(
       default:
         syntax_error(loc);
     }
-  }
+  };
 
-  function pre_after_var({ loc, lexical, counter, unit, context, imp }: goodies): T {
+  const pre_after_var: walker = ({ loc, lexical, counter, unit, context, imp, ...data }) => {
     assert(lexical.extensible);
     return go_right(
       loc,
@@ -764,7 +759,7 @@ function expand_type_parameters(
         if (loc.t.content !== ",") syntax_error(loc, "expected a comma ','");
         return go_right(
           loc,
-          (loc) => pre_var({ loc, lexical, counter, unit, context, imp, helpers }),
+          (loc) => pre_var({ loc, lexical, counter, unit, context, imp, ...data }),
           (loc) => debug(loc, "cant go past commma?"),
         );
       },
@@ -777,13 +772,13 @@ function expand_type_parameters(
             unit: extend_unit(unit, lexical),
             context,
             imp,
-            helpers,
+            ...data,
           }),
         ),
     );
-  }
+  };
 
-  function pre_var({ loc, lexical, counter, unit, context, ...data }: goodies): T {
+  const pre_var: walker = ({ loc, lexical, counter, unit, context, ...data }) => {
     switch (loc.t.tag) {
       case "identifier":
         const { name, ...gs } = gen_binding({
@@ -795,7 +790,7 @@ function expand_type_parameters(
           sort: "type",
           ...data,
         });
-        return pre_after_var({ ...gs, loc: rename(loc, name), imp });
+        return pre_after_var({ ...gs, loc: rename(loc, name) });
       case "type_parameter":
         return go_down(loc, (loc) => {
           if (loc.t.tag !== "identifier") syntax_error(loc, "expected an identifier");
@@ -808,27 +803,26 @@ function expand_type_parameters(
             sort: "type",
             ...data,
           });
-          return pre_after_var({ ...gs, loc: go_up(rename(loc, name)), imp });
+          return pre_after_var({ ...gs, loc: go_up(rename(loc, name)) });
         });
       default:
         syntax_error(loc);
     }
-  }
+  };
 
-  function start(loc: Loc): T {
+  const start: walker = ({ loc, counter, ...data }) => {
     assert(loc.t.tag === "syntax_list");
-
-    const [rib_id, counter] = new_rib_id(orig_counter);
+    const [rib_id, new_counter] = new_rib_id(counter);
     const rib: Rib = { type: "rib", normal_env: {}, types_env: {} };
     const lexical: lexical_extension = { extensible: true, rib_id, rib };
     return go_down(
       loc,
-      (loc) => pre_var({ loc, lexical, unit, counter, context, imp, helpers }),
-      (loc) => end({ loc, unit, lexical, context, counter, imp, helpers }),
+      (loc) => pre_var({ loc, ...data, lexical, counter: new_counter }),
+      (loc) => end({ loc, ...data, lexical, counter: new_counter }),
     );
-  }
+  };
 
-  async function end({ loc, ...data }: goodies): T {
+  const end: walker = async ({ loc, ...data }) => {
     return go_right(
       loc,
       (loc) => {
@@ -837,11 +831,11 @@ function expand_type_parameters(
       },
       syntax_error,
     );
-  }
+  };
 
   assert(loc.t.content === "<");
-  return go_right(loc, start, syntax_error);
-}
+  return go_right(loc, (loc) => start({ loc, ...data }), syntax_error);
+};
 
 function expand_expr(
   loc: Loc,
@@ -851,20 +845,21 @@ function expand_expr(
   imp: import_req,
   sort: "type" | "value",
   helpers: preexpand_helpers,
-): Promise<Omit<goodies, "lexical" | "modular">> {
+  lexical: lexical_extension,
+): Promise<Omit<goodies, "modular">> {
   return in_isolation(
     loc,
     async (loc) => {
       return preexpand_forms({
         loc,
-        lexical: { extensible: false },
+        lexical,
         counter,
         unit,
         context,
         sort,
         helpers,
         imp,
-      }).then(({ loc, unit, counter, context }) =>
+      }).then(({ loc, unit, counter, context, lexical, imp, helpers }) =>
         postexpand_body(
           loc,
           { extensible: false },
@@ -874,17 +869,19 @@ function expand_expr(
           imp,
           sort,
           helpers,
-        ).then(({ loc, imp, counter }) => ({
+          lexical,
+        ).then(({ loc, imp, counter, modular: _ignored_modular }) => ({
           loc,
           unit,
           counter,
           context,
           imp,
           helpers,
+          lexical,
         })),
       );
     },
-    (loc, { unit, counter, context, imp }) => ({ loc, unit, counter, context, imp, helpers }),
+    (loc, data) => ({ loc, ...data }),
   );
 }
 
@@ -1003,6 +1000,7 @@ async function postexpand_type_alias_declaration(
   context: Context,
   imp: import_req,
   helpers: preexpand_helpers,
+  lexical: lexical_extension,
 ): Promise<{ loc: Loc; modular: modular_extension; imp: import_req; counter: number }> {
   async function do_after_equal(
     loc: Loc,
@@ -1011,7 +1009,7 @@ async function postexpand_type_alias_declaration(
     context: Context,
     imp: import_req,
   ): Promise<{ loc: Loc; imp: import_req; counter: number }> {
-    return expand_expr(loc, counter, unit, context, imp, "type", helpers).then(
+    return expand_expr(loc, counter, unit, context, imp, "type", helpers, lexical).then(
       ({ loc, unit: _unit, counter, context: _context, imp }) => {
         function done(loc: Loc) {
           return { loc: go_up(loc), imp, counter };
@@ -1038,7 +1036,7 @@ async function postexpand_type_alias_declaration(
       case "=":
         return go_right(loc, (loc) => do_after_equal(loc, counter, unit, context, imp));
       case "<":
-        return expand_type_parameters(loc, unit, counter, context, imp, helpers).then(
+        return expand_type_parameters({ loc, unit, counter, context, imp, helpers, lexical }).then(
           ({ loc, counter, unit, context, lexical, imp }) => {
             assert(loc.t.content === ">");
             assert(lexical.extensible);
@@ -1120,6 +1118,7 @@ async function postexpand_lexical_declaration(
   context: Context,
   imp: import_req,
   helpers: preexpand_helpers,
+  lexical: lexical_extension,
 ): Promise<{ loc: Loc; modular: modular_extension; imp: import_req; counter: number }> {
   async function handle_value_initializer(
     loc: Loc,
@@ -1127,7 +1126,7 @@ async function postexpand_lexical_declaration(
     assert(loc.t.content === "=");
     return go_right(
       loc,
-      (loc) => expand_expr(loc, counter, unit, context, imp, "value", helpers),
+      (loc) => expand_expr(loc, counter, unit, context, imp, "value", helpers, lexical),
       (loc) => syntax_error(loc, "expected an expression following the '=' sign"),
     );
   }
@@ -1138,7 +1137,7 @@ async function postexpand_lexical_declaration(
     return go_right(
       loc,
       (loc) =>
-        expand_expr(loc, counter, unit, context, imp, "type", helpers).then(
+        expand_expr(loc, counter, unit, context, imp, "type", helpers, lexical).then(
           ({ loc, counter, unit: _ignored_unit, context: _ignored_context, imp }) =>
             go_right(loc, handle_value_initializer, (loc) =>
               Promise.resolve({ loc, imp, counter }),
@@ -1298,6 +1297,7 @@ async function postexpand_body(
   imp: import_req,
   sort: "type" | "value",
   helpers: preexpand_helpers,
+  lexical: lexical_extension,
 ): Promise<{ loc: Loc; modular: modular_extension; imp: import_req; counter: number }> {
   type T = Promise<{ loc: Loc; modular: modular_extension; imp: import_req; counter: number }>;
   async function done(loc: Loc, modular: modular_extension, imp: import_req, counter: number): T {
@@ -1376,6 +1376,7 @@ async function postexpand_body(
               context,
               imp,
               helpers,
+              lexical,
             ).then(({ loc, modular, imp, counter }) => cont(loc, modular, imp, counter));
           case "arrow_function": {
             return in_isolation(
@@ -1396,6 +1397,7 @@ async function postexpand_body(
               context,
               imp,
               helpers,
+              lexical,
             ).then(({ loc, modular, imp, counter }) => cont(loc, modular, imp, counter));
           }
           case "member_expression": {
@@ -1412,6 +1414,7 @@ async function postexpand_body(
                     imp,
                     sort,
                     helpers,
+                    lexical,
                   ),
                 (loc, { modular: _ignored_modular, imp, counter }) =>
                   go_right(loc, (loc) => {
