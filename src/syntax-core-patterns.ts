@@ -24,15 +24,9 @@ import {
 } from "./syntax-structures";
 import { go_next, go_down, mkzipper, stx_list_content, go_up, change } from "./zipper";
 import { preexpand_helpers } from "./preexpand-helpers";
+import { data } from "./data";
 
-type handler = (
-  loc: Loc,
-  context: Context,
-  unit: CompilationUnit,
-  counter: number,
-  lexical: lexical_extension,
-  helpers: preexpand_helpers,
-) => Promise<{
+type handler = (data: data) => Promise<{
   loc: Loc;
   counter: number;
   unit: CompilationUnit;
@@ -266,7 +260,7 @@ export const core_pattern_match: (
   return unification;
 };
 
-const splice: handler = async (loc, context, unit, counter, lexical, helpers) => {
+const splice: handler = async ({ loc, context, unit, counter, lexical, helpers, ...data }) => {
   const unification = await core_pattern_match(loc, unit, "splice", helpers);
   assert(unification !== null);
   const { subst } = unification;
@@ -286,6 +280,7 @@ const splice: handler = async (loc, context, unit, counter, lexical, helpers) =>
     unit,
     context,
     lexical,
+    ...data,
   };
 };
 
@@ -356,14 +351,15 @@ function group_by<K, V>(ls: [K, V][], eq: (a: K, b: K) => boolean): [K, V[]][] {
   return ac;
 }
 
-const using_rewrite_rules: handler = async (
-  orig_loc,
-  orig_context,
-  orig_unit,
-  orig_counter,
-  orig_lexical,
+const using_rewrite_rules: handler = async ({
+  loc: orig_loc,
+  context: orig_context,
+  unit: orig_unit,
+  counter: orig_counter,
+  lexical: orig_lexical,
   helpers,
-) => {
+  ...data
+}) => {
   const unification = await core_pattern_match(orig_loc, orig_unit, "using_rewrite_rules", helpers);
   if (!unification) syntax_error(orig_loc);
   const { subst, loc } = unification;
@@ -426,6 +422,7 @@ const using_rewrite_rules: handler = async (
     unit: final_unit,
     context: final_context,
     lexical: orig_lexical,
+    ...data,
   };
 };
 
@@ -498,14 +495,15 @@ export async function apply_syntax_rules(
   return { loc: new_loc, counter: new_counter };
 }
 
-const define_rewrite_rules: handler = async (
-  orig_loc,
-  orig_context,
-  orig_unit,
-  orig_counter,
-  orig_lexical,
+const define_rewrite_rules: handler = async ({
+  loc: orig_loc,
+  context: orig_context,
+  unit: orig_unit,
+  counter: orig_counter,
+  lexical: orig_lexical,
   helpers,
-) => {
+  ...data
+}) => {
   if (orig_lexical.extensible === false)
     syntax_error(orig_loc, "cannot define rules in nondefinition context");
   const unification = await core_pattern_match(
@@ -570,6 +568,7 @@ const define_rewrite_rules: handler = async (
     unit: final_unit,
     context: final_context,
     lexical,
+    ...data,
   };
 };
 

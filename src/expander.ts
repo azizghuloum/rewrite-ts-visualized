@@ -236,6 +236,7 @@ async function handle_core_syntax(
   counter: number,
   lexical: lexical_extension,
   helpers: preexpand_helpers,
+  imp: import_req,
 ): Promise<{
   loc: Loc;
   counter: number;
@@ -245,7 +246,7 @@ async function handle_core_syntax(
 }> {
   const handler = core_handlers[name];
   assert(handler !== undefined);
-  return handler(loc, context, unit, counter, lexical, helpers);
+  return handler({ loc, context, unit, counter, lexical, helpers, imp });
 }
 
 const atom_handlers_table: { [tag in atom_tag]: "next" | "stop" } = {
@@ -405,6 +406,7 @@ const preexpand_forms: walkerplus<{ sort: "type" | "value" }> = async ({ loc, so
                     data.counter,
                     data.lexical,
                     data.helpers,
+                    data.imp,
                   ).then(({ loc, counter, unit, context, lexical }) =>
                     data.helpers.inspect(loc, `core output`, () =>
                       preexpand_forms({
