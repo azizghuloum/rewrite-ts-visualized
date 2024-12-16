@@ -27,7 +27,7 @@ import { debug, in_isolation, syntax_error } from "./stx-error";
 import { array_to_ll, join_separated, llappend } from "./llhelpers";
 import { gen_binding, preexpand_list_handlers } from "./preexpand-handlers";
 import { preexpand_helpers } from "./preexpand-helpers";
-import { goodies, walker, walkerplus } from "./data";
+import { data, goodies, swalker, walker, walkerplus } from "./data";
 
 export function initial_step(
   ast: AST,
@@ -349,16 +349,16 @@ function rewrap(loc: Loc, rib_id: string, cu_id: string): Loc {
 }
 
 const preexpand_forms: walkerplus<{ sort: "type" | "value" }> = async ({ loc, sort, ...data }) => {
-  function done(loc: Loc): Promise<goodies> {
+  function done(loc: Loc): Promise<data> {
     return Promise.resolve({ loc, ...data });
   }
-  function next(loc: Loc): Promise<goodies> {
+  function next(loc: Loc): Promise<data> {
     return go_next(loc, (loc) => h(find_form(loc)), done);
   }
-  function descend(loc: Loc): Promise<goodies> {
+  function descend(loc: Loc): Promise<data> {
     return go_down(loc, (loc) => h(find_form(loc)), syntax_error);
   }
-  async function h(ffrv: ffrv): Promise<goodies> {
+  async function h(ffrv: ffrv): Promise<data> {
     const loc = ffrv.loc;
     switch (ffrv.type) {
       case "done":
@@ -549,34 +549,32 @@ function itself(loc: Loc): Loc {
   return loc;
 }
 
-function extract_parameters(goodies: goodies): goodies {
+const extract_parameters: swalker = (data) => {
   //
-  function tail(goodies: goodies): goodies {
-    const loc = goodies.loc;
+  const tail: swalker = ({ loc, ...data }) => {
     switch (loc.t.type) {
       case "atom": {
         switch (loc.t.tag) {
           case "other": {
             switch (loc.t.content) {
               case ",":
-                return go_right(loc, (loc) => head({ ...goodies, loc }), invalid_form);
+                return go_right(loc, (loc) => head({ ...data, loc }), invalid_form);
               case ")":
-                return go_right(loc, invalid_form, (loc) => ({ ...goodies, loc: go_up(loc) }));
+                return go_right(loc, invalid_form, (loc) => ({ ...data, loc: go_up(loc) }));
             }
           }
         }
       }
     }
     syntax_error(loc);
-  }
+  };
 
-  function head(goodies: goodies): goodies {
-    const loc = goodies.loc;
+  const head: swalker = ({ loc, ...data }) => {
     switch (loc.t.type) {
       case "atom": {
         switch (loc.t.tag) {
           case "identifier": {
-            const gs = identifier(goodies);
+            const gs = identifier({ loc, ...data });
             return go_right(gs.loc, (loc) => tail({ ...gs, loc }), invalid_form);
           }
           case "other": {
@@ -584,45 +582,45 @@ function extract_parameters(goodies: goodies): goodies {
               case ",":
                 return invalid_form(loc);
               case ")":
-                return go_right(loc, invalid_form, (loc) => ({ ...goodies, loc: go_up(loc) }));
+                return go_right(loc, invalid_form, (loc) => ({ ...data, loc: go_up(loc) }));
             }
           }
         }
       }
     }
     syntax_error(loc);
-  }
+  };
 
-  function identifier(goodies: goodies): goodies {
-    const id = goodies.loc.t;
+  const identifier: swalker = (data) => {
+    const id = data.loc.t;
     assert(id.type === "atom" && id.tag === "identifier");
-    const { name, ...gs } = gen_binding({ ...goodies, sort: "value" });
-    return { ...gs, loc: rename(goodies.loc, name) };
-  }
+    const { name, ...gs } = gen_binding({ ...data, sort: "value" });
+    return { ...gs, loc: rename(data.loc, name) };
+  };
 
-  function first_param(goodies: goodies): goodies {
-    switch (goodies.loc.t.type) {
+  const first_param: swalker = (data) => {
+    switch (data.loc.t.type) {
       case "atom": {
-        switch (goodies.loc.t.tag) {
+        switch (data.loc.t.tag) {
           case "identifier":
-            const gs = identifier(goodies);
+            const gs = identifier(data);
             return go_right(gs.loc, invalid_form, (loc) => ({ ...gs, loc: go_up(loc) }));
           case "other": {
-            if (goodies.loc.t.content === "(") {
-              return go_right(goodies.loc, (loc) => head({ ...goodies, loc }), invalid_form);
+            if (data.loc.t.content === "(") {
+              return go_right(data.loc, (loc) => head({ ...data, loc }), invalid_form);
             }
           }
         }
-        return syntax_error(goodies.loc);
+        return syntax_error(data.loc);
       }
     }
-    debug(goodies.loc, "non atom first_param");
-  }
+    debug(data.loc, "non atom first_param");
+  };
   {
-    assert(goodies.loc.t.type === "list" && goodies.loc.t.tag === "formal_parameters");
-    return go_down(goodies.loc, (loc) => first_param({ ...goodies, loc }), invalid_form);
+    assert(data.loc.t.type === "list" && data.loc.t.tag === "formal_parameters");
+    return go_down(data.loc, (loc) => first_param({ ...data, loc }), invalid_form);
   }
-}
+};
 
 function check_punct(loc: Loc, content: string) {
   if (loc.t.type !== "atom" || loc.t.tag !== "other" || loc.t.content !== content) {
