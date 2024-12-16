@@ -71,22 +71,8 @@ export function gen_binding({
   );
 }
 
-function lexical_declaration({
-  loc,
-  lexical,
-  context,
-  counter,
-  unit,
-  ...data
-}: goodies): Promise<goodies> {
-  async function after_vars({
-    loc,
-    lexical,
-    context,
-    counter,
-    unit,
-    ...data
-  }: goodies): Promise<goodies> {
+const lexical_declaration: walker = ({ loc, lexical, context, counter, unit, ...data }) => {
+  const after_vars: walker = async ({ loc, lexical, context, counter, unit, ...data }) => {
     if (loc.t.type === "atom" && loc.t.tag === "other") {
       switch (loc.t.content) {
         case ";":
@@ -104,8 +90,8 @@ function lexical_declaration({
       }
     }
     syntax_error(loc, "expected a ',' or a ';'");
-  }
-  async function get_vars(ls: Loc, lexical: lexical_extension, context: Context, counter: number) {
+  };
+  function get_vars(ls: Loc, lexical: lexical_extension, context: Context, counter: number) {
     if (ls.t.type === "list" && ls.t.tag === "variable_declarator") {
       return go_down(
         ls,
@@ -142,19 +128,12 @@ function lexical_declaration({
       ),
     syntax_error,
   );
-}
+};
 
-function type_alias_declaration({
-  loc,
-  lexical,
-  context,
-  counter,
-  unit,
-  ...data
-}: goodies): Promise<goodies> {
+const type_alias_declaration: walker = ({ loc, ...data }) => {
   async function after_type(loc: Loc) {
     assert(loc.t.type === "atom" && loc.t.tag === "identifier", "expected an identifier");
-    const gs = gen_binding({ loc, lexical, counter, context, unit, sort: "type", ...data });
+    const gs = gen_binding({ loc, sort: "type", ...data });
     return { ...gs, loc: go_up(loc) };
   }
   return go_down(
@@ -162,7 +141,7 @@ function type_alias_declaration({
     (loc) => after_type(skip_required(skip_optional(loc, "export"), ["type"])),
     syntax_error,
   );
-}
+};
 
 const import_declaration: walker = async ({ loc, helpers, ...data }) => {
   async function handle_import_from_file(loc: Loc) {
