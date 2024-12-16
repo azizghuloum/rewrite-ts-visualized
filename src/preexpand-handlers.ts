@@ -1,25 +1,17 @@
 import { assert } from "./assert";
+import { goodies } from "./data";
 import { imported_module, preexpand_helpers } from "./preexpand-helpers";
 import {
   extend_context_lexical,
   extend_rib,
   extend_unit,
-  import_req,
   lexical_extension,
   rib_push,
 } from "./stx";
 import { syntax_error } from "./stx-error";
-import { CompilationUnit, Context, Loc, STX } from "./syntax-structures";
+import { Context, Loc, STX } from "./syntax-structures";
 import { list_tag } from "./tags";
 import { change, go_down, go_right, go_up, mkzipper } from "./zipper";
-
-export type goodies = {
-  loc: Loc;
-  lexical: lexical_extension;
-  context: Context;
-  counter: number;
-  unit: CompilationUnit;
-};
 
 function skip_optional(loc: Loc, kwd: string): Loc {
   if (loc.t.content === kwd) {
@@ -44,6 +36,7 @@ export function gen_binding({
   context,
   unit,
   sort,
+  helpers,
 }: goodies & { sort: "type" | "value" }): Omit<goodies, "loc"> & { name: string } {
   const stx = loc.t;
   assert(stx.type === "atom" && stx.tag === "identifier", stx);
@@ -71,21 +64,36 @@ export function gen_binding({
           counter,
           name,
           unit,
+          helpers,
         }),
       ),
     (reason) => syntax_error(loc, reason),
   );
 }
 
-function lexical_declaration({ loc, lexical, context, counter, unit }: goodies): Promise<goodies> {
-  async function after_vars({ loc, lexical, context, counter, unit }: goodies): Promise<goodies> {
+function lexical_declaration({
+  loc,
+  lexical,
+  context,
+  counter,
+  unit,
+  ...data
+}: goodies): Promise<goodies> {
+  async function after_vars({
+    loc,
+    lexical,
+    context,
+    counter,
+    unit,
+    ...data
+  }: goodies): Promise<goodies> {
     if (loc.t.type === "atom" && loc.t.tag === "other") {
       switch (loc.t.content) {
         case ";":
           return go_right(
             loc,
             (loc) => syntax_error(loc, "expected nothing after semicolon"),
-            (loc) => ({ loc, lexical, context, counter, unit }),
+            (loc) => ({ loc, lexical, context, counter, unit, ...data }),
           );
         case ",":
           return go_right(
@@ -102,7 +110,15 @@ function lexical_declaration({ loc, lexical, context, counter, unit }: goodies):
       return go_down(
         ls,
         (loc) => {
-          const goodies = gen_binding({ loc, lexical, counter, context, unit, sort: "value" });
+          const goodies = gen_binding({
+            loc,
+            lexical,
+            counter,
+            context,
+            unit,
+            sort: "value",
+            ...data,
+          });
           return go_right(
             ls,
             (loc) => after_vars({ ...goodies, loc }),
@@ -134,10 +150,11 @@ function type_alias_declaration({
   context,
   counter,
   unit,
+  ...data
 }: goodies): Promise<goodies> {
   async function after_type(loc: Loc) {
     assert(loc.t.type === "atom" && loc.t.tag === "identifier", "expected an identifier");
-    const gs = gen_binding({ loc, lexical, counter, context, unit, sort: "type" });
+    const gs = gen_binding({ loc, lexical, counter, context, unit, sort: "type", ...data });
     return { ...gs, loc: go_up(loc) };
   }
   return go_down(
@@ -147,7 +164,7 @@ function type_alias_declaration({
   );
 }
 
-const import_declaration: preexpand_list_handler = ({ loc, ...goodies }, helpers) => {
+const import_declaration: preexpand_list_handler = async ({ loc, ...goodies }, helpers) => {
   async function handle_import_from_file(loc: Loc) {
     if (loc.t.tag !== "string") syntax_error(loc, "expected a string literal for import");
     const mod = await helpers.manager.resolve_import(loc);
@@ -189,7 +206,7 @@ const import_declaration: preexpand_list_handler = ({ loc, ...goodies }, helpers
         }, rib);
         const new_lexical: lexical_extension = { extensible: true, rib: new_rib, rib_id };
         const new_unit = extend_unit(unit, new_lexical);
-        return { loc, counter, unit: new_unit, context, lexical: new_lexical };
+        return { loc, counter, unit: new_unit, context, lexical: new_lexical, helpers };
       }
       default:
         syntax_error(loc, `unexpected ${loc.t.tag} in import context`);

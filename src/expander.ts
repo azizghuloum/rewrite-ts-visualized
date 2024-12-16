@@ -25,8 +25,9 @@ import {
 import { apply_syntax_rules, core_handlers } from "./syntax-core-patterns";
 import { debug, in_isolation, syntax_error } from "./stx-error";
 import { array_to_ll, join_separated, llappend } from "./llhelpers";
-import { gen_binding, goodies, preexpand_list_handlers } from "./preexpand-handlers";
+import { gen_binding, preexpand_list_handlers } from "./preexpand-handlers";
 import { preexpand_helpers } from "./preexpand-helpers";
+import { goodies, walkerplus } from "./data";
 
 export function initial_step(
   ast: AST,
@@ -146,7 +147,7 @@ async function expand_program(
   imp: import_req;
 }> {
   async function expand(loc: Loc) {
-    return preexpand_body(loc, lexical, unit, context, counter, "value", helpers).then(
+    return preexpand_body({ loc, lexical, unit, context, counter, sort: "value", helpers }).then(
       ({ loc, lexical, counter, context, unit }) => {
         // rib is filled
         // context is filled also
@@ -193,26 +194,25 @@ async function expand_program(
   return go_down(loc, expand, expand_empty_program);
 }
 
-async function preexpand_body(
-  loc: Loc,
-  lexical: lexical_extension,
-  unit: CompilationUnit,
-  context: Context,
-  counter: number,
-  sort: "type" | "value",
-  helpers: preexpand_helpers,
-): Promise<goodies> {
-  return in_isolation(
+const preexpand_body: walkerplus<{ sort: "type" | "value" }> = async ({
+  loc,
+  lexical,
+  unit,
+  context,
+  counter,
+  sort,
+  ...data
+}) =>
+  in_isolation(
     loc,
-    (loc) => preexpand_forms(loc, lexical, counter, unit, context, sort, helpers),
-    (loc, { lexical, context, counter, unit }) =>
+    (loc) => preexpand_forms(loc, lexical, counter, unit, context, sort, data.helpers),
+    (loc, data) =>
       go_next(
         loc,
-        (loc) => preexpand_body(loc, lexical, unit, context, counter, sort, helpers),
-        (loc) => Promise.resolve({ loc, lexical, context, counter, unit }),
+        (loc) => preexpand_body({ loc, sort, ...data }),
+        (loc) => Promise.resolve({ loc, ...data }),
       ),
   );
-}
 
 async function preexpand_body_curly(
   loc: Loc,
@@ -231,6 +231,7 @@ async function preexpand_body_curly(
         counter,
         lexical,
         unit,
+        helpers,
       }),
     );
   }
@@ -406,6 +407,7 @@ async function preexpand_forms(
       context,
       counter,
       unit,
+      helpers,
     });
   }
   function next(loc: Loc): Promise<goodies> {
@@ -476,12 +478,12 @@ async function preexpand_forms(
         assert(loc.t.type === "list");
         const h = preexpand_list_handlers[loc.t.tag];
         if (h) {
-          return h({ loc, lexical, counter, unit, context }, helpers).then(
+          return h({ loc, lexical, counter, unit, context, helpers }, helpers).then(
             ({ loc, lexical, counter, unit, context }) =>
               go_next(
                 loc,
                 (loc) => preexpand_forms(loc, lexical, counter, unit, context, sort, helpers),
-                (loc) => Promise.resolve({ loc, lexical, counter, unit, context }),
+                (loc) => Promise.resolve({ loc, lexical, counter, unit, context, helpers }),
               ),
           );
         }
@@ -682,7 +684,7 @@ function expand_arrow_function(
         rib_id,
         rib: { type: "rib", normal_env: {}, types_env: {} },
       };
-      const pgs = extract_parameters({ loc, lexical, counter, context, unit });
+      const pgs = extract_parameters({ loc, lexical, counter, context, unit, helpers });
       const arr = go_right(pgs.loc, itself, invalid_form);
       check_punct(arr, "=>");
       const body = go_right(arr, itself, invalid_form);
@@ -737,13 +739,13 @@ function expand_type_parameters(
         assert(loc.t.content === ",");
         return go_right(
           loc,
-          (loc) => post_var({ loc, lexical, counter, unit, context, imp }),
+          (loc) => post_var({ loc, lexical, counter, unit, context, imp, helpers }),
           (loc) => {
             debug(loc, "cant go past commma2?");
           },
         );
       },
-      (loc) => end({ loc: go_up(loc), lexical, unit, counter, context, imp }),
+      (loc) => end({ loc: go_up(loc), lexical, unit, counter, context, imp, helpers }),
     );
   }
 
@@ -757,7 +759,7 @@ function expand_type_parameters(
   }: goodies & { imp: import_req }): T {
     switch (loc.t.tag) {
       case "identifier":
-        return post_after_var({ loc, lexical, counter, unit, context, imp });
+        return post_after_var({ loc, lexical, counter, unit, context, imp, helpers });
       case "type_parameter":
         return go_down(loc, (loc) => {
           assert(loc.t.tag === "identifier");
@@ -779,7 +781,15 @@ function expand_type_parameters(
                 helpers,
               ).then(({ loc, counter, unit, context, imp }) =>
                 go_right(loc, syntax_error, () =>
-                  post_after_var({ loc: go_up(loc), lexical, counter, unit, context, imp }),
+                  post_after_var({
+                    loc: go_up(loc),
+                    lexical,
+                    counter,
+                    unit,
+                    context,
+                    imp,
+                    helpers,
+                  }),
                 ),
               ),
             );
@@ -805,7 +815,7 @@ function expand_type_parameters(
         if (loc.t.content !== ",") syntax_error(loc, "expected a comma ','");
         return go_right(
           loc,
-          (loc) => pre_var({ loc, lexical, counter, unit, context, imp }),
+          (loc) => pre_var({ loc, lexical, counter, unit, context, imp, helpers }),
           (loc) => debug(loc, "cant go past commma?"),
         );
       },
@@ -818,6 +828,7 @@ function expand_type_parameters(
             unit: extend_unit(unit, lexical),
             context,
             imp,
+            helpers,
           }),
         ),
     );
@@ -840,6 +851,7 @@ function expand_type_parameters(
           context,
           unit,
           sort: "type",
+          helpers,
         });
         return pre_after_var({ ...gs, loc: rename(loc, name), imp });
       case "type_parameter":
@@ -852,6 +864,7 @@ function expand_type_parameters(
             context,
             unit,
             sort: "type",
+            helpers,
           });
           return pre_after_var({ ...gs, loc: go_up(rename(loc, name)), imp });
         });
@@ -868,8 +881,8 @@ function expand_type_parameters(
     const lexical: lexical_extension = { extensible: true, rib_id, rib };
     return go_down(
       loc,
-      (loc) => pre_var({ loc, lexical, unit, counter, context, imp }),
-      (loc) => end({ loc, unit, lexical, context, counter, imp }),
+      (loc) => pre_var({ loc, lexical, unit, counter, context, imp, helpers }),
+      (loc) => end({ loc, unit, lexical, context, counter, imp, helpers }),
     );
   }
 
@@ -885,7 +898,7 @@ function expand_type_parameters(
       loc,
       (loc) => {
         assert(loc.t.content === ">");
-        return { loc, lexical, unit, counter, context, imp };
+        return { loc, lexical, unit, counter, context, imp, helpers };
       },
       syntax_error,
     );
@@ -931,10 +944,11 @@ function expand_expr(
           counter,
           context,
           imp,
+          helpers,
         })),
       );
     },
-    (loc, { unit, counter, context, imp }) => ({ loc, unit, counter, context, imp }),
+    (loc, { unit, counter, context, imp }) => ({ loc, unit, counter, context, imp, helpers }),
   );
 }
 
