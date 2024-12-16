@@ -24,8 +24,11 @@ async function compile_script(filename: string, test_name: string) {
       resolve_import(loc) {
         syntax_error(loc, "import not supported in tests");
       },
-      resolve_label(label) {
+      resolve_label(_label) {
         throw new Error("resolving labels is not supported in tests");
+      },
+      get_import_path(_cuid) {
+        throw new Error(`imports are not supported in tests`);
       },
     },
     global_unit,

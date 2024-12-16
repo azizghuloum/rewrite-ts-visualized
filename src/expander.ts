@@ -24,7 +24,7 @@ import {
 } from "./zipper";
 import { apply_syntax_rules, core_handlers } from "./syntax-core-patterns";
 import { debug, in_isolation, syntax_error } from "./stx-error";
-import { array_to_ll } from "./llhelpers";
+import { array_to_ll, join_separated, llappend } from "./llhelpers";
 import { gen_binding, goodies, preexpand_list_handlers } from "./preexpand-handlers";
 import { preexpand_helpers } from "./preexpand-helpers";
 
@@ -35,9 +35,12 @@ export function initial_step(
   global_macros: string[],
 ): [
   Loc,
-  (
-    helpers: preexpand_helpers,
-  ) => Promise<{ loc: Loc; unit: CompilationUnit; context: Context; modular: modular_extension }>,
+  (helpers: preexpand_helpers) => Promise<{
+    loc: Loc;
+    unit: CompilationUnit;
+    context: Context;
+    modular: modular_extension;
+  }>,
 ] {
   const { stx, counter, unit, rib, rib_id } = init_top_level(ast, cu_id, globals, global_macros);
   const initial_loc: Loc = mkzipper(stx);
@@ -47,8 +50,84 @@ export function initial_step(
   return [
     initial_loc,
     (helpers: preexpand_helpers) =>
-      expand_program(initial_loc, unit, context, imp, counter, lexical, helpers),
+      expand_program(initial_loc, unit, context, imp, counter, lexical, helpers).then(
+        async ({ loc, unit, context, modular, imp }) => {
+          const import_code = await generate_imports(imp, helpers);
+          assert(loc.t.tag === "program");
+          assert(loc.p.type === "top");
+          const new_program: STX = {
+            ...loc.t,
+            wrap: empty_wrap,
+            content: llappend(array_to_ll(import_code), loc.t.content),
+          };
+          return { loc: mkzipper(new_program), unit, context, modular };
+        },
+      ),
   ];
+}
+
+async function generate_imports(imp: import_req, helpers: preexpand_helpers): Promise<STX[]> {
+  async function generate(
+    cuid: string,
+    bindings: { [label: string]: { type: "value" | "type"; new_name: string } },
+  ): Promise<STX> {
+    const import_path = await helpers.manager.get_import_path(cuid);
+    const bindings_codes = await Promise.all(
+      Object.entries(bindings).map(async ([label, rhs]) => {
+        const binding = await helpers.manager.resolve_label({ cuid, name: label });
+        assert(binding.type === "imported_lexical");
+        const new_name: STX = {
+          type: "atom",
+          tag: "identifier",
+          content: rhs.new_name,
+          src: false,
+          wrap: empty_wrap,
+        };
+        const orig_name: STX = {
+          type: "atom",
+          tag: "identifier",
+          content: binding.name,
+          src: false,
+          wrap: empty_wrap,
+        };
+        const code: STX = {
+          type: "list",
+          tag: "import_specifier",
+          content: array_to_ll([orig_name, as_keyword, new_name]),
+          src: false,
+          wrap: empty_wrap,
+        };
+        return code;
+      }),
+    );
+
+    return {
+      type: "list",
+      tag: "import_declaration",
+      src: false,
+      wrap: empty_wrap,
+      content: array_to_ll([
+        import_keyword,
+        {
+          type: "list",
+          tag: "import_specifier",
+          src: false,
+          wrap: empty_wrap,
+          content: llappend(
+            [lt_brace_keyword, null],
+            llappend(join_separated(array_to_ll(bindings_codes), comma_keyword), [
+              rt_brace_keyword,
+              null,
+            ]),
+          ),
+        },
+        from_keyword,
+        string_literal(import_path),
+        semi_keyword,
+      ]),
+    };
+  }
+  return Promise.all(Object.entries(imp).map(([cuid, bindings]) => generate(cuid, bindings)));
 }
 
 async function expand_program(
@@ -861,10 +940,36 @@ function expand_expr(
 
 const empty_wrap: Wrap = { marks: null, subst: null, aes: null };
 
+function string_literal(value: string): STX {
+  return {
+    type: "atom",
+    tag: "string",
+    content: JSON.stringify(value),
+    wrap: empty_wrap,
+    src: false,
+  };
+}
+
 const export_keyword: STX = {
   type: "atom",
   tag: "other",
   content: "export",
+  wrap: empty_wrap,
+  src: false,
+};
+
+const comma_keyword: STX = {
+  type: "atom",
+  tag: "other",
+  content: ",",
+  wrap: empty_wrap,
+  src: false,
+};
+
+const semi_keyword: STX = {
+  type: "atom",
+  tag: "other",
+  content: ";",
   wrap: empty_wrap,
   src: false,
 };
@@ -881,6 +986,30 @@ const rt_brace_keyword: STX = {
   type: "atom",
   tag: "other",
   content: "}",
+  wrap: empty_wrap,
+  src: false,
+};
+
+const import_keyword: STX = {
+  type: "atom",
+  tag: "other",
+  content: "import",
+  wrap: empty_wrap,
+  src: false,
+};
+
+const from_keyword: STX = {
+  type: "atom",
+  tag: "other",
+  content: "from",
+  wrap: empty_wrap,
+  src: false,
+};
+
+const as_keyword: STX = {
+  type: "atom",
+  tag: "other",
+  content: "as",
   wrap: empty_wrap,
   src: false,
 };
@@ -1060,7 +1189,7 @@ async function postexpand_lexical_declaration(
       loc,
       (loc) =>
         expand_expr(loc, counter, unit, context, imp, "type", helpers).then(
-          ({ loc, counter, unit, context, imp }) =>
+          ({ loc, counter, unit: _ignored_unit, context: _ignored_context, imp }) =>
             go_right(loc, handle_value_initializer, (loc) =>
               Promise.resolve({ loc, imp, counter }),
             ),
@@ -1334,7 +1463,7 @@ async function postexpand_body(
                     sort,
                     helpers,
                   ),
-                (loc, { modular: ignored_modular, imp, counter }) =>
+                (loc, { modular: _ignored_modular, imp, counter }) =>
                   go_right(loc, (loc) => {
                     assert(loc.t.content === ".");
                     return go_right(loc, (loc) => {

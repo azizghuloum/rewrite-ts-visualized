@@ -15,11 +15,13 @@ export type imported_module = {
   get_cid(): Promise<string>;
   find_module_by_cid(cid: string): Promise<imported_module | undefined>;
   resolve_label(name: string): Promise<Binding>;
+  get_pkg_and_path(): [{ name: string; version: string }, string];
 };
 
 export type manager = {
   resolve_import: (loc: Loc) => Promise<imported_module>;
   resolve_label: (label: Label) => Promise<Binding>;
+  get_import_path: (cuid: string) => Promise<string>;
 };
 
 export type preexpand_helpers = {

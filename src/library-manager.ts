@@ -19,7 +19,7 @@ import { Binding, CompilationUnit, Context, Loc } from "./syntax-structures";
 import stringify from "json-stringify-pretty-compact";
 import { init_global_context } from "./global-module";
 
-const cookie = "rewrite-ts-002";
+const cookie = "rewrite-ts-007";
 
 type module_state =
   | { type: "initial" }
@@ -128,9 +128,11 @@ class RtsModule implements imported_module {
     assert(this.state.type === "stale");
     console.log(`expanding ${this.state.cid}`);
     const code = await fs.readFile(this.path, { encoding: "utf-8" });
+    const my_pkg = this.state.pkg;
+    const my_path = this.state.pkg_relative_path;
     const source_file: source_file = {
-      package: { name: this.state.pkg.name, version: this.state.pkg.version },
-      path: this.state.pkg_relative_path,
+      package: { name: my_pkg.name, version: my_pkg.version },
+      path: my_path,
     };
     const [_loc0, expand] = initial_step(
       parse(code, source_file),
@@ -151,6 +153,19 @@ class RtsModule implements imported_module {
             const mod = await this.find_module_by_cid(label.cuid);
             if (!mod) throw new Error(`cannot find module with cuid = ${label.cuid}`);
             return mod.resolve_label(label.name);
+          },
+          get_import_path: async (cuid) => {
+            const mod = await this.find_module_by_cid(cuid);
+            if (!mod) throw new Error(`cannot find module with cuid = ${cuid}`);
+            const [mod_pkg, mod_path] = mod.get_pkg_and_path();
+            if (mod_pkg === my_pkg) {
+              const dir0 = join(dirname(my_path), ".rts");
+              const dir1 = join(dirname(mod_path), ".rts");
+              if (dir0 !== dir1) throw new Error(`TODO relative path imports`);
+              return `./${basename(mod_path)}.ts`;
+            } else {
+              throw new Error(`TODO cross package imports`);
+            }
           },
         },
         global_unit: this.global_unit,
@@ -231,6 +246,11 @@ class RtsModule implements imported_module {
       default:
         throw new Error(`unhandled binding type ${binding.type}`);
     }
+  }
+
+  get_pkg_and_path(): [{ name: string; version: string }, string] {
+    assert(this.state.type === "fresh");
+    return [this.state.pkg, this.state.pkg_relative_path];
   }
 
   private get_imported_modules_for_path(import_path: string, loc: Loc): imported_module {

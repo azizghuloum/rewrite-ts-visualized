@@ -133,6 +133,9 @@ function Example({ code, onChange }: ExampleProps) {
           resolve_label(_label) {
             throw new Error(`resolving labels is not supported in gui`);
           },
+          get_import_path(_cuid) {
+            throw new Error(`imports are not supported in gui`);
+          },
         },
         global_unit,
         global_context,
