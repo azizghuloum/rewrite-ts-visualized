@@ -608,7 +608,7 @@ const extract_parameters: swalker = (data) => {
     const id = data.loc.t;
     assert(id.type === "atom" && id.tag === "identifier");
     const { name, ...gs } = gen_binding({ ...data, sort: "value" });
-    return { ...gs, loc: rename(data.loc, name) };
+    return { ...data, ...gs, loc: rename(data.loc, name) };
   };
 
   const first_param: swalker = (data) => {
@@ -780,32 +780,16 @@ const expand_type_parameters: walker = ({ loc, ...data }) => {
     );
   };
 
-  const pre_var: walker = ({ loc, lexical, counter, unit, context, ...data }) => {
+  const pre_var: walker = ({ loc, ...data }) => {
     switch (loc.t.tag) {
       case "identifier":
-        const { name, ...gs } = gen_binding({
-          loc,
-          lexical,
-          counter,
-          context,
-          unit,
-          sort: "type",
-          ...data,
-        });
-        return pre_after_var({ ...gs, loc: rename(loc, name) });
+        const { name, ...gs } = gen_binding({ loc, ...data, sort: "type" });
+        return pre_after_var({ ...data, ...gs, loc: rename(loc, name) });
       case "type_parameter":
         return go_down(loc, (loc) => {
           if (loc.t.tag !== "identifier") syntax_error(loc, "expected an identifier");
-          const { name, ...gs } = gen_binding({
-            loc,
-            lexical,
-            counter,
-            context,
-            unit,
-            sort: "type",
-            ...data,
-          });
-          return pre_after_var({ ...gs, loc: go_up(rename(loc, name)) });
+          const { name, ...gs } = gen_binding({ loc, ...data, sort: "type" });
+          return pre_after_var({ ...data, ...gs, loc: go_up(rename(loc, name)) });
         });
       default:
         syntax_error(loc);

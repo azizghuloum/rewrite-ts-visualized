@@ -9,7 +9,7 @@ import {
   rib_push,
 } from "./stx";
 import { syntax_error } from "./stx-error";
-import { Context, Loc, STX } from "./syntax-structures";
+import { CompilationUnit, Context, Loc, STX } from "./syntax-structures";
 import { list_tag } from "./tags";
 import { change, go_down, go_right, go_up, mkzipper } from "./zipper";
 
@@ -36,8 +36,20 @@ export function gen_binding({
   context,
   unit,
   sort,
-  ...data
-}: goodies & { sort: "type" | "value" }): Omit<goodies, "loc"> & { name: string } {
+}: {
+  loc: Loc;
+  lexical: lexical_extension;
+  counter: number;
+  context: Context;
+  unit: CompilationUnit;
+  sort: "type" | "value";
+}): {
+  name: string;
+  lexical: lexical_extension;
+  counter: number;
+  context: Context;
+  unit: CompilationUnit;
+} {
   const stx = loc.t;
   assert(stx.type === "atom" && stx.tag === "identifier", stx);
   assert(lexical.extensible);
@@ -64,7 +76,6 @@ export function gen_binding({
           counter,
           name,
           unit,
-          ...data,
         }),
       ),
     (reason) => syntax_error(loc, reason),
@@ -103,12 +114,11 @@ const lexical_declaration: walker = ({ loc, lexical, context, counter, unit, ...
             context,
             unit,
             sort: "value",
-            ...data,
           });
           return go_right(
             ls,
-            (loc) => after_vars({ ...goodies, loc }),
-            (loc) => Promise.resolve({ ...goodies, loc }),
+            (loc) => after_vars({ ...data, ...goodies, loc }),
+            (loc) => Promise.resolve({ ...data, ...goodies, loc }),
           );
         },
         syntax_error,
@@ -134,7 +144,7 @@ const type_alias_declaration: walker = ({ loc, ...data }) => {
   async function after_type(loc: Loc) {
     assert(loc.t.type === "atom" && loc.t.tag === "identifier", "expected an identifier");
     const gs = gen_binding({ loc, sort: "type", ...data });
-    return { ...gs, loc: go_up(loc) };
+    return { ...data, ...gs, loc: go_up(loc) };
   }
   return go_down(
     loc,
