@@ -10,12 +10,12 @@ export type data = {
   unit: CompilationUnit;
   helpers: preexpand_helpers;
   imp: import_req;
+  modular: modular_extension;
 };
 
 export type goodies = data;
 
 //export type data = {
-//  modular: modular_extension;
 //};
 
 export type walker = (data: data) => Promise<data>;
