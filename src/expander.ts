@@ -1138,31 +1138,19 @@ const postexpand_forms: walkerplus<{ sort: "type" | "value" }> = ({ modular, ...
     modular,
   }));
 
-type ppdata = {
-  loc: Loc;
-  modular: modular_extension;
-  imp: import_req;
-  counter: number;
-};
-
 const postexpand_body: walkerplus<{ sort: "type" | "value" }> = ({ sort, ...data }) => {
-  type T = Promise<data>;
-  async function done(new_data: ppdata): T {
-    return { ...data, ...new_data };
-  }
-  function cont({ loc, ...data }: ppdata): T {
-    return go_next(
+  const cont: walker = ({ loc, ...data }) =>
+    go_next(
       loc,
       (loc) => h({ loc, ...data }),
-      (loc) => done({ loc, ...data }),
+      (loc) => Promise.resolve({ loc, ...data }),
     );
-  }
-  async function h({ loc: old_loc, ...hdata }: ppdata): T {
+  const h: walker = async ({ loc: old_loc, ...data }) => {
     const ffrv = find_form(old_loc);
     const loc = ffrv.loc;
     switch (ffrv.type) {
       case "done":
-        return done({ ...data, loc });
+        return { ...data, loc };
       case "identifier": {
         assert(loc.t.type === "atom");
         const { tag, content, wrap } = loc.t;
@@ -1183,13 +1171,13 @@ const postexpand_body: walkerplus<{ sort: "type" | "value" }> = ({ sort, ...data
                   case "ts":
                   case "type":
                   case "lexical": {
-                    return cont({ ...hdata, loc: rename(loc, binding.name) });
+                    return cont({ ...data, loc: rename(loc, binding.name) });
                   }
                   case "imported_lexical": {
-                    const { imp, counter } = hdata;
+                    const { imp, counter } = data;
                     const existing = (imp[label.cuid] ?? {})[label.name];
                     if (existing) {
-                      return cont({ ...hdata, loc: rename(loc, existing.new_name) });
+                      return cont({ ...data, loc: rename(loc, existing.new_name) });
                     } else {
                       const { name } = binding;
                       const new_name = `${name}_${counter}`;
@@ -1202,7 +1190,7 @@ const postexpand_body: walkerplus<{ sort: "type" | "value" }> = ({ sort, ...data
                         },
                       };
                       return cont({
-                        ...hdata,
+                        ...data,
                         loc: rename(loc, new_name),
                         imp: new_imp,
                         counter: new_counter,
@@ -1229,32 +1217,32 @@ const postexpand_body: walkerplus<{ sort: "type" | "value" }> = ({ sort, ...data
         switch (loc.t.tag) {
           case "lexical_declaration":
             assert(sort === "value");
-            return postexpand_lexical_declaration({ ...data, ...hdata, loc }).then(cont);
+            return postexpand_lexical_declaration({ ...data, loc }).then(cont);
           case "arrow_function": {
             return in_isolation(
               loc,
-              (loc) => expand_arrow_function({ ...data, ...hdata, loc }),
-              (loc, gs) => ({ ...gs, loc }),
+              (loc) => expand_arrow_function({ ...data, loc }),
+              (loc, gs) => ({ ...data, ...gs, loc }),
             ).then(cont);
           }
           case "slice": {
             return syntax_error(loc, "invalid slice");
           }
           case "type_alias_declaration": {
-            return postexpand_type_alias_declaration({ ...data, ...hdata, loc }).then(cont);
+            return postexpand_type_alias_declaration({ ...data, loc }).then(cont);
           }
           case "member_expression": {
             return go_down(loc, (loc) =>
               in_isolation(
                 loc,
-                (loc) => postexpand_forms({ ...data, ...hdata, loc, sort }),
-                (loc, { modular, imp, counter }) =>
+                (loc) => postexpand_forms({ ...data, loc, sort }),
+                (loc, data) =>
                   go_right(loc, (loc) => {
                     assert(loc.t.content === ".");
                     return go_right(loc, (loc) => {
                       if (loc.t.tag === "identifier") {
                         // rename to identifier name itself
-                        return { loc: rename(loc, loc.t.content), modular, imp, counter };
+                        return { ...data, loc: rename(loc, loc.t.content) };
                       } else {
                         return syntax_error(loc, "not an identifier");
                       }
@@ -1267,11 +1255,11 @@ const postexpand_body: walkerplus<{ sort: "type" | "value" }> = ({ sort, ...data
             if (list_handlers_table[loc.t.tag] !== "descend") {
               debug(loc, `unhandled '${loc.t.tag}' form in postexpand_body`);
             }
-            return cont({ ...hdata, loc });
+            return cont({ ...data, loc });
           }
         }
       }
     }
-  }
+  };
   return h(data);
 };
