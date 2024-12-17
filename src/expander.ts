@@ -568,15 +568,15 @@ function check_punct(loc: Loc, content: string) {
   }
 }
 
-function expand_arrow_function(
-  loc: Loc,
-  counter: number,
-  context: Context,
-  imp: import_req,
-  unit: CompilationUnit,
-  helpers: preexpand_helpers,
-  modular: modular_extension,
-): Promise<{ loc: Loc; imp: import_req; counter: number; modular: modular_extension }> {
+function expand_arrow_function({
+  loc,
+  counter,
+  context,
+  imp,
+  unit,
+  helpers,
+  modular,
+}: data): Promise<{ loc: Loc; imp: import_req; counter: number; modular: modular_extension }> {
   return go_down(
     loc,
     (loc) => {
@@ -840,12 +840,17 @@ const as_keyword: STX = {
   src: false,
 };
 
-function insert_export_keyword(
-  loc: Loc,
-  counter: number,
-  modular: modular_extension,
-  imp: import_req,
-): {
+function insert_export_keyword({
+  loc,
+  counter,
+  modular,
+  imp,
+}: {
+  loc: Loc;
+  counter: number;
+  modular: modular_extension;
+  imp: import_req;
+}): {
   loc: Loc;
   modular: modular_extension;
   counter: number;
@@ -1001,7 +1006,7 @@ async function postexpand_type_alias_declaration({
       default:
         syntax_error(loc);
     }
-  }).then(({ loc, modular, imp, counter }) => insert_export_keyword(loc, counter, modular, imp));
+  }).then(insert_export_keyword);
 }
 
 async function postexpand_lexical_declaration({
@@ -1146,35 +1151,25 @@ async function postexpand_lexical_declaration({
     counter: number,
   ): Promise<{ loc: Loc; modular: modular_extension; imp: import_req; counter: number }> {
     assert(loc.t.content === "let" || loc.t.content === "const");
-    return go_right(
-      loc,
-      (loc) => handle_declarations(loc, exporting, modular, imp, counter),
-      syntax_error,
-    );
+    return go_right(loc, (loc) => handle_declarations(loc, exporting, modular, imp, counter));
   }
   async function handle_export(
     loc: Loc,
   ): Promise<{ loc: Loc; modular: modular_extension; imp: import_req; counter: number }> {
     if (!modular.extensible) syntax_error(loc, "unexpected export keyword");
-    return go_right(loc, (loc) => handle_declaration_list(loc, true, imp, counter), syntax_error);
+    return go_right(loc, (loc) => handle_declaration_list(loc, true, imp, counter));
   }
-  return go_down(
-    loc,
-    (loc) => {
-      switch (loc.t.content) {
-        case "export":
-          return handle_export(loc);
-        case "const":
-        case "let":
-          return handle_declaration_list(loc, false, imp, counter);
-        default:
-          syntax_error(loc);
-      }
-    },
-    syntax_error,
-  ).then(({ loc, modular: new_modular, imp, counter }) =>
-    insert_export_keyword(loc, counter, new_modular, imp),
-  );
+  return go_down(loc, (loc) => {
+    switch (loc.t.content) {
+      case "export":
+        return handle_export(loc);
+      case "const":
+      case "let":
+        return handle_declaration_list(loc, false, imp, counter);
+      default:
+        syntax_error(loc);
+    }
+  }).then(insert_export_keyword);
 }
 
 function rename(loc: Loc, new_name: string): Loc {
@@ -1302,16 +1297,7 @@ const postexpand_body: walkerplus<{ sort: "type" | "value" }> = ({
           case "arrow_function": {
             return in_isolation(
               loc,
-              (loc) =>
-                expand_arrow_function(
-                  loc,
-                  counter,
-                  data.context,
-                  imp,
-                  data.unit,
-                  data.helpers,
-                  modular,
-                ),
+              (loc) => expand_arrow_function({ ...data, loc, counter, imp, modular }),
               (loc, gs) => ({ ...gs, loc }),
             ).then(cont);
           }
