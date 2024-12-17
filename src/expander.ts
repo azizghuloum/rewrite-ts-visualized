@@ -179,30 +179,19 @@ async function expand_program({ loc, ...data }: data): Promise<{
 }
 
 const preexpand_body: walkerplus<{ sort: "type" | "value" }> = async ({ loc, sort, ...data }) =>
-  in_isolation(
-    loc,
-    (loc) => preexpand_forms({ loc, sort, ...data }),
-    (loc, data) =>
-      go_next(
-        loc,
-        (loc) => preexpand_body({ loc, sort, ...data }),
-        (loc) => Promise.resolve({ loc, ...data }),
-      ),
+  in_isolation(loc, (loc) => preexpand_forms({ loc, sort, ...data })).then(({ loc, ...data }) =>
+    go_next(
+      loc,
+      (loc) => preexpand_body({ loc, sort, ...data }),
+      (loc) => Promise.resolve({ loc, ...data }),
+    ),
   );
 
 const preexpand_body_curly: walker = async ({ loc, ...data }) =>
-  loc.t.type === "atom" && loc.t.tag === "other" && loc.t.content === "}"
+  loc.t.content === "}"
     ? go_right(loc, syntax_error, () => ({ loc: go_up(loc), ...data }))
-    : in_isolation(
-        loc,
-        (loc) => preexpand_forms({ loc, sort: "value", ...data }),
-        (loc, data) => {
-          return go_right(
-            loc,
-            (loc) => preexpand_body_curly({ loc, ...data }),
-            (loc) => syntax_error(loc, "no right"),
-          );
-        },
+    : in_isolation(loc, (loc) => preexpand_forms({ loc, sort: "value", ...data })).then(
+        ({ loc, ...data }) => go_right(loc, (loc) => preexpand_body_curly({ loc, ...data })),
       );
 
 async function handle_core_syntax({ name, ...data }: data & { name: string }): Promise<{
@@ -564,22 +553,18 @@ const expand_arrow_function: walker = ({ loc, counter, ...data }) =>
     const arr = go_right(pgs.loc, itself, invalid_form);
     check_punct(arr, "=>");
     const body = go_right(arr, itself, invalid_form);
-    return in_isolation(
-      body,
-      (body) => {
-        const wrap: Wrap = {
-          marks: null,
-          subst: [{ rib_id, cu_id: pgs.unit.cu_id }, null],
-          aes: null,
-        };
-        return expand_concise_body({
-          ...pgs,
-          loc: wrap_loc(body, wrap),
-          unit: extend_unit(pgs.unit, pgs.lexical),
-        });
-      },
-      (loc, data) => ({ loc, ...data }),
-    );
+    return in_isolation(body, (body) => {
+      const wrap: Wrap = {
+        marks: null,
+        subst: [{ rib_id, cu_id: pgs.unit.cu_id }, null],
+        aes: null,
+      };
+      return expand_concise_body({
+        ...pgs,
+        loc: wrap_loc(body, wrap),
+        unit: extend_unit(pgs.unit, pgs.lexical),
+      });
+    });
   });
 
 const expand_type_parameters: walker = ({ loc, ...data }) => {
@@ -685,16 +670,11 @@ const expand_type_parameters: walker = ({ loc, ...data }) => {
     );
   };
 
-  const end: walker = async ({ loc, ...data }) => {
-    return go_right(
-      loc,
-      (loc) => {
-        assert(loc.t.content === ">");
-        return { loc, ...data };
-      },
-      syntax_error,
-    );
-  };
+  const end: walker = async ({ loc, ...data }) =>
+    go_right(loc, (loc) => {
+      assert(loc.t.content === ">");
+      return { loc, ...data };
+    });
 
   assert(loc.t.content === "<");
   return go_right(loc, (loc) => start({ loc, ...data }), syntax_error);
@@ -707,16 +687,12 @@ const expand_expr: walkerplus<{ sort: "type" | "value" }> = ({
   unit,
   context,
   ...data
-}) => {
-  return in_isolation(
-    loc,
-    (loc) =>
-      preexpand_forms({ loc, sort, modular: { extensible: false }, unit, context, ...data }).then(
-        (data) => postexpand_body({ ...data, sort }),
-      ),
-    (loc, new_data) => ({ loc, ...data, ...new_data, modular, unit, context }),
-  );
-};
+}) =>
+  in_isolation(loc, (loc) =>
+    preexpand_forms({ loc, sort, modular: { extensible: false }, unit, context, ...data }).then(
+      (data) => postexpand_body({ ...data, sort }),
+    ),
+  ).then((data) => ({ ...data, modular, unit, context }));
 
 const empty_wrap: Wrap = { marks: null, subst: null, aes: null };
 
@@ -1173,11 +1149,7 @@ const postexpand_body: walkerplus<{ sort: "type" | "value" }> = ({ sort, ...data
             assert(sort === "value");
             return postexpand_lexical_declaration({ ...data, loc }).then(cont);
           case "arrow_function": {
-            return in_isolation(
-              loc,
-              (loc) => expand_arrow_function({ ...data, loc }),
-              (loc, gs) => ({ ...data, ...gs, loc }),
-            ).then(cont);
+            return in_isolation(loc, (loc) => expand_arrow_function({ ...data, loc })).then(cont);
           }
           case "slice": {
             return syntax_error(loc, "invalid slice");
@@ -1187,10 +1159,8 @@ const postexpand_body: walkerplus<{ sort: "type" | "value" }> = ({ sort, ...data
           }
           case "member_expression": {
             return go_down(loc, (loc) =>
-              in_isolation(
-                loc,
-                (loc) => postexpand_forms({ ...data, loc, sort }),
-                (loc, data) =>
+              in_isolation(loc, (loc) => postexpand_forms({ ...data, loc, sort }))
+                .then(({ loc, ...data }) =>
                   go_right(loc, (loc) => {
                     assert(loc.t.content === ".");
                     return go_right(loc, (loc) => {
@@ -1202,7 +1172,8 @@ const postexpand_body: walkerplus<{ sort: "type" | "value" }> = ({ sort, ...data
                       }
                     });
                   }),
-              ).then(cont),
+                )
+                .then(cont),
             );
           }
           default: {
