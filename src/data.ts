@@ -13,11 +13,6 @@ export type data = {
   modular: modular_extension;
 };
 
-export type goodies = data;
-
-//export type data = {
-//};
-
 export type walker = (data: data) => Promise<data>;
 
 export type walkerplus<T> = (data: data & T) => Promise<data>;

@@ -1,5 +1,5 @@
 import { assert } from "./assert";
-import { data, goodies, walker } from "./data";
+import { data, walker } from "./data";
 import { imported_module } from "./preexpand-helpers";
 import {
   extend_context_lexical,
