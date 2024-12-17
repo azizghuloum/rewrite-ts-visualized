@@ -468,10 +468,6 @@ const postexpand_program: walker = ({ loc, ...data }: data) =>
     ...new_data,
   }));
 
-function invalid_form(loc: Loc): never {
-  syntax_error(loc, "invalid form");
-}
-
 function itself(loc: Loc): Loc {
   return loc;
 }
@@ -481,9 +477,9 @@ const extract_parameters: swalker = (data) => {
   const tail: swalker = ({ loc, ...data }) => {
     switch (loc.t.content) {
       case ",":
-        return go_right(loc, (loc) => head({ ...data, loc }), invalid_form);
+        return go_right(loc, (loc) => head({ ...data, loc }));
       case ")":
-        return go_right(loc, invalid_form, (loc) => ({ ...data, loc: go_up(loc) }));
+        return go_right(loc, syntax_error, (loc) => ({ ...data, loc: go_up(loc) }));
       default:
         syntax_error(loc);
     }
@@ -493,14 +489,14 @@ const extract_parameters: swalker = (data) => {
     switch (loc.t.tag) {
       case "identifier": {
         const gs = identifier({ loc, ...data });
-        return go_right(gs.loc, (loc) => tail({ ...gs, loc }), invalid_form);
+        return go_right(gs.loc, (loc) => tail({ ...gs, loc }));
       }
       case "other": {
         switch (loc.t.content) {
           case ",":
-            return invalid_form(loc);
+            return syntax_error(loc);
           case ")":
-            return go_right(loc, invalid_form, (loc) => ({ ...data, loc: go_up(loc) }));
+            return go_right(loc, syntax_error, (loc) => ({ ...data, loc: go_up(loc) }));
         }
       }
     }
@@ -518,10 +514,10 @@ const extract_parameters: swalker = (data) => {
     switch (data.loc.t.tag) {
       case "identifier":
         const gs = identifier(data);
-        return go_right(gs.loc, invalid_form, (loc) => ({ ...gs, loc: go_up(loc) }));
+        return go_right(gs.loc, syntax_error, (loc) => ({ ...gs, loc: go_up(loc) }));
       case "other": {
         if (data.loc.t.content === "(") {
-          return go_right(data.loc, (loc) => head({ ...data, loc }), invalid_form);
+          return go_right(data.loc, (loc) => head({ ...data, loc }));
         }
       }
       default:
@@ -531,7 +527,7 @@ const extract_parameters: swalker = (data) => {
 
   {
     assert(data.loc.t.type === "list" && data.loc.t.tag === "formal_parameters");
-    return go_down(data.loc, (loc) => first_param({ ...data, loc }), invalid_form);
+    return go_down(data.loc, (loc) => first_param({ ...data, loc }));
   }
 };
 
@@ -550,9 +546,9 @@ const expand_arrow_function: walker = ({ loc, counter, ...data }) =>
       rib: { type: "rib", normal_env: {}, types_env: {} },
     };
     const pgs = extract_parameters({ ...data, loc, lexical, counter: new_counter });
-    const arr = go_right(pgs.loc, itself, invalid_form);
+    const arr = go_right(pgs.loc, itself);
     check_punct(arr, "=>");
-    const body = go_right(arr, itself, invalid_form);
+    const body = go_right(arr, itself);
     return in_isolation(body, (body) => {
       const wrap: Wrap = {
         marks: null,
@@ -680,19 +676,12 @@ const expand_type_parameters: walker = ({ loc, ...data }) => {
   return go_right(loc, (loc) => start({ loc, ...data }), syntax_error);
 };
 
-const expand_expr: walkerplus<{ sort: "type" | "value" }> = ({
-  loc,
-  sort,
-  modular,
-  unit,
-  context,
-  ...data
-}) =>
+const expand_expr: walkerplus<{ sort: "type" | "value" }> = ({ loc, sort, modular, ...data }) =>
   in_isolation(loc, (loc) =>
-    preexpand_forms({ loc, sort, modular: { extensible: false }, unit, context, ...data }).then(
-      (data) => postexpand_body({ ...data, sort }),
+    preexpand_forms({ loc, sort, modular: { extensible: false }, ...data }).then((data) =>
+      postexpand_body({ ...data, sort }),
     ),
-  ).then((data) => ({ ...data, modular, unit, context }));
+  ).then((data) => ({ ...data, modular }));
 
 const empty_wrap: Wrap = { marks: null, subst: null, aes: null };
 
@@ -1031,7 +1020,6 @@ const sort_env = { type: "types_env" as const, value: "normal_env" as const };
 
 const postexpand_forms: walkerplus<{ sort: "type" | "value" }> = ({ modular, ...data }) =>
   postexpand_body({ modular: { extensible: false }, ...data }).then((new_data) => ({
-    ...data,
     ...new_data,
     modular,
   }));
