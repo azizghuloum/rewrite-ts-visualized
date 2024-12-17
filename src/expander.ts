@@ -306,17 +306,17 @@ async function expand_concise_body(
       )
     : preexpand_forms({ loc, lexical, counter, unit, context, sort, helpers, imp, modular }));
   const new_unit = extend_unit(gs.unit, gs.lexical);
-  return postexpand_body(
-    gs.loc,
-    { extensible: false },
-    new_unit,
-    gs.counter,
-    gs.context,
+  return postexpand_body({
+    loc: gs.loc,
+    modular: { extensible: false },
+    unit: new_unit,
+    counter: gs.counter,
+    context: gs.context,
     imp,
     sort,
     helpers,
     lexical,
-  );
+  });
 }
 
 function rewrap(loc: Loc, rib_id: string, cu_id: string): Loc {
@@ -501,7 +501,7 @@ function postexpand_program({
 }: data): Promise<{ loc: Loc; modular: modular_extension; counter: number; imp: import_req }> {
   assert(loc.t.tag === "program");
   return go_down(loc, (loc) =>
-    postexpand_body(loc, modular, unit, counter, context, imp, "value", helpers, lexical),
+    postexpand_body({ loc, modular, unit, counter, context, imp, sort: "value", helpers, lexical }),
   );
 }
 
@@ -770,53 +770,33 @@ const expand_type_parameters: walker = ({ loc, ...data }) => {
   return go_right(loc, (loc) => start({ loc, ...data }), syntax_error);
 };
 
-const expand_expr: walkerplus<{ sort: "type" | "value" }> = ({
-  loc,
-  counter,
-  unit,
-  context,
-  imp,
-  sort,
-  helpers,
-  lexical,
-  ...data
-}) => {
+const expand_expr: walkerplus<{ sort: "type" | "value" }> = ({ loc, sort, ...data }) => {
   return in_isolation(
     loc,
-    async (loc) => {
-      return preexpand_forms({
-        loc,
-        lexical,
-        counter,
-        unit,
-        context,
-        sort,
-        helpers,
-        imp,
-        ...data,
-      }).then(({ loc, unit, counter, context, lexical, imp, helpers }) =>
-        postexpand_body(
-          loc,
-          { extensible: false },
-          unit,
-          counter,
-          context,
-          imp,
-          sort,
-          helpers,
-          lexical,
-        ).then(({ loc, imp, counter, modular }) => ({
-          loc,
-          unit,
-          counter,
-          context,
-          imp,
-          helpers,
-          lexical,
-          modular,
-        })),
-      );
-    },
+    (loc) =>
+      preexpand_forms({ loc, sort, ...data }).then(
+        ({ loc, unit, counter, context, lexical, imp, helpers }) =>
+          postexpand_body({
+            loc,
+            modular: { extensible: false },
+            unit,
+            counter,
+            context,
+            imp,
+            sort,
+            helpers,
+            lexical,
+          }).then(({ loc, imp, counter, modular }) => ({
+            unit,
+            context,
+            helpers,
+            lexical,
+            loc,
+            imp,
+            counter,
+            modular,
+          })),
+      ),
     (loc, data) => ({ loc, ...data }),
   );
 };
@@ -1247,17 +1227,22 @@ function rename(loc: Loc, new_name: string): Loc {
 
 const sort_env = { type: "types_env" as const, value: "normal_env" as const };
 
-async function postexpand_body(
-  loc: Loc,
-  modular: modular_extension,
-  unit: CompilationUnit,
-  counter: number,
-  context: Context,
-  imp: import_req,
-  sort: "type" | "value",
-  helpers: preexpand_helpers,
-  lexical: lexical_extension,
-): Promise<{ loc: Loc; modular: modular_extension; imp: import_req; counter: number }> {
+async function postexpand_body({
+  loc,
+  modular,
+  unit,
+  counter,
+  context,
+  imp,
+  sort,
+  helpers,
+  lexical,
+}: data & { sort: "type" | "value" }): Promise<{
+  loc: Loc;
+  modular: modular_extension;
+  imp: import_req;
+  counter: number;
+}> {
   type T = Promise<{ loc: Loc; modular: modular_extension; imp: import_req; counter: number }>;
   async function done(loc: Loc, modular: modular_extension, imp: import_req, counter: number): T {
     return { loc, modular, imp, counter };
@@ -1364,9 +1349,9 @@ async function postexpand_body(
               in_isolation(
                 loc,
                 (loc) =>
-                  postexpand_body(
+                  postexpand_body({
                     loc,
-                    { extensible: false },
+                    modular: { extensible: false },
                     unit,
                     counter,
                     context,
@@ -1374,7 +1359,7 @@ async function postexpand_body(
                     sort,
                     helpers,
                     lexical,
-                  ),
+                  }),
                 (loc, { modular: _ignored_modular, imp, counter }) =>
                   go_right(loc, (loc) => {
                     assert(loc.t.content === ".");
