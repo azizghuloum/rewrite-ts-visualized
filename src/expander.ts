@@ -278,22 +278,21 @@ const non_modular: (walker: walker) => walker =
   ({ modular, ...data }) =>
     walker({ ...data, modular: { extensible: false } }).then((data) => ({ ...data, modular }));
 
-const expand_concise_body = non_modular(async ({ loc, ...data }) => {
-  const sort = "value";
-  const gs = await (loc.t.type === "list" && loc.t.tag === "statement_block"
-    ? preexpand_block({ ...data, loc }).then(({ loc, ...gs }) =>
-        go_down(
-          loc,
-          (loc) => ({ ...gs, loc }),
-          (loc) => debug(loc, "???"),
-        ),
-      )
-    : preexpand_forms(sort)({ ...data, loc }));
-  return postexpand_body(sort)({
-    ...gs,
-    unit: extend_unit(gs.unit, gs.lexical),
-  });
-});
+const preexpand_concise_body: walker = ({ loc, ...data }) =>
+  loc.t.tag === "statement_block"
+    ? preexpand_block({ ...data, loc })
+    : preexpand_forms("value")({ ...data, loc });
+
+const postexpand_concise_body: walker = ({ loc, ...data }) =>
+  loc.t.tag === "statement_block"
+    ? go_down(loc, (loc) => postexpand_body("value")({ loc, ...data }))
+    : postexpand_body("value")({ loc, ...data });
+
+const expand_concise_body = non_modular((data) =>
+  preexpand_concise_body(data)
+    .then(({ unit, lexical, ...data }) => ({ ...data, lexical, unit: extend_unit(unit, lexical) }))
+    .then(postexpand_concise_body),
+);
 
 function rewrap(loc: Loc, rib_id: string, cu_id: string): Loc {
   return {
