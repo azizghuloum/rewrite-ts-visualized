@@ -489,21 +489,11 @@ function find_form(loc: Loc): ffrv {
   return find_form(loc);
 }
 
-function postexpand_program({
-  loc,
-  modular,
-  unit,
-  counter,
-  context,
-  imp,
-  helpers,
-  lexical,
-}: data): Promise<{ loc: Loc; modular: modular_extension; counter: number; imp: import_req }> {
-  assert(loc.t.tag === "program");
-  return go_down(loc, (loc) =>
-    postexpand_body({ loc, modular, unit, counter, context, imp, sort: "value", helpers, lexical }),
-  );
-}
+const postexpand_program: walker = ({ loc, ...data }: data) =>
+  go_down(loc, (loc) => postexpand_body({ loc, sort: "value", ...data })).then((new_data) => ({
+    ...data,
+    ...new_data,
+  }));
 
 function invalid_form(loc: Loc): never {
   syntax_error(loc, "invalid form");
@@ -516,39 +506,28 @@ function itself(loc: Loc): Loc {
 const extract_parameters: swalker = (data) => {
   //
   const tail: swalker = ({ loc, ...data }) => {
-    switch (loc.t.type) {
-      case "atom": {
-        switch (loc.t.tag) {
-          case "other": {
-            switch (loc.t.content) {
-              case ",":
-                return go_right(loc, (loc) => head({ ...data, loc }), invalid_form);
-              case ")":
-                return go_right(loc, invalid_form, (loc) => ({ ...data, loc: go_up(loc) }));
-            }
-          }
-        }
-      }
+    switch (loc.t.content) {
+      case ",":
+        return go_right(loc, (loc) => head({ ...data, loc }), invalid_form);
+      case ")":
+        return go_right(loc, invalid_form, (loc) => ({ ...data, loc: go_up(loc) }));
+      default:
+        syntax_error(loc);
     }
-    syntax_error(loc);
   };
 
   const head: swalker = ({ loc, ...data }) => {
-    switch (loc.t.type) {
-      case "atom": {
-        switch (loc.t.tag) {
-          case "identifier": {
-            const gs = identifier({ loc, ...data });
-            return go_right(gs.loc, (loc) => tail({ ...gs, loc }), invalid_form);
-          }
-          case "other": {
-            switch (loc.t.content) {
-              case ",":
-                return invalid_form(loc);
-              case ")":
-                return go_right(loc, invalid_form, (loc) => ({ ...data, loc: go_up(loc) }));
-            }
-          }
+    switch (loc.t.tag) {
+      case "identifier": {
+        const gs = identifier({ loc, ...data });
+        return go_right(gs.loc, (loc) => tail({ ...gs, loc }), invalid_form);
+      }
+      case "other": {
+        switch (loc.t.content) {
+          case ",":
+            return invalid_form(loc);
+          case ")":
+            return go_right(loc, invalid_form, (loc) => ({ ...data, loc: go_up(loc) }));
         }
       }
     }
@@ -563,23 +542,20 @@ const extract_parameters: swalker = (data) => {
   };
 
   const first_param: swalker = (data) => {
-    switch (data.loc.t.type) {
-      case "atom": {
-        switch (data.loc.t.tag) {
-          case "identifier":
-            const gs = identifier(data);
-            return go_right(gs.loc, invalid_form, (loc) => ({ ...gs, loc: go_up(loc) }));
-          case "other": {
-            if (data.loc.t.content === "(") {
-              return go_right(data.loc, (loc) => head({ ...data, loc }), invalid_form);
-            }
-          }
+    switch (data.loc.t.tag) {
+      case "identifier":
+        const gs = identifier(data);
+        return go_right(gs.loc, invalid_form, (loc) => ({ ...gs, loc: go_up(loc) }));
+      case "other": {
+        if (data.loc.t.content === "(") {
+          return go_right(data.loc, (loc) => head({ ...data, loc }), invalid_form);
         }
-        return syntax_error(data.loc);
       }
+      default:
+        syntax_error(data.loc);
     }
-    debug(data.loc, "non atom first_param");
   };
+
   {
     assert(data.loc.t.type === "list" && data.loc.t.tag === "formal_parameters");
     return go_down(data.loc, (loc) => first_param({ ...data, loc }), invalid_form);
