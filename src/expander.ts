@@ -908,16 +908,16 @@ function insert_export_keyword(
   }
 }
 
-async function postexpand_type_alias_declaration(
-  loc: Loc,
-  modular: modular_extension,
-  unit: CompilationUnit,
-  counter: number,
-  context: Context,
-  imp: import_req,
-  helpers: preexpand_helpers,
-  lexical: lexical_extension,
-): Promise<{ loc: Loc; modular: modular_extension; imp: import_req; counter: number }> {
+async function postexpand_type_alias_declaration({
+  loc,
+  modular,
+  unit,
+  context,
+  counter,
+  imp,
+  helpers,
+  lexical,
+}: data): Promise<{ loc: Loc; modular: modular_extension; imp: import_req; counter: number }> {
   async function do_after_equal(
     loc: Loc,
     counter: number,
@@ -1333,7 +1333,7 @@ async function postexpand_body({
             return syntax_error(loc, "invalid slice");
           }
           case "type_alias_declaration": {
-            return postexpand_type_alias_declaration(
+            return postexpand_type_alias_declaration({
               loc,
               modular,
               unit,
@@ -1342,7 +1342,7 @@ async function postexpand_body({
               imp,
               helpers,
               lexical,
-            ).then(({ loc, modular, imp, counter }) => cont(loc, modular, imp, counter));
+            }).then(({ loc, modular, imp, counter }) => cont(loc, modular, imp, counter));
           }
           case "member_expression": {
             return go_down(loc, (loc) =>
