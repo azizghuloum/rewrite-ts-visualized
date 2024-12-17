@@ -284,40 +284,24 @@ const preexpand_block: walker = async ({ loc, ...data }) => {
   return gs;
 };
 
-async function expand_concise_body(
-  loc: Loc,
-  lexical: lexical_extension,
-  counter: number,
-  unit: CompilationUnit,
-  context: Context,
-  imp: import_req,
-  sort: "type" | "value",
-  helpers: preexpand_helpers,
-  modular: modular_extension,
-): Promise<data> {
+const expand_concise_body: walker = async ({ loc, ...data }) => {
+  const sort = "value";
+  const modular: modular_extension = { extensible: false };
   const gs = await (loc.t.type === "list" && loc.t.tag === "statement_block"
-    ? preexpand_block({ loc, lexical, counter, unit, context, helpers, imp, modular }).then(
-        ({ loc, ...gs }) =>
-          go_down(
-            loc,
-            (loc) => ({ ...gs, loc }),
-            (loc) => debug(loc, "???"),
-          ),
+    ? preexpand_block({ ...data, loc, modular }).then(({ loc, ...gs }) =>
+        go_down(
+          loc,
+          (loc) => ({ ...gs, loc }),
+          (loc) => debug(loc, "???"),
+        ),
       )
-    : preexpand_forms({ loc, lexical, counter, unit, context, sort, helpers, imp, modular }));
-  const new_unit = extend_unit(gs.unit, gs.lexical);
+    : preexpand_forms({ ...data, loc, sort, modular }));
   return postexpand_body({
-    loc: gs.loc,
-    modular: { extensible: false },
-    unit: new_unit,
-    counter: gs.counter,
-    context: gs.context,
-    imp,
+    ...gs,
+    unit: extend_unit(gs.unit, gs.lexical),
     sort,
-    helpers,
-    lexical,
   });
-}
+};
 
 function rewrap(loc: Loc, rib_id: string, cu_id: string): Loc {
   return {
@@ -607,17 +591,16 @@ function expand_arrow_function({
         };
         const loc = wrap_loc(body, wrap);
         const new_unit = extend_unit(pgs.unit, pgs.lexical); // params are in rib
-        return expand_concise_body(
+        return expand_concise_body({
           loc,
-          pgs.lexical,
-          new_counter,
-          new_unit,
-          pgs.context,
+          lexical: pgs.lexical,
+          counter: new_counter,
+          unit: new_unit,
+          context: pgs.context,
           imp,
-          "value",
           helpers,
           modular,
-        );
+        });
       },
       (loc, { imp, counter }) => ({ loc, imp, counter, modular }),
     );
