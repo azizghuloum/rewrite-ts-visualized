@@ -1041,16 +1041,16 @@ async function postexpand_type_alias_declaration(
   }).then(({ loc, modular, imp, counter }) => insert_export_keyword(loc, counter, modular, imp));
 }
 
-async function postexpand_lexical_declaration(
-  loc: Loc,
-  modular: modular_extension,
-  unit: CompilationUnit,
-  counter: number,
-  context: Context,
-  imp: import_req,
-  helpers: preexpand_helpers,
-  lexical: lexical_extension,
-): Promise<{ loc: Loc; modular: modular_extension; imp: import_req; counter: number }> {
+async function postexpand_lexical_declaration({
+  loc,
+  modular,
+  unit,
+  counter,
+  context,
+  imp,
+  helpers,
+  lexical,
+}: data): Promise<{ loc: Loc; modular: modular_extension; imp: import_req; counter: number }> {
   async function handle_value_initializer(
     loc: Loc,
   ): Promise<{ loc: Loc; imp: import_req; counter: number }> {
@@ -1312,7 +1312,7 @@ async function postexpand_body({
         switch (loc.t.tag) {
           case "lexical_declaration":
             assert(sort === "value");
-            return postexpand_lexical_declaration(
+            return postexpand_lexical_declaration({
               loc,
               modular,
               unit,
@@ -1321,7 +1321,7 @@ async function postexpand_body({
               imp,
               helpers,
               lexical,
-            ).then(({ loc, modular, imp, counter }) => cont(loc, modular, imp, counter));
+            }).then(({ loc, modular, imp, counter }) => cont(loc, modular, imp, counter));
           case "arrow_function": {
             return in_isolation(
               loc,
