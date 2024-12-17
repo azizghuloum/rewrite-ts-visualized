@@ -840,16 +840,17 @@ const as_keyword: STX = {
   src: false,
 };
 
-function insert_export_keyword({ loc, counter, modular, imp }: ppdata): ppdata {
+const insert_export_keyword: swalker = ({ loc, counter, modular, imp, ...data }) => {
   if (modular.extensible) {
     assert(loc.t.type === "list");
     const content = stx_list_content(loc.t);
     assert(content !== null);
     const fst = content[0];
     if (fst.content === "export") {
-      return { loc, modular, imp, counter };
+      return { ...data, loc, modular, imp, counter };
     } else {
       return {
+        ...data,
         loc: { type: "loc", t: { ...loc.t, content: [export_keyword, content] }, p: loc.p },
         modular,
         imp,
@@ -857,11 +858,11 @@ function insert_export_keyword({ loc, counter, modular, imp }: ppdata): ppdata {
       };
     }
   } else {
-    return { loc, modular, counter, imp };
+    return { ...data, loc, modular, counter, imp };
   }
-}
+};
 
-async function postexpand_type_alias_declaration({
+const postexpand_type_alias_declaration: walker = async ({
   loc,
   modular,
   unit,
@@ -870,7 +871,8 @@ async function postexpand_type_alias_declaration({
   imp,
   helpers,
   lexical,
-}: data): Promise<ppdata> {
+  ...data
+}) => {
   async function do_after_equal(
     loc: Loc,
     counter: number,
@@ -972,7 +974,7 @@ async function postexpand_type_alias_declaration({
     });
   }
 
-  function handle_export(loc: Loc): Promise<ppdata> {
+  function handle_export(loc: Loc): Promise<data> {
     assert(loc.t.content === "export");
     if (!modular.extensible) syntax_error(loc, "location does not permit export");
     return go_right(loc, (loc) => handle_type(loc, true), syntax_error);
@@ -987,9 +989,9 @@ async function postexpand_type_alias_declaration({
         syntax_error(loc);
     }
   }).then(insert_export_keyword);
-}
+};
 
-async function postexpand_lexical_declaration({ loc, ...data }: data): Promise<ppdata> {
+const postexpand_lexical_declaration: walker = async ({ loc, ...data }) => {
   async function handle_value_initializer(loc: Loc): Promise<data> {
     assert(loc.t.content === "=");
     return go_right(
@@ -1024,7 +1026,7 @@ async function postexpand_lexical_declaration({ loc, ...data }: data): Promise<p
 
   function handle_declaration_list(exporting: boolean) {
     //
-    async function handle_inner_variable_declarator(loc: Loc): Promise<ppdata> {
+    async function handle_inner_variable_declarator(loc: Loc): Promise<data> {
       assert(loc.t.tag === "identifier");
       const { content, wrap } = loc.t;
       const resolution = await resolve(
@@ -1059,12 +1061,12 @@ async function postexpand_lexical_declaration({ loc, ...data }: data): Promise<p
       };
     }
 
-    async function handle_variable_declarator(loc: Loc): Promise<ppdata> {
+    async function handle_variable_declarator(loc: Loc): Promise<data> {
       assert(loc.t.tag === "variable_declarator");
       return go_down(loc, (loc) => handle_inner_variable_declarator(loc));
     }
 
-    async function handle_declarations(loc: Loc): Promise<ppdata> {
+    async function handle_declarations(loc: Loc): Promise<data> {
       if (loc.t.tag === "variable_declarator") {
         return handle_variable_declarator(loc).then(({ loc, ...data }) =>
           go_right(
@@ -1090,7 +1092,7 @@ async function postexpand_lexical_declaration({ loc, ...data }: data): Promise<p
       debug(loc, "handle_declarations");
     }
 
-    async function handle_declaration_list(loc: Loc): Promise<ppdata> {
+    async function handle_declaration_list(loc: Loc): Promise<data> {
       assert(loc.t.content === "let" || loc.t.content === "const");
       return go_right(loc, (loc) => handle_declarations(loc));
     }
@@ -1098,7 +1100,7 @@ async function postexpand_lexical_declaration({ loc, ...data }: data): Promise<p
     return handle_declaration_list;
   }
 
-  async function handle_export(loc: Loc): Promise<ppdata> {
+  async function handle_export(loc: Loc): Promise<data> {
     if (!data.modular.extensible) syntax_error(loc, "unexpected export keyword");
     return go_right(loc, handle_declaration_list(true));
   }
@@ -1114,7 +1116,7 @@ async function postexpand_lexical_declaration({ loc, ...data }: data): Promise<p
         syntax_error(loc);
     }
   }).then(insert_export_keyword);
-}
+};
 
 function rename(loc: Loc, new_name: string): Loc {
   const new_id: STX = {
