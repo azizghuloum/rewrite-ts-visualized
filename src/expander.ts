@@ -552,32 +552,15 @@ function check_punct(loc: Loc, content: string) {
   }
 }
 
-function expand_arrow_function({
-  loc,
-  counter,
-  context,
-  imp,
-  unit,
-  helpers,
-  modular,
-}: data): Promise<{ loc: Loc; imp: import_req; counter: number; modular: modular_extension }> {
-  return go_down(loc, (loc) => {
+const expand_arrow_function: walker = ({ loc, counter, ...data }) =>
+  go_down(loc, (loc) => {
     const [rib_id, new_counter] = new_rib_id(counter);
     const lexical: lexical_extension = {
       extensible: true,
       rib_id,
       rib: { type: "rib", normal_env: {}, types_env: {} },
     };
-    const pgs = extract_parameters({
-      loc,
-      lexical,
-      counter: new_counter,
-      context,
-      unit,
-      helpers,
-      imp,
-      modular,
-    });
+    const pgs = extract_parameters({ ...data, loc, lexical, counter: new_counter });
     const arr = go_right(pgs.loc, itself, invalid_form);
     check_punct(arr, "=>");
     const body = go_right(arr, itself, invalid_form);
@@ -586,26 +569,18 @@ function expand_arrow_function({
       (body) => {
         const wrap: Wrap = {
           marks: null,
-          subst: [{ rib_id, cu_id: unit.cu_id }, null],
+          subst: [{ rib_id, cu_id: pgs.unit.cu_id }, null],
           aes: null,
         };
-        const loc = wrap_loc(body, wrap);
-        const new_unit = extend_unit(pgs.unit, pgs.lexical); // params are in rib
         return expand_concise_body({
-          loc,
-          lexical: pgs.lexical,
-          context: pgs.context,
-          counter: pgs.counter,
-          unit: new_unit,
-          imp,
-          helpers,
-          modular,
+          ...pgs,
+          loc: wrap_loc(body, wrap),
+          unit: extend_unit(pgs.unit, pgs.lexical),
         });
       },
       (loc, data) => ({ loc, ...data }),
     );
   });
-}
 
 const expand_type_parameters: walker = ({ loc, ...data }) => {
   //
