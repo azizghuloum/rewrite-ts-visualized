@@ -294,7 +294,7 @@ async function expand_concise_body(
   sort: "type" | "value",
   helpers: preexpand_helpers,
   modular: modular_extension,
-): Promise<{ loc: Loc; imp: import_req; counter: number }> {
+): Promise<data> {
   const gs = await (loc.t.type === "list" && loc.t.tag === "statement_block"
     ? preexpand_block({ loc, lexical, counter, unit, context, helpers, imp, modular }).then(
         ({ loc, ...gs }) =>
@@ -577,55 +577,51 @@ function expand_arrow_function({
   helpers,
   modular,
 }: data): Promise<{ loc: Loc; imp: import_req; counter: number; modular: modular_extension }> {
-  return go_down(
-    loc,
-    (loc) => {
-      const [rib_id, new_counter] = new_rib_id(counter);
-      const lexical: lexical_extension = {
-        extensible: true,
-        rib_id,
-        rib: { type: "rib", normal_env: {}, types_env: {} },
-      };
-      const pgs = extract_parameters({
-        loc,
-        lexical,
-        counter,
-        context,
-        unit,
-        helpers,
-        imp,
-        modular,
-      });
-      const arr = go_right(pgs.loc, itself, invalid_form);
-      check_punct(arr, "=>");
-      const body = go_right(arr, itself, invalid_form);
-      return in_isolation(
-        body,
-        async (body) => {
-          const wrap: Wrap = {
-            marks: null,
-            subst: [{ rib_id, cu_id: unit.cu_id }, null],
-            aes: null,
-          };
-          const loc = wrap_loc(body, wrap);
-          const new_unit = extend_unit(pgs.unit, pgs.lexical); // params are in rib
-          return expand_concise_body(
-            loc,
-            pgs.lexical,
-            new_counter,
-            new_unit,
-            pgs.context,
-            imp,
-            "value",
-            helpers,
-            modular,
-          );
-        },
-        (loc, { imp, counter }) => ({ loc, imp, counter, modular }),
-      );
-    },
-    invalid_form,
-  );
+  return go_down(loc, (loc) => {
+    const [rib_id, new_counter] = new_rib_id(counter);
+    const lexical: lexical_extension = {
+      extensible: true,
+      rib_id,
+      rib: { type: "rib", normal_env: {}, types_env: {} },
+    };
+    const pgs = extract_parameters({
+      loc,
+      lexical,
+      counter,
+      context,
+      unit,
+      helpers,
+      imp,
+      modular,
+    });
+    const arr = go_right(pgs.loc, itself, invalid_form);
+    check_punct(arr, "=>");
+    const body = go_right(arr, itself, invalid_form);
+    return in_isolation(
+      body,
+      (body) => {
+        const wrap: Wrap = {
+          marks: null,
+          subst: [{ rib_id, cu_id: unit.cu_id }, null],
+          aes: null,
+        };
+        const loc = wrap_loc(body, wrap);
+        const new_unit = extend_unit(pgs.unit, pgs.lexical); // params are in rib
+        return expand_concise_body(
+          loc,
+          pgs.lexical,
+          new_counter,
+          new_unit,
+          pgs.context,
+          imp,
+          "value",
+          helpers,
+          modular,
+        );
+      },
+      (loc, { imp, counter }) => ({ loc, imp, counter, modular }),
+    );
+  });
 }
 
 const expand_type_parameters: walker = ({ loc, ...data }) => {
