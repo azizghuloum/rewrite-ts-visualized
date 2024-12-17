@@ -15,6 +15,6 @@ using_rewrite_rules(
 ### Output Program
 
 ```typescript
-1 ? !3 : (x_9) => !x_9;
+1 ? !3 : (x_10) => !x_10;
 ```
 

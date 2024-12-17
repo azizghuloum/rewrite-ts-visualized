@@ -300,7 +300,7 @@ const expand_concise_body: walker = async ({ loc, ...data }) => {
     ...gs,
     unit: extend_unit(gs.unit, gs.lexical),
     sort,
-  });
+  }).then((new_data) => ({ ...new_data, modular: data.modular }));
 };
 
 function rewrap(loc: Loc, rib_id: string, cu_id: string): Loc {
@@ -571,7 +571,7 @@ function expand_arrow_function({
     const pgs = extract_parameters({
       loc,
       lexical,
-      counter,
+      counter: new_counter,
       context,
       unit,
       helpers,
@@ -594,15 +594,15 @@ function expand_arrow_function({
         return expand_concise_body({
           loc,
           lexical: pgs.lexical,
-          counter: new_counter,
-          unit: new_unit,
           context: pgs.context,
+          counter: pgs.counter,
+          unit: new_unit,
           imp,
           helpers,
           modular,
         });
       },
-      (loc, { imp, counter }) => ({ loc, imp, counter, modular }),
+      (loc, data) => ({ loc, ...data }),
     );
   });
 }
