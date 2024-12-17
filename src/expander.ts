@@ -792,94 +792,57 @@ const insert_export_keyword: swalker = ({ loc, counter, modular, imp, ...data })
   }
 };
 
-const postexpand_type_alias_declaration: walker = async ({
-  loc,
-  modular,
-  unit,
-  context,
-  counter,
-  imp,
-  helpers,
-  lexical,
-  ...data
-}) => {
-  async function do_after_equal(
-    loc: Loc,
-    counter: number,
-    unit: CompilationUnit,
-    context: Context,
-    imp: import_req,
-  ): Promise<data> {
-    return expand_expr({
-      loc,
-      counter,
-      unit,
-      context,
-      imp,
-      sort: "type",
-      helpers,
-      lexical,
-      modular,
-    }).then(({ loc, ...data }) => {
-      function done(loc: Loc) {
-        return { ...data, loc: go_up(loc) };
-      }
-      return go_right(
-        loc,
-        (loc) => {
-          assert(loc.t.content === ";");
-          return go_right(loc, syntax_error, done);
-        },
-        done,
-      );
-    });
+const handle_optional_semi: walker = async ({ loc, ...data }) => {
+  function done(loc: Loc) {
+    return { ...data, loc: go_up(loc) };
   }
-  async function do_after_identifier(
-    loc: Loc,
-    counter: number,
-    unit: CompilationUnit,
-    context: Context,
-    imp: import_req,
-  ): Promise<data> {
+  return go_right(
+    loc,
+    (loc) => {
+      assert(loc.t.content === ";");
+      return go_right(loc, syntax_error, done);
+    },
+    done,
+  );
+};
+
+const postexpand_type_alias_declaration: walker = async (data) => {
+  const do_after_equal: walker = (data: data) =>
+    expand_expr({ sort: "type", ...data }).then(handle_optional_semi);
+  const do_after_identifier: walker = async ({ loc, ...data }) => {
     switch (loc.t.content) {
       case "=":
-        return go_right(loc, (loc) => do_after_equal(loc, counter, unit, context, imp));
+        return go_right(loc, (loc) => do_after_equal({ loc, ...data }));
       case "<":
         return expand_type_parameters({
           loc,
-          unit,
-          counter,
-          context,
-          imp,
-          helpers,
-          lexical,
-          modular,
-        }).then(({ loc, counter, unit, context, lexical, imp }) => {
+          ...data,
+        }).then(({ loc, unit, lexical, ...data }) => {
           assert(loc.t.content === ">");
           assert(lexical.extensible);
           return go_right(loc, (loc) => {
             if (loc.t.content !== "=") syntax_error(loc, "expected '='");
             return go_right(loc, (loc) =>
-              do_after_equal(
-                wrap_loc(loc, {
+              do_after_equal({
+                loc: wrap_loc(loc, {
                   marks: null,
                   subst: [{ rib_id: lexical.rib_id, cu_id: unit.cu_id }, null],
                   aes: null,
                 }),
-                counter,
                 unit,
-                context,
-                imp,
-              ),
+                lexical,
+                ...data,
+              }),
             );
           });
         });
       default:
         return syntax_error(loc);
     }
-  }
+  };
 
   function handle_type(loc: Loc, exporting: boolean): Promise<data> {
+    const { context, unit, modular, helpers } = data;
     assert(loc.t.content === "type");
     return go_right(loc, async (loc) => {
       assert(loc.t.tag === "identifier");
@@ -889,7 +852,7 @@ const postexpand_type_alias_declaration: walker = async ({
       assert(resolution.binding.type === "type");
       const new_name = resolution.binding.name;
       const gs = await go_right(rename(loc, new_name), (loc) =>
-        do_after_identifier(loc, counter, unit, context, imp),
+        do_after_identifier({ ...data, loc }),
       );
       const new_modular = extend_modular(
         modular,
@@ -906,19 +869,24 @@ const postexpand_type_alias_declaration: walker = async ({
 
   function handle_export(loc: Loc): Promise<data> {
     assert(loc.t.content === "export");
+    const { modular } = data;
     if (!modular.extensible) syntax_error(loc, "location does not permit export");
     return go_right(loc, (loc) => handle_type(loc, true), syntax_error);
   }
-  return go_down(loc, (loc) => {
-    switch (loc.t.content) {
-      case "type":
-        return handle_type(loc, false);
-      case "export":
-        return handle_export(loc);
-      default:
-        syntax_error(loc);
-    }
-  }).then(insert_export_keyword);
+
+  {
+    const { loc } = data;
+    return go_down(loc, (loc) => {
+      switch (loc.t.content) {
+        case "type":
+          return handle_type(loc, false);
+        case "export":
+          return handle_export(loc);
+        default:
+          syntax_error(loc);
+      }
+    }).then(insert_export_keyword);
+  }
 };
 
 const postexpand_lexical_declaration: walker = async ({ loc, ...data }) => {
