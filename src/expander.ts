@@ -840,22 +840,7 @@ const as_keyword: STX = {
   src: false,
 };
 
-function insert_export_keyword({
-  loc,
-  counter,
-  modular,
-  imp,
-}: {
-  loc: Loc;
-  counter: number;
-  modular: modular_extension;
-  imp: import_req;
-}): {
-  loc: Loc;
-  modular: modular_extension;
-  counter: number;
-  imp: import_req;
-} {
+function insert_export_keyword({ loc, counter, modular, imp }: ppdata): ppdata {
   if (modular.extensible) {
     assert(loc.t.type === "list");
     const content = stx_list_content(loc.t);
@@ -885,14 +870,14 @@ async function postexpand_type_alias_declaration({
   imp,
   helpers,
   lexical,
-}: data): Promise<{ loc: Loc; modular: modular_extension; imp: import_req; counter: number }> {
+}: data): Promise<ppdata> {
   async function do_after_equal(
     loc: Loc,
     counter: number,
     unit: CompilationUnit,
     context: Context,
     imp: import_req,
-  ): Promise<{ loc: Loc; imp: import_req; counter: number }> {
+  ): Promise<data> {
     return expand_expr({
       loc,
       counter,
@@ -903,9 +888,9 @@ async function postexpand_type_alias_declaration({
       helpers,
       lexical,
       modular,
-    }).then(({ loc, unit: _unit, counter, context: _context, imp }) => {
+    }).then(({ loc, ...data }) => {
       function done(loc: Loc) {
-        return { loc: go_up(loc), imp, counter };
+        return { ...data, loc: go_up(loc) };
       }
       return go_right(
         loc,
@@ -923,7 +908,7 @@ async function postexpand_type_alias_declaration({
     unit: CompilationUnit,
     context: Context,
     imp: import_req,
-  ): Promise<{ loc: Loc; imp: import_req; counter: number }> {
+  ): Promise<data> {
     switch (loc.t.content) {
       case "=":
         return go_right(loc, (loc) => do_after_equal(loc, counter, unit, context, imp));
@@ -962,10 +947,7 @@ async function postexpand_type_alias_declaration({
     }
   }
 
-  function handle_type(
-    loc: Loc,
-    exporting: boolean,
-  ): Promise<{ loc: Loc; imp: import_req; counter: number; modular: modular_extension }> {
+  function handle_type(loc: Loc, exporting: boolean): Promise<data> {
     assert(loc.t.content === "type");
     return go_right(loc, async (loc) => {
       assert(loc.t.tag === "identifier");
@@ -986,13 +968,11 @@ async function postexpand_type_alias_declaration({
         "types_env",
         loc,
       );
-      return { loc: gs.loc, modular: new_modular, counter: gs.counter, imp: gs.imp };
+      return { ...gs, modular: new_modular };
     });
   }
 
-  function handle_export(
-    loc: Loc,
-  ): Promise<{ loc: Loc; modular: modular_extension; imp: import_req; counter: number }> {
+  function handle_export(loc: Loc): Promise<ppdata> {
     assert(loc.t.content === "export");
     if (!modular.extensible) syntax_error(loc, "location does not permit export");
     return go_right(loc, (loc) => handle_type(loc, true), syntax_error);
@@ -1009,53 +989,29 @@ async function postexpand_type_alias_declaration({
   }).then(insert_export_keyword);
 }
 
-async function postexpand_lexical_declaration({
-  loc,
-  modular,
-  unit,
-  counter,
-  context,
-  imp,
-  helpers,
-  lexical,
-}: data): Promise<{ loc: Loc; modular: modular_extension; imp: import_req; counter: number }> {
-  async function handle_value_initializer(
-    loc: Loc,
-  ): Promise<{ loc: Loc; imp: import_req; counter: number }> {
+async function postexpand_lexical_declaration({ loc, ...data }: data): Promise<ppdata> {
+  async function handle_value_initializer(loc: Loc): Promise<data> {
     assert(loc.t.content === "=");
     return go_right(
       loc,
-      (loc) =>
-        expand_expr({ loc, counter, unit, context, imp, sort: "value", helpers, lexical, modular }),
+      (loc) => expand_expr({ loc, sort: "value", ...data }),
       (loc) => syntax_error(loc, "expected an expression following the '=' sign"),
     );
   }
-  async function handle_type_then_initializer(
-    loc: Loc,
-  ): Promise<{ loc: Loc; imp: import_req; counter: number }> {
+
+  async function handle_type_then_initializer(loc: Loc): Promise<data> {
     assert(loc.t.content === ":");
     return go_right(
       loc,
       (loc) =>
-        expand_expr({
-          loc,
-          counter,
-          unit,
-          context,
-          imp,
-          sort: "type",
-          helpers,
-          lexical,
-          modular,
-        }).then(({ loc, counter, unit: _ignored_unit, context: _ignored_context, imp }) =>
-          go_right(loc, handle_value_initializer, (loc) => Promise.resolve({ loc, imp, counter })),
+        expand_expr({ loc, sort: "type", ...data }).then(({ loc, ...data }) =>
+          go_right(loc, handle_value_initializer, (loc) => Promise.resolve({ loc, ...data })),
         ),
       (loc) => syntax_error(loc, "expected an expression following the '=' sign"),
     );
   }
-  async function handle_initializer(
-    loc: Loc,
-  ): Promise<{ loc: Loc; imp: import_req; counter: number }> {
+
+  async function handle_initializer(loc: Loc): Promise<data> {
     switch (loc.t.content) {
       case "=":
         return handle_value_initializer(loc);
@@ -1065,63 +1021,52 @@ async function postexpand_lexical_declaration({
         syntax_error(loc);
     }
   }
-  async function handle_inner_variable_declarator(
-    loc: Loc,
-    exporting: boolean,
-    modular: modular_extension,
-    imp: import_req,
-    counter: number,
-  ): Promise<{ loc: Loc; modular: modular_extension; imp: import_req; counter: number }> {
-    assert(loc.t.tag === "identifier");
-    const { content, wrap } = loc.t;
-    const resolution = await resolve(content, wrap, context, unit, "normal_env", helpers);
-    assert(resolution.type === "bound");
-    assert(resolution.binding.type === "lexical");
-    const new_name = resolution.binding.name;
-    const gs = await go_right(
-      rename(loc, new_name),
-      (loc) => handle_initializer(loc),
-      (loc) => Promise.resolve({ loc, imp, counter }),
-    );
-    return {
-      loc: go_up(gs.loc),
-      modular: extend_modular(
-        modular,
-        exporting,
+
+  function handle_declaration_list(exporting: boolean) {
+    //
+    async function handle_inner_variable_declarator(loc: Loc): Promise<ppdata> {
+      assert(loc.t.tag === "identifier");
+      const { content, wrap } = loc.t;
+      const resolution = await resolve(
         content,
-        wrap.marks,
-        resolution.label,
+        wrap,
+        data.context,
+        data.unit,
         "normal_env",
-        loc,
-      ),
-      imp: gs.imp,
-      counter: gs.counter,
-    };
-  }
-  async function handle_variable_declarator(
-    loc: Loc,
-    exporting: boolean,
-    modular: modular_extension,
-    imp: import_req,
-    counter: number,
-  ): Promise<{ loc: Loc; modular: modular_extension; imp: import_req; counter: number }> {
-    assert(loc.t.tag === "variable_declarator");
-    return go_down(
-      loc,
-      (loc) => handle_inner_variable_declarator(loc, exporting, modular, imp, counter),
-      syntax_error,
-    );
-  }
-  async function handle_declarations(
-    loc: Loc,
-    exporting: boolean,
-    modular: modular_extension,
-    imp: import_req,
-    counter: number,
-  ): Promise<{ loc: Loc; modular: modular_extension; imp: import_req; counter: number }> {
-    if (loc.t.tag === "variable_declarator") {
-      return handle_variable_declarator(loc, exporting, modular, imp, counter).then(
-        ({ loc, modular, imp, counter }) =>
+        data.helpers,
+      );
+      assert(resolution.type === "bound");
+      assert(resolution.binding.type === "lexical");
+      const new_name = resolution.binding.name;
+      const gs = await go_right(
+        rename(loc, new_name),
+        (loc) => handle_initializer(loc),
+        (loc) => Promise.resolve({ ...data, loc }),
+      );
+      return {
+        ...data,
+        ...gs,
+        loc: go_up(gs.loc),
+        modular: extend_modular(
+          data.modular,
+          exporting,
+          content,
+          wrap.marks,
+          resolution.label,
+          "normal_env",
+          loc,
+        ),
+      };
+    }
+
+    async function handle_variable_declarator(loc: Loc): Promise<ppdata> {
+      assert(loc.t.tag === "variable_declarator");
+      return go_down(loc, (loc) => handle_inner_variable_declarator(loc));
+    }
+
+    async function handle_declarations(loc: Loc): Promise<ppdata> {
+      if (loc.t.tag === "variable_declarator") {
+        return handle_variable_declarator(loc).then(({ loc, ...data }) =>
           go_right(
             loc,
             (loc) => {
@@ -1129,43 +1074,42 @@ async function postexpand_lexical_declaration({
                 case ",":
                   return go_right(
                     loc,
-                    (loc) => handle_declarations(loc, exporting, modular, imp, counter),
-                    (loc) => Promise.resolve({ loc: go_up(loc), modular, imp, counter }),
+                    (loc) => handle_declarations(loc),
+                    (loc) => Promise.resolve({ loc: go_up(loc), ...data }),
                   );
                 case ";":
-                  return Promise.resolve({ loc: go_up(loc), modular, imp, counter });
+                  return Promise.resolve({ loc: go_up(loc), ...data });
                 default:
                   syntax_error(loc);
               }
             },
-            (loc) => Promise.resolve({ loc: go_up(loc), modular, imp, counter }),
+            (loc) => Promise.resolve({ loc: go_up(loc), ...data }),
           ),
-      );
+        );
+      }
+      debug(loc, "handle_declarations");
     }
-    debug(loc, "handle_declarations");
+
+    async function handle_declaration_list(loc: Loc): Promise<ppdata> {
+      assert(loc.t.content === "let" || loc.t.content === "const");
+      return go_right(loc, (loc) => handle_declarations(loc));
+    }
+
+    return handle_declaration_list;
   }
-  async function handle_declaration_list(
-    loc: Loc,
-    exporting: boolean,
-    imp: import_req,
-    counter: number,
-  ): Promise<{ loc: Loc; modular: modular_extension; imp: import_req; counter: number }> {
-    assert(loc.t.content === "let" || loc.t.content === "const");
-    return go_right(loc, (loc) => handle_declarations(loc, exporting, modular, imp, counter));
+
+  async function handle_export(loc: Loc): Promise<ppdata> {
+    if (!data.modular.extensible) syntax_error(loc, "unexpected export keyword");
+    return go_right(loc, handle_declaration_list(true));
   }
-  async function handle_export(
-    loc: Loc,
-  ): Promise<{ loc: Loc; modular: modular_extension; imp: import_req; counter: number }> {
-    if (!modular.extensible) syntax_error(loc, "unexpected export keyword");
-    return go_right(loc, (loc) => handle_declaration_list(loc, true, imp, counter));
-  }
+
   return go_down(loc, (loc) => {
     switch (loc.t.content) {
       case "export":
         return handle_export(loc);
       case "const":
       case "let":
-        return handle_declaration_list(loc, false, imp, counter);
+        return handle_declaration_list(false)(loc);
       default:
         syntax_error(loc);
     }
@@ -1192,6 +1136,13 @@ const postexpand_forms: walkerplus<{ sort: "type" | "value" }> = ({ modular, ...
     modular,
   }));
 
+type ppdata = {
+  loc: Loc;
+  modular: modular_extension;
+  imp: import_req;
+  counter: number;
+};
+
 const postexpand_body: walkerplus<{ sort: "type" | "value" }> = ({
   loc,
   modular,
@@ -1204,17 +1155,7 @@ const postexpand_body: walkerplus<{ sort: "type" | "value" }> = ({
   async function done(loc: Loc, modular: modular_extension, imp: import_req, counter: number): T {
     return { ...data, loc, modular, imp, counter };
   }
-  function cont({
-    loc,
-    imp,
-    modular,
-    counter,
-  }: {
-    loc: Loc;
-    modular: modular_extension;
-    imp: import_req;
-    counter: number;
-  }): T {
+  function cont({ loc, imp, modular, counter }: ppdata): T {
     return go_next(
       loc,
       (loc) => h(find_form(loc), modular, imp, counter),
