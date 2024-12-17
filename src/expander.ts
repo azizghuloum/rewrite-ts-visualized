@@ -179,7 +179,7 @@ async function expand_program({ loc, ...data }: data): Promise<{
 }
 
 const preexpand_body: walkerplus<{ sort: "type" | "value" }> = async ({ loc, sort, ...data }) =>
-  in_isolation(loc, (loc) => preexpand_forms({ loc, sort, ...data })).then(({ loc, ...data }) =>
+  in_isolation(loc, (loc) => preexpand_forms(sort)({ loc, ...data })).then(({ loc, ...data }) =>
     go_next(
       loc,
       (loc) => preexpand_body({ loc, sort, ...data }),
@@ -190,7 +190,7 @@ const preexpand_body: walkerplus<{ sort: "type" | "value" }> = async ({ loc, sor
 const preexpand_body_curly: walker = async ({ loc, ...data }) =>
   loc.t.content === "}"
     ? go_right(loc, syntax_error, () => ({ loc: go_up(loc), ...data }))
-    : in_isolation(loc, (loc) => preexpand_forms({ loc, sort: "value", ...data })).then(
+    : in_isolation(loc, (loc) => preexpand_forms("value")({ loc, ...data })).then(
         ({ loc, ...data }) => go_right(loc, (loc) => preexpand_body_curly({ loc, ...data })),
       );
 
@@ -273,24 +273,27 @@ const preexpand_block: walker = async ({ loc, ...data }) => {
   return gs;
 };
 
-const expand_concise_body: walker = async ({ loc, ...data }) => {
+const non_modular: (walker: walker) => walker =
+  (walker) =>
+  ({ modular, ...data }) =>
+    walker({ ...data, modular: { extensible: false } }).then((data) => ({ ...data, modular }));
+
+const expand_concise_body = non_modular(async ({ loc, ...data }) => {
   const sort = "value";
-  const modular: modular_extension = { extensible: false };
   const gs = await (loc.t.type === "list" && loc.t.tag === "statement_block"
-    ? preexpand_block({ ...data, loc, modular }).then(({ loc, ...gs }) =>
+    ? preexpand_block({ ...data, loc }).then(({ loc, ...gs }) =>
         go_down(
           loc,
           (loc) => ({ ...gs, loc }),
           (loc) => debug(loc, "???"),
         ),
       )
-    : preexpand_forms({ ...data, loc, sort, modular }));
-  return postexpand_body({
+    : preexpand_forms(sort)({ ...data, loc }));
+  return postexpand_body(sort)({
     ...gs,
     unit: extend_unit(gs.unit, gs.lexical),
-    sort,
-  }).then((new_data) => ({ ...new_data, modular: data.modular }));
-};
+  });
+});
 
 function rewrap(loc: Loc, rib_id: string, cu_id: string): Loc {
   return {
@@ -300,110 +303,115 @@ function rewrap(loc: Loc, rib_id: string, cu_id: string): Loc {
   };
 }
 
-const preexpand_forms: walkerplus<{ sort: "type" | "value" }> = async ({ loc, sort, ...data }) => {
-  function done(loc: Loc): Promise<data> {
-    return Promise.resolve({ loc, ...data });
-  }
-  function next(loc: Loc): Promise<data> {
-    return go_next(loc, (loc) => h(find_form(loc)), done);
-  }
-  function descend(loc: Loc): Promise<data> {
-    return go_down(loc, (loc) => h(find_form(loc)), syntax_error);
-  }
-  async function h(ffrv: ffrv): Promise<data> {
-    const loc = ffrv.loc;
-    switch (ffrv.type) {
-      case "done":
-        return done(loc);
-      case "identifier": {
-        assert(loc.t.type === "atom" && loc.t.tag === "identifier", loc.t);
-        const { content, wrap } = loc.t;
-        const resolution = await resolve(
-          content,
-          wrap,
-          data.context,
-          data.unit,
-          sort_env[sort],
-          data.helpers,
-        );
-        switch (resolution.type) {
-          case "unbound":
-            return next(loc);
-          case "bound": {
-            const binding = resolution.binding;
-            switch (binding.type) {
-              case "lexical":
-              case "type":
-              case "ts":
-              case "imported_lexical":
-                return next(loc);
-              case "core_syntax": {
-                const { name } = binding;
-                return data.helpers.inspect(loc, "core form", () =>
-                  handle_core_syntax({ ...data, loc, name }).then(({ loc, ...new_data }) =>
-                    data.helpers.inspect(loc, `core output`, () =>
-                      preexpand_forms({ loc, sort, ...data, ...new_data }),
-                    ),
-                  ),
-                );
-              }
-              case "syntax_rules_transformer": {
-                const { clauses } = binding;
-                return data.helpers.inspect(loc, `transformer form`, () =>
-                  apply_syntax_rules(loc, clauses, data.unit, data.counter, data.helpers).then(
-                    ({ loc, counter }) => {
-                      const rewrapped = data.lexical.extensible
-                        ? rewrap(loc, data.lexical.rib_id, data.unit.cu_id)
-                        : loc;
-                      return data.helpers.inspect(rewrapped, `transformer output`, () =>
-                        preexpand_forms({ loc: rewrapped, ...data, counter, sort }),
-                      );
-                    },
-                  ),
-                );
-              }
-              default:
-                const invalid: never = binding;
-                throw invalid;
-            }
-          }
-          case "error":
-            syntax_error(loc, resolution.reason);
-          default:
-            const invalid: never = resolution;
-            throw invalid;
-        }
-      }
-      case "list": {
-        assert(loc.t.type === "list");
-        const h = preexpand_list_handlers[loc.t.tag];
-        if (h) {
-          return h({ loc, ...data }).then(({ loc, ...data }) =>
-            go_next(
-              loc,
-              (loc) => preexpand_forms({ loc, sort, ...data }),
-              (loc) => Promise.resolve({ loc, ...data }),
-            ),
+const preexpand_forms =
+  (sort: "type" | "value") =>
+  async ({ loc, ...data }: data) => {
+    function done(loc: Loc): Promise<data> {
+      return Promise.resolve({ loc, ...data });
+    }
+    function next(loc: Loc): Promise<data> {
+      return go_next(loc, (loc) => h(find_form(loc)), done);
+    }
+    function descend(loc: Loc): Promise<data> {
+      return go_down(loc, (loc) => h(find_form(loc)), syntax_error);
+    }
+    async function h(ffrv: ffrv): Promise<data> {
+      const loc = ffrv.loc;
+      switch (ffrv.type) {
+        case "done":
+          return done(loc);
+        case "identifier": {
+          assert(loc.t.type === "atom" && loc.t.tag === "identifier", loc.t);
+          const { content, wrap } = loc.t;
+          const resolution = await resolve(
+            content,
+            wrap,
+            data.context,
+            data.unit,
+            sort_env[sort],
+            data.helpers,
           );
-        }
-        switch (loc.t.tag) {
-          case "arrow_function":
-            return next(loc);
-          case "member_expression":
-            return descend(loc);
-          default: {
-            if (list_handlers_table[loc.t.tag] === "todo") {
-              debug(loc, `todo list handler for '${loc.t.tag}'`);
+          switch (resolution.type) {
+            case "unbound":
+              return next(loc);
+            case "bound": {
+              const binding = resolution.binding;
+              switch (binding.type) {
+                case "lexical":
+                case "type":
+                case "ts":
+                case "imported_lexical":
+                  return next(loc);
+                case "core_syntax": {
+                  const { name } = binding;
+                  return data.helpers.inspect(loc, "core form", () =>
+                    handle_core_syntax({ ...data, loc, name }).then(({ loc, ...new_data }) =>
+                      data.helpers.inspect(loc, `core output`, () =>
+                        preexpand_forms(sort)({ loc, ...data, ...new_data }),
+                      ),
+                    ),
+                  );
+                }
+                case "syntax_rules_transformer": {
+                  const { clauses } = binding;
+                  return data.helpers.inspect(loc, `transformer form`, () =>
+                    apply_syntax_rules(loc, clauses, data.unit, data.counter, data.helpers).then(
+                      ({ loc, counter }) => {
+                        const rewrapped = data.lexical.extensible
+                          ? rewrap(loc, data.lexical.rib_id, data.unit.cu_id)
+                          : loc;
+                        return data.helpers.inspect(rewrapped, `transformer output`, () =>
+                          preexpand_forms(sort)({ loc: rewrapped, ...data, counter }),
+                        );
+                      },
+                    ),
+                  );
+                }
+                default:
+                  const invalid: never = binding;
+                  throw invalid;
+              }
             }
-            assert(list_handlers_table[loc.t.tag] === "descend", `non descend tag '${loc.t.tag}'`);
-            return next(loc);
+            case "error":
+              syntax_error(loc, resolution.reason);
+            default:
+              const invalid: never = resolution;
+              throw invalid;
+          }
+        }
+        case "list": {
+          assert(loc.t.type === "list");
+          const h = preexpand_list_handlers[loc.t.tag];
+          if (h) {
+            return h({ loc, ...data }).then(({ loc, ...data }) =>
+              go_next(
+                loc,
+                (loc) => preexpand_forms(sort)({ loc, ...data }),
+                (loc) => Promise.resolve({ loc, ...data }),
+              ),
+            );
+          }
+          switch (loc.t.tag) {
+            case "arrow_function":
+              return next(loc);
+            case "member_expression":
+              return descend(loc);
+            default: {
+              if (list_handlers_table[loc.t.tag] === "todo") {
+                debug(loc, `todo list handler for '${loc.t.tag}'`);
+              }
+              assert(
+                list_handlers_table[loc.t.tag] === "descend",
+                `non descend tag '${loc.t.tag}'`,
+              );
+              return next(loc);
+            }
           }
         }
       }
     }
-  }
-  return h(find_form(loc));
-};
+    return h(find_form(loc));
+  };
 
 type ffrv =
   | { type: "done"; loc: Loc }
@@ -463,10 +471,7 @@ function find_form(loc: Loc): ffrv {
 }
 
 const postexpand_program: walker = ({ loc, ...data }: data) =>
-  go_down(loc, (loc) => postexpand_body({ loc, sort: "value", ...data })).then((new_data) => ({
-    ...data,
-    ...new_data,
-  }));
+  go_down(loc, (loc) => postexpand_body("value")({ loc, ...data }));
 
 function itself(loc: Loc): Loc {
   return loc;
@@ -593,13 +598,12 @@ const expand_type_parameters: walker = ({ loc, ...data }) => {
             if (loc.t.content !== "extends") syntax_error(loc, "expected 'extends'");
             assert(lexical.extensible);
             return go_right(loc, (loc) =>
-              expand_expr({
+              expand_expr("type")({
                 loc: wrap_loc(loc, {
                   marks: null,
                   subst: [{ rib_id: lexical.rib_id, cu_id: data.unit.cu_id }, null],
                   aes: null,
                 }),
-                sort: "type",
                 lexical,
                 ...data,
               }).then(({ loc, ...data }) =>
@@ -676,12 +680,10 @@ const expand_type_parameters: walker = ({ loc, ...data }) => {
   return go_right(loc, (loc) => start({ loc, ...data }), syntax_error);
 };
 
-const expand_expr: walkerplus<{ sort: "type" | "value" }> = ({ loc, sort, modular, ...data }) =>
-  in_isolation(loc, (loc) =>
-    preexpand_forms({ loc, sort, modular: { extensible: false }, ...data }).then((data) =>
-      postexpand_body({ ...data, sort }),
-    ),
-  ).then((data) => ({ ...data, modular }));
+const expand_expr = (sort: "type" | "value") =>
+  non_modular(({ loc, ...data }) =>
+    in_isolation(loc, (loc) => preexpand_forms(sort)({ loc, ...data }).then(postexpand_body(sort))),
+  );
 
 const empty_wrap: Wrap = { marks: null, subst: null, aes: null };
 
@@ -797,7 +799,7 @@ const handle_optional_semi: walker = async ({ loc, ...data }) => {
 
 const postexpand_type_alias_declaration: walker = async (data) => {
   const do_after_equal: walker = (data: data) =>
-    expand_expr({ sort: "type", ...data }).then(handle_optional_semi);
+    expand_expr("type")(data).then(handle_optional_semi);
   const do_after_identifier: walker = async ({ loc, ...data }) => {
     switch (loc.t.content) {
       case "=":
@@ -883,7 +885,7 @@ const postexpand_lexical_declaration: walker = async ({ loc, ...data }) => {
     assert(loc.t.content === "=");
     return go_right(
       loc,
-      (loc) => expand_expr({ loc, sort: "value", ...data }),
+      (loc) => expand_expr("value")({ loc, ...data }),
       (loc) => syntax_error(loc, "expected an expression following the '=' sign"),
     );
   }
@@ -893,7 +895,7 @@ const postexpand_lexical_declaration: walker = async ({ loc, ...data }) => {
     return go_right(
       loc,
       (loc) =>
-        expand_expr({ loc, sort: "type", ...data }).then(({ loc, ...data }) =>
+        expand_expr("type")({ loc, ...data }).then(({ loc, ...data }) =>
           go_right(loc, handle_value_initializer, (loc) => Promise.resolve({ loc, ...data })),
         ),
       (loc) => syntax_error(loc, "expected an expression following the '=' sign"),
@@ -1018,13 +1020,9 @@ function rename(loc: Loc, new_name: string): Loc {
 
 const sort_env = { type: "types_env" as const, value: "normal_env" as const };
 
-const postexpand_forms: walkerplus<{ sort: "type" | "value" }> = ({ modular, ...data }) =>
-  postexpand_body({ modular: { extensible: false }, ...data }).then((new_data) => ({
-    ...new_data,
-    modular,
-  }));
+const postexpand_forms = (sort: "type" | "value") => non_modular(postexpand_body(sort));
 
-const postexpand_body: walkerplus<{ sort: "type" | "value" }> = ({ sort, ...data }) => {
+const postexpand_body = (sort: "type" | "value") => (data: data) => {
   const cont: walker = ({ loc, ...data }) =>
     go_next(
       loc,
@@ -1115,7 +1113,7 @@ const postexpand_body: walkerplus<{ sort: "type" | "value" }> = ({ sort, ...data
           }
           case "member_expression": {
             return go_down(loc, (loc) =>
-              in_isolation(loc, (loc) => postexpand_forms({ ...data, loc, sort }))
+              in_isolation(loc, (loc) => postexpand_forms(sort)({ ...data, loc }))
                 .then(({ loc, ...data }) =>
                   go_right(loc, (loc) => {
                     assert(loc.t.content === ".");
