@@ -28,12 +28,11 @@ export function syntax_error(loc: Loc, reason?: string): never {
   throw new StxError("SyntaxError", loc, reason ?? "syntax error");
 }
 
-export const in_isolation: <G extends { loc: Loc }, T>(
+export const in_isolation: <G extends { loc: Loc }>(
   loc: Loc,
   f: (loc: Loc) => Promise<G>,
-  k: (loc: Loc, g: Omit<G, "loc">) => T,
-) => Promise<T> = async (loc, f, k) => {
-  return f(isolate(loc)).then(({ loc: res, ...g }) => k(unisolate(loc, res), g));
+) => Promise<Omit<G, "loc"> & { loc: Loc }> = async (loc, f) => {
+  return f(isolate(loc)).then(({ loc: res, ...g }) => ({ ...g, loc: unisolate(loc, res) }));
 };
 
 type LibraryManager = {

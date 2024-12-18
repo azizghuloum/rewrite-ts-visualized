@@ -1,10 +1,10 @@
 import { assert } from "./assert";
-import { imported_module, preexpand_helpers } from "./preexpand-helpers";
+import { data, walker } from "./data";
+import { imported_module } from "./preexpand-helpers";
 import {
   extend_context_lexical,
   extend_rib,
   extend_unit,
-  import_req,
   lexical_extension,
   rib_push,
 } from "./stx";
@@ -12,14 +12,6 @@ import { syntax_error } from "./stx-error";
 import { CompilationUnit, Context, Loc, STX } from "./syntax-structures";
 import { list_tag } from "./tags";
 import { change, go_down, go_right, go_up, mkzipper } from "./zipper";
-
-export type goodies = {
-  loc: Loc;
-  lexical: lexical_extension;
-  context: Context;
-  counter: number;
-  unit: CompilationUnit;
-};
 
 function skip_optional(loc: Loc, kwd: string): Loc {
   if (loc.t.content === kwd) {
@@ -44,7 +36,20 @@ export function gen_binding({
   context,
   unit,
   sort,
-}: goodies & { sort: "type" | "value" }): Omit<goodies, "loc"> & { name: string } {
+}: {
+  loc: Loc;
+  lexical: lexical_extension;
+  counter: number;
+  context: Context;
+  unit: CompilationUnit;
+  sort: "type" | "value";
+}): {
+  name: string;
+  lexical: lexical_extension;
+  counter: number;
+  context: Context;
+  unit: CompilationUnit;
+} {
   const stx = loc.t;
   assert(stx.type === "atom" && stx.tag === "identifier", stx);
   assert(lexical.extensible);
@@ -77,15 +82,15 @@ export function gen_binding({
   );
 }
 
-function lexical_declaration({ loc, lexical, context, counter, unit }: goodies): Promise<goodies> {
-  async function after_vars({ loc, lexical, context, counter, unit }: goodies): Promise<goodies> {
+const lexical_declaration: walker = ({ loc, lexical, context, counter, unit, ...data }) => {
+  const after_vars: walker = async ({ loc, lexical, context, counter, unit, ...data }) => {
     if (loc.t.type === "atom" && loc.t.tag === "other") {
       switch (loc.t.content) {
         case ";":
           return go_right(
             loc,
             (loc) => syntax_error(loc, "expected nothing after semicolon"),
-            (loc) => ({ loc, lexical, context, counter, unit }),
+            (loc) => ({ loc, lexical, context, counter, unit, ...data }),
           );
         case ",":
           return go_right(
@@ -96,17 +101,24 @@ function lexical_declaration({ loc, lexical, context, counter, unit }: goodies):
       }
     }
     syntax_error(loc, "expected a ',' or a ';'");
-  }
-  async function get_vars(ls: Loc, lexical: lexical_extension, context: Context, counter: number) {
+  };
+  function get_vars(ls: Loc, lexical: lexical_extension, context: Context, counter: number) {
     if (ls.t.type === "list" && ls.t.tag === "variable_declarator") {
       return go_down(
         ls,
         (loc) => {
-          const goodies = gen_binding({ loc, lexical, counter, context, unit, sort: "value" });
+          const goodies = gen_binding({
+            loc,
+            lexical,
+            counter,
+            context,
+            unit,
+            sort: "value",
+          });
           return go_right(
             ls,
-            (loc) => after_vars({ ...goodies, loc }),
-            (loc) => Promise.resolve({ ...goodies, loc }),
+            (loc) => after_vars({ ...data, ...goodies, loc }),
+            (loc) => Promise.resolve({ ...data, ...goodies, loc }),
           );
         },
         syntax_error,
@@ -126,44 +138,38 @@ function lexical_declaration({ loc, lexical, context, counter, unit }: goodies):
       ),
     syntax_error,
   );
-}
+};
 
-function type_alias_declaration({
-  loc,
-  lexical,
-  context,
-  counter,
-  unit,
-}: goodies): Promise<goodies> {
+const type_alias_declaration: walker = ({ loc, ...data }) => {
   async function after_type(loc: Loc) {
     assert(loc.t.type === "atom" && loc.t.tag === "identifier", "expected an identifier");
-    const gs = gen_binding({ loc, lexical, counter, context, unit, sort: "type" });
-    return { ...gs, loc: go_up(loc) };
+    const gs = gen_binding({ loc, sort: "type", ...data });
+    return { ...data, ...gs, loc: go_up(loc) };
   }
   return go_down(
     loc,
     (loc) => after_type(skip_required(skip_optional(loc, "export"), ["type"])),
     syntax_error,
   );
-}
+};
 
-const import_declaration: preexpand_list_handler = ({ loc, ...goodies }, helpers) => {
+const import_declaration: walker = async ({ loc, helpers, ...data }) => {
   async function handle_import_from_file(loc: Loc) {
     if (loc.t.tag !== "string") syntax_error(loc, "expected a string literal for import");
     const mod = await helpers.manager.resolve_import(loc);
     return mod;
   }
-  async function after_var(loc: Loc, mod: imported_module): Promise<goodies> {
+  async function after_var(loc: Loc, mod: imported_module): Promise<data> {
     switch (loc.t.content) {
       case "}":
-        return { loc: go_up(loc), ...goodies };
+        return { loc: go_up(loc), helpers, ...data };
       case ",":
         return go_right(loc, (loc) => handle_named_import(loc, mod), syntax_error);
       default:
         syntax_error(loc);
     }
   }
-  async function handle_named_import(loc0: Loc, mod: imported_module): Promise<goodies> {
+  async function handle_named_import(loc0: Loc, mod: imported_module): Promise<data> {
     switch (loc0.t.tag) {
       case "identifier": {
         const name = loc0.t.content;
@@ -189,17 +195,17 @@ const import_declaration: preexpand_list_handler = ({ loc, ...goodies }, helpers
         }, rib);
         const new_lexical: lexical_extension = { extensible: true, rib: new_rib, rib_id };
         const new_unit = extend_unit(unit, new_lexical);
-        return { loc, counter, unit: new_unit, context, lexical: new_lexical };
+        return { loc, ...data, counter, unit: new_unit, context, lexical: new_lexical, helpers };
       }
       default:
         syntax_error(loc, `unexpected ${loc.t.tag} in import context`);
     }
   }
-  async function handle_named_imports(loc: Loc, mod: imported_module): Promise<goodies> {
+  async function handle_named_imports(loc: Loc, mod: imported_module): Promise<data> {
     if (loc.t.content !== "{") syntax_error(loc);
     return go_right(loc, (loc) => handle_named_import(loc, mod), syntax_error);
   }
-  async function handle_imports(loc: Loc, mod: imported_module): Promise<goodies> {
+  async function handle_imports(loc: Loc, mod: imported_module): Promise<data> {
     switch (loc.t.tag) {
       case "named_imports":
         return go_down(loc, (loc) => handle_named_imports(loc, mod), syntax_error);
@@ -207,7 +213,7 @@ const import_declaration: preexpand_list_handler = ({ loc, ...goodies }, helpers
         syntax_error(loc, `unexpected ${loc.t.tag} in import`);
     }
   }
-  async function handle_import_clause(loc: Loc): Promise<goodies> {
+  async function handle_import_clause(loc: Loc): Promise<data> {
     if (loc.t.tag === "import_clause") {
       const mod = await handle_import_from_file(
         skip_required(
@@ -234,9 +240,7 @@ const import_declaration: preexpand_list_handler = ({ loc, ...goodies }, helpers
   ).then(({ ...gs }) => ({ ...gs, loc: change(loc, mkzipper(empty_slice)) }));
 };
 
-type preexpand_list_handler = (goodies: goodies, helpers: preexpand_helpers) => Promise<goodies>;
-
-export const preexpand_list_handlers: { [k in list_tag]?: preexpand_list_handler } = {
+export const preexpand_list_handlers: { [k in list_tag]?: walker } = {
   lexical_declaration,
   type_alias_declaration,
   import_declaration,
