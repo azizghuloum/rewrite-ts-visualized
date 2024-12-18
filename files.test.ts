@@ -30,6 +30,9 @@ async function compile_script(filename: string, test_name: string) {
       get_import_path(_cuid) {
         throw new Error(`imports are not supported in tests`);
       },
+      resolve_rib(_rib_id, _cuid) {
+        throw new Error(`imports are not supported in gui`);
+      },
     },
     global_unit,
     global_context,

@@ -12,16 +12,18 @@ export type imported_module = {
   imported_modules: imported_module[];
   resolve_exported_identifier: (name: string, loc: Loc) => Promise<import_resolution[]>;
   ensureUpToDate(): Promise<void>;
-  get_cid(): Promise<string>;
-  find_module_by_cid(cid: string): Promise<imported_module | undefined>;
+  get_cid(): string;
+  find_module_by_cid(cid: string): imported_module | undefined;
   resolve_label(name: string): Promise<Binding>;
   get_pkg_and_path(): [{ name: string; version: string }, string];
+  resolve_rib: (rib_id: string) => Rib;
 };
 
 export type manager = {
   resolve_import: (loc: Loc) => Promise<imported_module>;
   resolve_label: (label: Label) => Promise<Binding>;
   get_import_path: (cuid: string) => Promise<string>;
+  resolve_rib: (rib_id: string, cuid: string) => Rib;
 };
 
 export type preexpand_helpers = {

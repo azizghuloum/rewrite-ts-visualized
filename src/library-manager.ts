@@ -15,11 +15,11 @@ import {
 } from "./preexpand-helpers";
 import { AST, source_file } from "./ast";
 import { normalize } from "node:path";
-import { Binding, CompilationUnit, Context, Loc } from "./syntax-structures";
+import { Binding, CompilationUnit, Context, Loc, Rib } from "./syntax-structures";
 import stringify from "json-stringify-pretty-compact";
 import { init_global_context } from "./global-module";
 
-const cookie = "rewrite-ts-011";
+const cookie = "rewrite-ts-012";
 
 type module_state =
   | { type: "initial" }
@@ -31,6 +31,7 @@ type module_state =
       pkg_relative_path: string;
       exported_identifiers: { [name: string]: import_resolution[] };
       context: Context;
+      unit: CompilationUnit;
     }
   | { type: "error"; reason: string };
 
@@ -121,6 +122,7 @@ class RtsModule implements imported_module {
       pkg_relative_path,
       exported_identifiers: json.exported_identifiers,
       context: json.context,
+      unit: json.unit,
     };
   }
 
@@ -150,12 +152,12 @@ class RtsModule implements imported_module {
             return mod;
           },
           resolve_label: async (label) => {
-            const mod = await this.find_module_by_cid(label.cuid);
+            const mod = this.find_module_by_cid(label.cuid);
             if (!mod) throw new Error(`cannot find module with cuid = ${label.cuid}`);
             return mod.resolve_label(label.name);
           },
           get_import_path: async (cuid) => {
-            const mod = await this.find_module_by_cid(cuid);
+            const mod = this.find_module_by_cid(cuid);
             if (!mod) throw new Error(`cannot find module with cuid = ${cuid}`);
             const [mod_pkg, mod_path] = mod.get_pkg_and_path();
             if (mod_pkg === my_pkg) {
@@ -167,6 +169,11 @@ class RtsModule implements imported_module {
               throw new Error(`TODO cross package imports`);
             }
           },
+          resolve_rib: (rib_id, cuid) => {
+            const mod = this.find_module_by_cid(cuid);
+            if (!mod) throw new Error(`cannot find module with cuid = ${cuid}`);
+            return mod.resolve_rib(rib_id);
+          },
         },
         global_unit: this.global_unit,
         global_context: this.global_context,
@@ -174,7 +181,7 @@ class RtsModule implements imported_module {
           return k();
         },
       };
-      const { loc, unit: _unit, context, modular } = await expand(helpers);
+      const { loc, unit, context, modular } = await expand(helpers);
       assert(modular.extensible);
       const proxy_code = generate_proxy_code(
         this.get_generated_code_relative_path(),
@@ -191,6 +198,7 @@ class RtsModule implements imported_module {
         cookie,
         exported_identifiers,
         context,
+        unit,
       };
       const code_path = this.get_generated_code_absolute_path();
       await fs.mkdir(dirname(code_path), { recursive: true });
@@ -220,7 +228,7 @@ class RtsModule implements imported_module {
     return resolutions;
   }
 
-  async get_cid(): Promise<string> {
+  get_cid(): string {
     //await this.ensureUpToDate();
     switch (this.state.type) {
       case "fresh":
@@ -231,10 +239,10 @@ class RtsModule implements imported_module {
     }
   }
 
-  async find_module_by_cid(cid: string): Promise<imported_module | undefined> {
-    if ((await this.get_cid()) === cid) return this;
+  find_module_by_cid(cid: string): imported_module | undefined {
+    if (this.get_cid() === cid) return this;
     for (const m of this.imported_modules) {
-      const r = await m.find_module_by_cid(cid);
+      const r = m.find_module_by_cid(cid);
       if (r) return r;
     }
     return undefined;
@@ -249,6 +257,12 @@ class RtsModule implements imported_module {
         return { type: "imported_lexical", cuid: this.state.cid, name: binding.name };
       case "type":
         return { type: "imported_type", cuid: this.state.cid, name: binding.name };
+      case "syntax_rules_transformer":
+        return {
+          type: "imported_syntax_rules_transformer",
+          cuid: this.state.cid,
+          clauses: binding.clauses,
+        };
       default:
         throw new Error(`unhandled binding type ${binding.type}`);
     }
@@ -272,6 +286,14 @@ class RtsModule implements imported_module {
     check(mod);
     this.imported_modules.push(mod);
     return mod;
+  }
+
+  resolve_rib(rib_id: string): Rib {
+    assert(this.state.type === "fresh");
+    const unit = this.state.unit;
+    const rib = unit.store[rib_id];
+    assert(rib !== undefined);
+    return rib;
   }
 }
 

@@ -355,6 +355,7 @@ const preexpand_forms =
                     ),
                   );
                 }
+                case "imported_syntax_rules_transformer":
                 case "syntax_rules_transformer": {
                   const { clauses } = binding;
                   return data.helpers.inspect(loc, `transformer form`, () =>

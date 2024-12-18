@@ -85,6 +85,11 @@ export type Binding =
   | { type: "syntax_rules_transformer"; clauses: { pattern: Loc; template: STX }[] }
   | { type: "imported_lexical"; name: string; cuid: string }
   | { type: "imported_type"; name: string; cuid: string }
+  | {
+      type: "imported_syntax_rules_transformer";
+      clauses: { pattern: Loc; template: STX }[];
+      cuid: string;
+    }
   | { type: "ts"; name: string };
 
 export type Context = { [label: string]: Binding };

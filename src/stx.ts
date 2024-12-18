@@ -63,7 +63,8 @@ function id_to_label(
         return rib;
       } else {
         // need to resolve name, marks in imported rib?
-        throw new Error(`unhandled imported rib?  ${name} ${cu_id}, ${JSON.stringify(marks)}`);
+        const rib = helpers.manager.resolve_rib(rib_id, cu_id);
+        return rib;
       }
     })(subst[0]);
     const ls = rib[resolution_type][name];

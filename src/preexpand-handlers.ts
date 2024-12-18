@@ -190,6 +190,7 @@ const import_declaration: walker = async ({ loc, helpers, ...data }) => {
           core_syntax: "both",
           ts: "both",
           syntax_rules_transformer: "both",
+          imported_syntax_rules_transformer: "both",
         };
         const new_rib = resolutions.reduce((rib, resolution) => {
           assert(typeof resolution.label !== "string");
