@@ -17,7 +17,6 @@ async function compile_script(filename: string, test_name: string) {
   const code = await readFile(filename, { encoding: "utf-8" });
   const patterns = core_patterns(parse);
   const globals = get_globals("es2024.full");
-  const global_macros = Object.keys(patterns);
   const [global_unit, global_context] = init_global_context(patterns, globals);
   const helpers: preexpand_helpers = {
     manager: {
@@ -30,6 +29,9 @@ async function compile_script(filename: string, test_name: string) {
       get_import_path(_cuid) {
         throw new Error(`imports are not supported in tests`);
       },
+      resolve_rib(_rib_id, _cuid) {
+        throw new Error(`imports are not supported in gui`);
+      },
     },
     global_unit,
     global_context,
@@ -41,7 +43,7 @@ async function compile_script(filename: string, test_name: string) {
     package: { name: "@rewrite-ts/test", version: "0.0.0" },
     path: filename,
   };
-  const [_loc0, expand] = initial_step(parse(code, source_file), test_name, globals, global_macros);
+  const [_loc0, expand] = initial_step(parse(code, source_file), test_name, ["es2024.full"]);
   const result = await (async () => {
     try {
       const { loc } = await expand(helpers);

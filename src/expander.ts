@@ -32,8 +32,7 @@ import { counters, data, swalker, walker, walkerplus } from "./data";
 export function initial_step(
   ast: AST,
   cu_id: string,
-  globals: string[],
-  global_macros: string[],
+  libs: string[],
 ): [
   Loc,
   (helpers: preexpand_helpers) => Promise<{
@@ -43,7 +42,7 @@ export function initial_step(
     modular: modular_extension;
   }>,
 ] {
-  const { stx, counters, unit, rib, rib_id } = init_top_level(ast, cu_id, globals, global_macros);
+  const { stx, counters, unit, rib, rib_id } = init_top_level(ast, cu_id, libs);
   const initial_loc: Loc = mkzipper(stx);
   const lexical: lexical_extension = { extensible: true, rib, rib_id };
   const empty_rib: Rib = { type: "rib", normal_env: {}, types_env: {} };
@@ -225,7 +224,7 @@ const list_handlers_table: { [tag in list_tag]: "descend" | "stop" | "todo" } = 
   variable_declarator: "stop",
   export_specifier: "todo",
   export_clause: "todo",
-  export_declaration: "todo",
+  export_declaration: "stop",
   named_exports: "todo",
   slice: "descend",
   arrow_function: "stop",
@@ -355,6 +354,7 @@ const preexpand_forms =
                     ),
                   );
                 }
+                case "imported_syntax_rules_transformer":
                 case "syntax_rules_transformer": {
                   const { clauses } = binding;
                   return data.helpers.inspect(loc, `transformer form`, () =>
@@ -395,6 +395,7 @@ const preexpand_forms =
             );
           }
           switch (loc.t.tag) {
+            case "export_declaration":
             case "arrow_function":
               return next(loc);
             case "member_expression":
@@ -699,6 +700,14 @@ function string_literal(value: string): STX {
     src: false,
   };
 }
+
+const empty_slice: STX = {
+  type: "list",
+  tag: "slice",
+  content: null,
+  wrap: empty_wrap,
+  src: false,
+};
 
 const export_keyword: STX = {
   type: "atom",
@@ -1022,6 +1031,56 @@ const postexpand_lexical_declaration: walker = async ({ loc, ...data }) => {
   }).then(insert_export_keyword);
 };
 
+const postexpand_export_declaration: walker = ({ loc: main_loc, ...data }) => {
+  const handle_identifier: walker = async ({ loc, modular, context, unit, helpers, ...data }) => {
+    assert(modular.extensible);
+    assert(loc.t.tag === "identifier");
+    const { content, wrap } = loc.t;
+    const resolution = await resolve(content, wrap, context, unit, "normal_env", helpers);
+    if (resolution.type !== "bound") syntax_error(loc, "unbound identifier");
+    const new_modular = extend_modular(
+      modular,
+      true,
+      content,
+      wrap.marks,
+      resolution.label,
+      "normal_env",
+      loc,
+    );
+    return go_right(loc, (loc) =>
+      after_identifier({ loc, modular: new_modular, context, unit, helpers, ...data }),
+    );
+  };
+  const after_identifier: walker = ({ loc, ...data }) =>
+    loc.t.content === "}" ? Promise.resolve({ loc, ...data }) : debug(loc, "TODO");
+
+  const expect_export: walker = ({ loc, ...data }) =>
+    loc.t.content === "}"
+      ? Promise.resolve({ loc, ...data })
+      : loc.t.tag === "identifier"
+        ? handle_identifier({ loc, ...data })
+        : syntax_error(loc);
+
+  const start: walker = ({ loc, ...data }) =>
+    loc.t.content === "export"
+      ? go_right(loc, (loc) =>
+          go_down(loc, (loc) =>
+            loc.t.content === "{"
+              ? go_right(loc, (loc) => expect_export({ loc, ...data }))
+              : syntax_error(loc),
+          ),
+        )
+      : syntax_error(loc);
+
+  if (!data.modular.extensible) syntax_error(main_loc, "invalid context for export");
+  return go_down(main_loc, (loc) =>
+    start({ loc, ...data }).then((data) => ({
+      ...data,
+      loc: change(main_loc, mkzipper(empty_slice)),
+    })),
+  );
+};
+
 function rename(loc: Loc, new_name: string): Loc {
   const new_id: STX = {
     type: "atom",
@@ -1136,6 +1195,9 @@ const postexpand_body = (sort: "type" | "value") => (data: data) => {
           }
           case "type_alias_declaration": {
             return postexpand_type_alias_declaration({ ...data, loc }).then(cont);
+          }
+          case "export_declaration": {
+            return postexpand_export_declaration({ ...data, loc }).then(cont);
           }
           case "member_expression": {
             return go_down(loc, (loc) =>

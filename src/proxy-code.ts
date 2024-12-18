@@ -18,9 +18,12 @@ function extract_bindings(
     const [_marks, label] = ls[0];
     const binding = context[label.name];
     assert(binding !== undefined);
-    assert(binding.type === binding_type);
-    const new_name = binding.name;
-    a[original_name] = new_name;
+    if (binding.type === binding_type) {
+      const new_name = binding.name;
+      a[original_name] = new_name;
+    } else {
+      assert(binding.type === "syntax_rules_transformer");
+    }
   });
   return a;
 }

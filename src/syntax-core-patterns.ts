@@ -276,12 +276,12 @@ const splice: walker = async ({ loc, context, unit, lexical, helpers, ...data })
   };
 };
 
-function literal_binding(
+async function literal_binding(
   name: string,
   subst: subst,
   unit: CompilationUnit,
   helpers: preexpand_helpers,
-): boolean {
+): Promise<boolean> {
   const x = subst.find(([lhs]) => lhs.content === name);
   assert(x !== undefined);
   const lhs = x[0];

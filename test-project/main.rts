@@ -1,3 +1,3 @@
-import { x, t } from "./mod.rts";
-const y: t = x;
+import { x, t, fref } from "./mod.rts";
+const y: t = x + fref;
 console.log(y);

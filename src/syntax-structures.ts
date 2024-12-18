@@ -41,7 +41,7 @@ export type Label = { cuid: string; name: string };
 
 export type Env = { [name: string]: [LL<Mark>, Label][] };
 
-export type Rib = { type: "rib"; types_env: Env; normal_env: Env };
+export type Rib = { type: "rib"; types_env: Env; normal_env: Env; libs?: string[] };
 
 function label_generator(prefix: string): (counters: counters) => [string, counters] {
   return (counters: counters) => [
@@ -85,6 +85,11 @@ export type Binding =
   | { type: "syntax_rules_transformer"; clauses: { pattern: Loc; template: STX }[] }
   | { type: "imported_lexical"; name: string; cuid: string }
   | { type: "imported_type"; name: string; cuid: string }
+  | {
+      type: "imported_syntax_rules_transformer";
+      clauses: { pattern: Loc; template: STX }[];
+      cuid: string;
+    }
   | { type: "ts"; name: string };
 
 export type Context = { [label: string]: Binding };

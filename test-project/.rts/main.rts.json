@@ -1,6 +1,79 @@
 {
   "cid": "test-project/main.rts rewrite-ts-visualized 0.0.0",
-  "cookie": "rewrite-ts-010",
+  "cookie": "rewrite-ts-013",
   "exported_identifiers": {},
-  "context": {"l1": {"type": "lexical", "name": "y_1"}}
+  "context": {"l1": {"type": "lexical", "name": "y_1"}},
+  "unit": {
+    "cu_id": "test-project/main.rts rewrite-ts-visualized 0.0.0",
+    "store": {
+      "r0": {
+        "type": "rib",
+        "normal_env": {
+          "fref": [
+            [
+              [
+                "test-project/main.rts rewrite-ts-visualized 0.0.0",
+                ["top", null]
+              ],
+              {
+                "cuid": "test-project/mod.rts rewrite-ts-visualized 0.0.0",
+                "name": "l4"
+              }
+            ]
+          ],
+          "x": [
+            [
+              [
+                "test-project/main.rts rewrite-ts-visualized 0.0.0",
+                ["top", null]
+              ],
+              {
+                "cuid": "test-project/mod.rts rewrite-ts-visualized 0.0.0",
+                "name": "l1"
+              }
+            ]
+          ],
+          "y": [
+            [
+              [
+                "test-project/main.rts rewrite-ts-visualized 0.0.0",
+                ["top", null]
+              ],
+              {
+                "cuid": "test-project/main.rts rewrite-ts-visualized 0.0.0",
+                "name": "l1"
+              }
+            ]
+          ]
+        },
+        "types_env": {
+          "fref": [
+            [
+              [
+                "test-project/main.rts rewrite-ts-visualized 0.0.0",
+                ["top", null]
+              ],
+              {
+                "cuid": "test-project/mod.rts rewrite-ts-visualized 0.0.0",
+                "name": "l4"
+              }
+            ]
+          ],
+          "t": [
+            [
+              [
+                "test-project/main.rts rewrite-ts-visualized 0.0.0",
+                ["top", null]
+              ],
+              {
+                "cuid": "test-project/mod.rts rewrite-ts-visualized 0.0.0",
+                "name": "l2"
+              }
+            ]
+          ]
+        },
+        "libs": ["es2024.full"]
+      }
+    }
+  }
 }
