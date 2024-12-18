@@ -27,7 +27,7 @@ import { debug, in_isolation, syntax_error } from "./stx-error";
 import { array_to_ll, join_separated, llappend } from "./llhelpers";
 import { gen_binding, preexpand_list_handlers } from "./preexpand-handlers";
 import { preexpand_helpers } from "./preexpand-helpers";
-import { data, swalker, walker, walkerplus } from "./data";
+import { counters, data, swalker, walker, walkerplus } from "./data";
 
 export function initial_step(
   ast: AST,
@@ -43,14 +43,14 @@ export function initial_step(
     modular: modular_extension;
   }>,
 ] {
-  const { stx, counter, unit, rib, rib_id } = init_top_level(ast, cu_id, globals, global_macros);
+  const { stx, counters, unit, rib, rib_id } = init_top_level(ast, cu_id, globals, global_macros);
   const initial_loc: Loc = mkzipper(stx);
   const lexical: lexical_extension = { extensible: true, rib, rib_id };
   const empty_rib: Rib = { type: "rib", normal_env: {}, types_env: {} };
   const modular: modular_extension = { extensible: true, explicit: empty_rib, implicit: empty_rib };
   const context: Context = {};
   const imp: import_req = {};
-  const data = { loc: initial_loc, unit, context, imp, counter, lexical, modular };
+  const data = { loc: initial_loc, unit, context, imp, counters, lexical, modular };
   return [
     initial_loc,
     (helpers: preexpand_helpers) =>
@@ -196,7 +196,7 @@ const preexpand_body_curly: walker = async ({ loc, ...data }) =>
 
 async function handle_core_syntax({ name, ...data }: data & { name: string }): Promise<{
   loc: Loc;
-  counter: number;
+  counters: counters;
   unit: CompilationUnit;
   context: Context;
   lexical: lexical_extension;
@@ -354,13 +354,13 @@ const preexpand_forms =
                 case "syntax_rules_transformer": {
                   const { clauses } = binding;
                   return data.helpers.inspect(loc, `transformer form`, () =>
-                    apply_syntax_rules(loc, clauses, data.unit, data.counter, data.helpers).then(
-                      ({ loc, counter }) => {
+                    apply_syntax_rules(loc, clauses, data.unit, data.counters, data.helpers).then(
+                      ({ loc, counters }) => {
                         const rewrapped = data.lexical.extensible
                           ? rewrap(loc, data.lexical.rib_id, data.unit.cu_id)
                           : loc;
                         return data.helpers.inspect(rewrapped, `transformer output`, () =>
-                          preexpand_forms(sort)({ loc: rewrapped, ...data, counter }),
+                          preexpand_forms(sort)({ loc: rewrapped, ...data, counters }),
                         );
                       },
                     ),
@@ -541,15 +541,15 @@ function check_punct(loc: Loc, content: string) {
   }
 }
 
-const expand_arrow_function: walker = ({ loc, counter, ...data }) =>
+const expand_arrow_function: walker = ({ loc, counters, ...data }) =>
   go_down(loc, (loc) => {
-    const [rib_id, new_counter] = new_rib_id(counter);
+    const [rib_id, new_counters] = new_rib_id(counters);
     const lexical: lexical_extension = {
       extensible: true,
       rib_id,
       rib: { type: "rib", normal_env: {}, types_env: {} },
     };
-    const pgs = extract_parameters({ ...data, loc, lexical, counter: new_counter });
+    const pgs = extract_parameters({ ...data, loc, lexical, counters: new_counters });
     const arr = go_right(pgs.loc, itself);
     check_punct(arr, "=>");
     const body = go_right(arr, itself);
@@ -616,7 +616,7 @@ const expand_type_parameters: walker = ({ loc, ...data }) => {
     }
   };
 
-  const pre_after_var: walker = ({ loc, lexical, counter, unit, ...data }) => {
+  const pre_after_var: walker = ({ loc, lexical, counters, unit, ...data }) => {
     assert(lexical.extensible);
     return go_right(
       loc,
@@ -624,7 +624,7 @@ const expand_type_parameters: walker = ({ loc, ...data }) => {
         if (loc.t.content !== ",") syntax_error(loc, "expected a comma ','");
         return go_right(
           loc,
-          (loc) => pre_var({ loc, lexical, counter, unit, ...data }),
+          (loc) => pre_var({ loc, lexical, counters, unit, ...data }),
           (loc) => debug(loc, "cant go past commma?"),
         );
       },
@@ -633,7 +633,7 @@ const expand_type_parameters: walker = ({ loc, ...data }) => {
           post_var({
             loc,
             lexical,
-            counter,
+            counters,
             unit: extend_unit(unit, lexical),
             ...data,
           }),
@@ -657,15 +657,15 @@ const expand_type_parameters: walker = ({ loc, ...data }) => {
     }
   };
 
-  const start: walker = ({ loc, counter, ...data }) => {
+  const start: walker = ({ loc, counters, ...data }) => {
     assert(loc.t.tag === "syntax_list");
-    const [rib_id, new_counter] = new_rib_id(counter);
+    const [rib_id, new_counters] = new_rib_id(counters);
     const rib: Rib = { type: "rib", normal_env: {}, types_env: {} };
     const lexical: lexical_extension = { extensible: true, rib_id, rib };
     return go_down(
       loc,
-      (loc) => pre_var({ loc, ...data, lexical, counter: new_counter }),
-      (loc) => end({ loc, ...data, lexical, counter: new_counter }),
+      (loc) => pre_var({ loc, ...data, lexical, counters: new_counters }),
+      (loc) => end({ loc, ...data, lexical, counters: new_counters }),
     );
   };
 
@@ -760,25 +760,25 @@ const as_keyword: STX = {
   src: false,
 };
 
-const insert_export_keyword: swalker = ({ loc, counter, modular, imp, ...data }) => {
+const insert_export_keyword: swalker = ({ loc, counters, modular, imp, ...data }) => {
   if (modular.extensible) {
     assert(loc.t.type === "list");
     const content = stx_list_content(loc.t);
     assert(content !== null);
     const fst = content[0];
     if (fst.content === "export") {
-      return { ...data, loc, modular, imp, counter };
+      return { ...data, loc, modular, imp, counters };
     } else {
       return {
         ...data,
         loc: { type: "loc", t: { ...loc.t, content: [export_keyword, content] }, p: loc.p },
         modular,
         imp,
-        counter,
+        counters,
       };
     }
   } else {
-    return { ...data, loc, modular, counter, imp };
+    return { ...data, loc, modular, counters, imp };
   }
 };
 
@@ -1057,14 +1057,14 @@ const postexpand_body = (sort: "type" | "value") => (data: data) => {
                     return cont({ ...data, loc: rename(loc, binding.name) });
                   }
                   case "imported_lexical": {
-                    const { imp, counter } = data;
+                    const { imp, counters } = data;
                     const existing = (imp[label.cuid] ?? {})[label.name];
                     if (existing) {
                       return cont({ ...data, loc: rename(loc, existing.new_name) });
                     } else {
                       const { name } = binding;
-                      const new_name = `${name}_${counter}`;
-                      const new_counter = counter + 1;
+                      const new_name = `${name}_${counters.vars}`;
+                      const new_counters = { ...counters, vars: counters.vars + 1 };
                       const new_imp: import_req = {
                         ...imp,
                         [label.cuid]: {
@@ -1076,7 +1076,7 @@ const postexpand_body = (sort: "type" | "value") => (data: data) => {
                         ...data,
                         loc: rename(loc, new_name),
                         imp: new_imp,
-                        counter: new_counter,
+                        counters: new_counters,
                       });
                     }
                   }

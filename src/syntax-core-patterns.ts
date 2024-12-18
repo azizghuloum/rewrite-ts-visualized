@@ -24,7 +24,7 @@ import {
 } from "./syntax-structures";
 import { go_next, go_down, mkzipper, stx_list_content, go_up, change } from "./zipper";
 import { preexpand_helpers } from "./preexpand-helpers";
-import { walker } from "./data";
+import { counters, walker } from "./data";
 
 const zipper_find: (loc: Loc, pred: (x: STX) => boolean) => Loc | null = (loc, pred) => {
   const t = loc.t;
@@ -252,7 +252,7 @@ export const core_pattern_match: (
   return unification;
 };
 
-const splice: walker = async ({ loc, context, unit, counter, lexical, helpers, ...data }) => {
+const splice: walker = async ({ loc, context, unit, lexical, helpers, ...data }) => {
   const unification = await core_pattern_match(loc, unit, "splice", helpers);
   assert(unification !== null);
   const { subst } = unification;
@@ -268,7 +268,6 @@ const splice: walker = async ({ loc, context, unit, counter, lexical, helpers, .
   };
   return {
     loc: change(unification.loc, mkzipper(result)),
-    counter,
     unit,
     context,
     lexical,
@@ -348,7 +347,7 @@ const using_rewrite_rules: walker = async ({
   loc: orig_loc,
   context: orig_context,
   unit: orig_unit,
-  counter: orig_counter,
+  counters: orig_counters,
   lexical: orig_lexical,
   helpers,
   ...data
@@ -372,15 +371,15 @@ const using_rewrite_rules: walker = async ({
       .map((x) => parse_syntax_rules_clause(x, loc)),
     (x, y) => bound_id_equal(x, y),
   );
-  const [rib_id, new_counter] = new_rib_id(orig_counter);
+  const [rib_id, new_counters] = new_rib_id(orig_counters);
   const cuid = orig_unit.cu_id;
   const do_wrap = push_wrap({
     marks: null,
     subst: [{ rib_id, cu_id: cuid }, null],
     aes: null,
   });
-  const [new_rib, final_counter, final_context] = clauses.reduce(
-    (ac: [Rib, number, Context], [lhs, rhs]) => {
+  const [new_rib, final_counters, final_context] = clauses.reduce(
+    (ac: [Rib, counters, Context], [lhs, rhs]) => {
       assert(lhs.type === "atom" && lhs.wrap !== undefined);
       return extend_rib(
         ac[0],
@@ -389,9 +388,9 @@ const using_rewrite_rules: walker = async ({
         lhs.wrap.marks,
         ac[1],
         "normal_env",
-        ({ rib, counter, label }) => [
+        ({ rib, counters, label }) => [
           rib,
-          counter,
+          counters,
           extend_context(ac[2], label.name, {
             type: "syntax_rules_transformer",
             clauses: rhs.map(({ pattern, template }) => ({
@@ -405,13 +404,13 @@ const using_rewrite_rules: walker = async ({
         },
       );
     },
-    [{ type: "rib", normal_env: {}, types_env: {} }, new_counter, orig_context],
+    [{ type: "rib", normal_env: {}, types_env: {} }, new_counters, orig_context],
   );
   const final_unit = extend_unit(orig_unit, { extensible: true, rib_id, rib: new_rib });
   const final_loc = change(loc, mkzipper(do_wrap(expression)));
   return {
     loc: final_loc,
-    counter: final_counter,
+    counters: final_counters,
     unit: final_unit,
     context: final_context,
     lexical: orig_lexical,
@@ -469,9 +468,9 @@ export async function apply_syntax_rules(
   orig_loc: Loc,
   clauses: syntax_rules_clause[],
   unit: CompilationUnit,
-  orig_counter: number,
+  orig_counters: counters,
   helpers: preexpand_helpers,
-): Promise<{ loc: Loc; counter: number }> {
+): Promise<{ loc: Loc; counters: counters }> {
   const do_antimark = push_wrap({
     marks: [antimark, null],
     subst: [shift, null],
@@ -483,17 +482,17 @@ export async function apply_syntax_rules(
   if (expressionls === null) syntax_error(loc, "splicing error of empty slice");
   if (expressionls[1] !== null) syntax_error(loc, "splicing error of more than one thing");
   const expression = expressionls[0];
-  const [mark, new_counter] = new_mark(orig_counter);
+  const [mark, new_counters] = new_mark(orig_counters);
   const do_mark = push_wrap({ marks: [mark, null], subst: [shift, null], aes: [loc.t, null] });
   const new_loc = change(loc, mkzipper(do_mark(expression)));
-  return { loc: new_loc, counter: new_counter };
+  return { loc: new_loc, counters: new_counters };
 }
 
 const define_rewrite_rules: walker = async ({
   loc: orig_loc,
   context: orig_context,
   unit: orig_unit,
-  counter: orig_counter,
+  counters: orig_counters,
   lexical: orig_lexical,
   helpers,
   ...data
@@ -517,8 +516,8 @@ const define_rewrite_rules: walker = async ({
     (x, y) => bound_id_equal(x, y),
   );
   const cuid = orig_unit.cu_id;
-  const [final_rib, final_counter, final_context] = clauses.reduce(
-    (ac: [Rib, number, Context], [lhs, rhs]) => {
+  const [final_rib, final_counters, final_context] = clauses.reduce(
+    (ac: [Rib, counters, Context], [lhs, rhs]) => {
       assert(lhs.type === "atom" && lhs.wrap !== undefined);
       return extend_rib(
         ac[0],
@@ -527,9 +526,9 @@ const define_rewrite_rules: walker = async ({
         lhs.wrap.marks,
         ac[1],
         "normal_env",
-        ({ rib, counter, label }) => [
+        ({ rib, counters, label }) => [
           rib,
-          counter,
+          counters,
           extend_context(ac[2], label.name, {
             type: "syntax_rules_transformer",
             clauses: rhs,
@@ -538,7 +537,7 @@ const define_rewrite_rules: walker = async ({
         (reason) => syntax_error(loc, reason),
       );
     },
-    [orig_lexical.rib, orig_counter, orig_context],
+    [orig_lexical.rib, orig_counters, orig_context],
   );
   const lexical: lexical_extension = {
     extensible: true,
@@ -558,7 +557,7 @@ const define_rewrite_rules: walker = async ({
   );
   return {
     loc: final_loc,
-    counter: final_counter,
+    counters: final_counters,
     unit: final_unit,
     context: final_context,
     lexical,

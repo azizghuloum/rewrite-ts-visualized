@@ -16,7 +16,7 @@ const x = 12;
 ### Output Program
 
 ```typescript
-x_6 + ((foo_9, foo_11) => foo_11 + foo_9);
-export const x_6 = 12;
+x_1 + ((foo_2, foo_3) => foo_3 + foo_2);
+export const x_1 = 12;
 ```
 

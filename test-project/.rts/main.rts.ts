@@ -1,2 +1,2 @@
-import { x_2 as x_2_1 } from "./mod.rts.ts";
-console.log(x_2_1);
+import { x_1 as x_1_1 } from "./mod.rts.ts";
+console.log(x_1_1);

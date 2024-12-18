@@ -1,5 +1,5 @@
 import { assert } from "./assert";
-import { data, walker } from "./data";
+import { counters, data, walker } from "./data";
 import { imported_module } from "./preexpand-helpers";
 import {
   extend_context_lexical,
@@ -32,21 +32,21 @@ function skip_required(loc: Loc, kwd_options: string[]): Loc {
 export function gen_binding({
   loc,
   lexical,
-  counter,
+  counters,
   context,
   unit,
   sort,
 }: {
   loc: Loc;
   lexical: lexical_extension;
-  counter: number;
+  counters: counters;
   context: Context;
   unit: CompilationUnit;
   sort: "type" | "value";
 }): {
   name: string;
   lexical: lexical_extension;
-  counter: number;
+  counters: counters;
   context: Context;
   unit: CompilationUnit;
 } {
@@ -61,19 +61,19 @@ export function gen_binding({
     cuid,
     stx.content,
     stx.wrap.marks,
-    counter,
+    counters,
     env_type,
-    ({ rib, counter, label }) =>
+    ({ rib, counters, label }) =>
       extend_context_lexical(
         context,
-        counter,
+        counters,
         label.name,
         { type: "type" as const, value: "lexical" as const }[sort],
         stx.content,
-        ({ context, counter, name }) => ({
+        ({ context, counters, name }) => ({
           lexical: { extensible: true, rib, rib_id },
           context,
-          counter,
+          counters,
           name,
           unit,
         }),
@@ -82,27 +82,27 @@ export function gen_binding({
   );
 }
 
-const lexical_declaration: walker = ({ loc, lexical, context, counter, unit, ...data }) => {
-  const after_vars: walker = async ({ loc, lexical, context, counter, unit, ...data }) => {
+const lexical_declaration: walker = ({ loc, lexical, context, counters, unit, ...data }) => {
+  const after_vars: walker = async ({ loc, lexical, context, counters, unit, ...data }) => {
     if (loc.t.type === "atom" && loc.t.tag === "other") {
       switch (loc.t.content) {
         case ";":
           return go_right(
             loc,
             (loc) => syntax_error(loc, "expected nothing after semicolon"),
-            (loc) => ({ loc, lexical, context, counter, unit, ...data }),
+            (loc) => ({ loc, lexical, context, counters, unit, ...data }),
           );
         case ",":
           return go_right(
             loc,
-            (loc) => get_vars(loc, lexical, context, counter),
+            (loc) => get_vars(loc, lexical, context, counters),
             (loc) => syntax_error(loc, "expected variable after ','"),
           );
       }
     }
     syntax_error(loc, "expected a ',' or a ';'");
   };
-  function get_vars(ls: Loc, lexical: lexical_extension, context: Context, counter: number) {
+  function get_vars(ls: Loc, lexical: lexical_extension, context: Context, counters: counters) {
     if (ls.t.type === "list" && ls.t.tag === "variable_declarator") {
       return go_down(
         ls,
@@ -110,7 +110,7 @@ const lexical_declaration: walker = ({ loc, lexical, context, counter, unit, ...
           const goodies = gen_binding({
             loc,
             lexical,
-            counter,
+            counters,
             context,
             unit,
             sort: "value",
@@ -134,7 +134,7 @@ const lexical_declaration: walker = ({ loc, lexical, context, counter, unit, ...
         skip_required(skip_optional(loc, "export"), ["let", "const"]),
         lexical,
         context,
-        counter,
+        counters,
       ),
     syntax_error,
   );
@@ -175,7 +175,7 @@ const import_declaration: walker = async ({ loc, helpers, ...data }) => {
         const name = loc0.t.content;
         const wrap = loc0.t.wrap;
         const resolutions = await mod.resolve_exported_identifier(name, loc0);
-        const { loc, counter, unit, context, lexical } = await go_right(
+        const { loc, counters, unit, context, lexical } = await go_right(
           loc0,
           (loc) => after_var(loc, mod),
           syntax_error,
@@ -195,7 +195,7 @@ const import_declaration: walker = async ({ loc, helpers, ...data }) => {
         }, rib);
         const new_lexical: lexical_extension = { extensible: true, rib: new_rib, rib_id };
         const new_unit = extend_unit(unit, new_lexical);
-        return { loc, ...data, counter, unit: new_unit, context, lexical: new_lexical, helpers };
+        return { loc, ...data, counters, unit: new_unit, context, lexical: new_lexical, helpers };
       }
       default:
         syntax_error(loc, `unexpected ${loc.t.tag} in import context`);

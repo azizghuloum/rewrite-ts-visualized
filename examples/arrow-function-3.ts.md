@@ -13,8 +13,8 @@ const foo = (x) => {
 ### Output Program
 
 ```typescript
-export const foo_2 = (x_5) => {
-  const bar_7 = x_5(13);
+export const foo_1 = (x_2) => {
+  const bar_3 = x_2(13);
 };
 ```
 

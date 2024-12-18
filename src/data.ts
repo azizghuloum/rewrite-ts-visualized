@@ -2,11 +2,13 @@ import { preexpand_helpers } from "./preexpand-helpers";
 import { import_req, lexical_extension, modular_extension } from "./stx";
 import { CompilationUnit, Context, Loc } from "./syntax-structures";
 
+export type counters = { vars: number; internal: number };
+
 export type data = {
   loc: Loc;
   lexical: lexical_extension;
   context: Context;
-  counter: number;
+  counters: counters;
   unit: CompilationUnit;
   helpers: preexpand_helpers;
   imp: import_req;
