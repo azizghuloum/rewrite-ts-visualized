@@ -17,12 +17,15 @@ import {
   STX,
   Subst,
   top_mark,
+  top_marks,
   Wrap,
 } from "./syntax-structures";
-import { globals_cuid, init_global_unit } from "./global-module";
+import { get_globals, globals_cuid } from "./global-module";
 import { syntax_error } from "./stx-error";
 import { preexpand_helpers } from "./preexpand-helpers";
 import { counters } from "./data";
+import { core_handlers } from "./syntax-core-patterns";
+import { stdlibs } from "./generated-stdlibs";
 
 function is_top_marked(wrap: Wrap): boolean {
   function loop_marks(marks: Marks): boolean {
@@ -35,6 +38,20 @@ function is_top_marked(wrap: Wrap): boolean {
 
 function same_marks(m1: Marks, m2: Marks): boolean {
   return m1 === null ? m2 === null : m2 !== null && m1[0] === m2[0] && same_marks(m1[1], m2[1]);
+}
+
+function global_resolve(libname: string, idname: string): boolean {
+  const lib = stdlibs[libname];
+  if (!lib) throw new Error(`invalid lib name '${libname}'`);
+  return (
+    lib.value?.includes(idname) ||
+    lib.type?.includes(idname) ||
+    lib.module?.includes(idname) ||
+    lib.interface?.includes(idname) ||
+    lib.class?.includes(idname) ||
+    lib.include?.some((x) => global_resolve(x, idname)) ||
+    false
+  );
 }
 
 function id_to_label(
@@ -69,12 +86,19 @@ function id_to_label(
     })(subst[0]);
     const ls = rib[resolution_type][name];
     const entry = ls?.find(([ms, _]) => same_marks(ms, marks));
+    if (entry) return entry[1];
+    if (rib.libs) {
+      if (core_handlers[name]) {
+        return { cuid: globals_cuid, name: `global.${name}` };
+      }
+      for (const lib of rib.libs) {
+        if (global_resolve(lib, name)) {
+          return { cuid: globals_cuid, name: `global.${name}` };
+        }
+      }
+    }
     if (entry === undefined) return lookup(marks, subst[1]);
     const label = entry[1];
-    if (typeof label === "string") {
-      console.error(rib);
-      throw new Error(`invalid label`);
-    }
     return label;
   }
   return lookup(marks, subst);
@@ -298,8 +322,7 @@ export type CorePatterns = { [k: string]: AST };
 export function init_top_level(
   ast: AST,
   cuid: string,
-  globals: string[],
-  global_macros: string[],
+  libs: string[],
 ): {
   stx: STX;
   counters: counters;
@@ -309,10 +332,19 @@ export function init_top_level(
 } {
   const initial_counters: counters = { internal: 0, vars: 1 };
   const [rib_id, counters] = new_rib_id(initial_counters);
-  const { top_wrap, rib, unit } = init_global_unit(cuid, rib_id, globals, global_macros);
+
+  const marks: Marks = [cuid, top_marks];
+  const top_wrap: Wrap = { marks, subst: [{ rib_id, cu_id: cuid }, null], aes: null };
+  const rib: Rib = { type: "rib", normal_env: {}, types_env: {}, libs: libs };
   function wrap(ast: AST): STX {
     return { ...ast, wrap: top_wrap, src: ast };
   }
+  const unit: CompilationUnit = {
+    cu_id: cuid,
+    store: {
+      [rib_id]: rib,
+    },
+  };
   return {
     stx: wrap(ast),
     counters,

@@ -19,7 +19,7 @@ import { Binding, CompilationUnit, Context, Loc, Rib } from "./syntax-structures
 import stringify from "json-stringify-pretty-compact";
 import { init_global_context } from "./global-module";
 
-const cookie = "rewrite-ts-012";
+const cookie = "rewrite-ts-013";
 
 type module_state =
   | { type: "initial" }
@@ -39,8 +39,7 @@ class RtsModule implements imported_module {
   private path: string;
   private library_manager: LibraryManager;
   private state: module_state = { type: "initial" };
-  private globals: string[];
-  private global_macros: string[];
+  private libs: string[];
   private global_unit: CompilationUnit;
   private global_context: Context;
   public imported_modules: imported_module[] = [];
@@ -48,15 +47,13 @@ class RtsModule implements imported_module {
   constructor(
     path: string,
     library_manager: LibraryManager,
-    globals: string[],
-    global_macros: string[],
+    libs: string[],
     global_unit: CompilationUnit,
     global_context: Context,
   ) {
     this.path = path;
     this.library_manager = library_manager;
-    this.globals = globals;
-    this.global_macros = global_macros;
+    this.libs = libs;
     this.global_unit = global_unit;
     this.global_context = global_context;
   }
@@ -136,12 +133,7 @@ class RtsModule implements imported_module {
       package: { name: my_pkg.name, version: my_pkg.version },
       path: my_path,
     };
-    const [_loc0, expand] = initial_step(
-      parse(code, source_file),
-      this.state.cid,
-      this.globals,
-      this.global_macros,
-    );
+    const [_loc0, expand] = initial_step(parse(code, source_file), this.state.cid, this.libs);
     try {
       const helpers: preexpand_helpers = {
         manager: {
@@ -310,16 +302,14 @@ class Package {
 }
 
 export class LibraryManager {
-  private globals: string[];
-  private global_macros: string[];
+  private libs: string[];
   private global_unit: CompilationUnit;
   private global_context: Context;
   private modules: { [path: string]: imported_module } = {};
   private packages: { [dir: string]: Package } = {};
 
-  constructor(patterns: { [k: string]: AST }, globals: string[]) {
-    this.globals = globals;
-    this.global_macros = Object.keys(patterns);
+  constructor(patterns: { [k: string]: AST }, globals: string[], libs: string[]) {
+    this.libs = libs;
     const [global_unit, global_context] = init_global_context(patterns, globals);
     this.global_unit = global_unit;
     this.global_context = global_context;
@@ -329,8 +319,7 @@ export class LibraryManager {
     const mod = (this.modules[path] ??= new RtsModule(
       path,
       this,
-      this.globals,
-      this.global_macros,
+      this.libs,
       this.global_unit,
       this.global_context,
     ));

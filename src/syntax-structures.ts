@@ -41,7 +41,7 @@ export type Label = { cuid: string; name: string };
 
 export type Env = { [name: string]: [LL<Mark>, Label][] };
 
-export type Rib = { type: "rib"; types_env: Env; normal_env: Env };
+export type Rib = { type: "rib"; types_env: Env; normal_env: Env; libs?: string[] };
 
 function label_generator(prefix: string): (counters: counters) => [string, counters] {
   return (counters: counters) => [

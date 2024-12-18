@@ -91,22 +91,16 @@ function StepperView({ step, step_number }: { step: Step; step_number: number })
 
 function Example({ code, onChange }: ExampleProps) {
   type expand = (helpers: preexpand_helpers) => Promise<{ loc: Loc }>;
-  const globals = get_globals("es2024.full");
-  const patterns = core_patterns(parse);
-  const global_macros = Object.keys(patterns);
   function init_state(code: string): [State, expand] {
     const source_file: source_file = {
       package: { name: "@rewrite-ts/example", version: "0.0.0" },
       path: "example",
     };
-    const [loc0, expand] = initial_step(
-      parse(code, source_file),
-      "example",
-      globals,
-      global_macros,
-    );
+    const [loc0, expand] = initial_step(parse(code, source_file), "example", ["es2024.full"]);
     return [initial_state(loc0), expand];
   }
+  const globals = get_globals("es2024.full");
+  const patterns = core_patterns(parse);
   const [global_unit, global_context] = init_global_context(patterns, globals);
   const [state, setState] = useState(init_state(code)[0]);
   useEffect(() => {

@@ -32,8 +32,7 @@ import { counters, data, swalker, walker, walkerplus } from "./data";
 export function initial_step(
   ast: AST,
   cu_id: string,
-  globals: string[],
-  global_macros: string[],
+  libs: string[],
 ): [
   Loc,
   (helpers: preexpand_helpers) => Promise<{
@@ -43,7 +42,7 @@ export function initial_step(
     modular: modular_extension;
   }>,
 ] {
-  const { stx, counters, unit, rib, rib_id } = init_top_level(ast, cu_id, globals, global_macros);
+  const { stx, counters, unit, rib, rib_id } = init_top_level(ast, cu_id, libs);
   const initial_loc: Loc = mkzipper(stx);
   const lexical: lexical_extension = { extensible: true, rib, rib_id };
   const empty_rib: Rib = { type: "rib", normal_env: {}, types_env: {} };
