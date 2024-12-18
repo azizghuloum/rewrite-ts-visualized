@@ -19,7 +19,7 @@ import { Binding, CompilationUnit, Context, Loc } from "./syntax-structures";
 import stringify from "json-stringify-pretty-compact";
 import { init_global_context } from "./global-module";
 
-const cookie = "rewrite-ts-010";
+const cookie = "rewrite-ts-011";
 
 type module_state =
   | { type: "initial" }
@@ -181,7 +181,11 @@ class RtsModule implements imported_module {
         modular,
         context,
       );
-      const exported_identifiers = get_exported_identifiers_from_rib(modular.explicit);
+      const exported_identifiers = get_exported_identifiers_from_rib(
+        modular.explicit,
+        this.state.cid,
+        context,
+      );
       const json_content = {
         cid: this.state.cid,
         cookie,

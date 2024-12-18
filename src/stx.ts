@@ -144,9 +144,19 @@ export function rib_push(
   name: string,
   marks: Marks,
   label: Label,
-  env_type: "normal_env" | "types_env",
+  env_type: "normal_env" | "types_env" | "both",
   loc: Loc,
 ): Rib {
+  if (env_type === "both") {
+    return rib_push(
+      rib_push(rib, name, marks, label, "normal_env", loc),
+      name,
+      marks,
+      label,
+      "types_env",
+      loc,
+    );
+  }
   const env = rib[env_type];
   const entry = env[name] ?? [];
   if (entry.find((x) => same_marks(x[0], marks))) {

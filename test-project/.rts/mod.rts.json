@@ -1,13 +1,22 @@
 {
   "cid": "test-project/mod.rts rewrite-ts-visualized 0.0.0",
-  "cookie": "rewrite-ts-010",
+  "cookie": "rewrite-ts-011",
   "exported_identifiers": {
     "x": [
       {
-        "type": "value",
+        "type": "lexical",
         "label": {
           "cuid": "test-project/mod.rts rewrite-ts-visualized 0.0.0",
           "name": "l1"
+        }
+      }
+    ],
+    "fref": [
+      {
+        "type": "syntax_rules_transformer",
+        "label": {
+          "cuid": "test-project/mod.rts rewrite-ts-visualized 0.0.0",
+          "name": "l4"
         }
       }
     ],
@@ -23,6 +32,90 @@
   },
   "context": {
     "l1": {"type": "lexical", "name": "x_1"},
-    "l2": {"type": "type", "name": "t_2"}
+    "l2": {"type": "type", "name": "t_2"},
+    "l3": {"type": "lexical", "name": "f_3"},
+    "l4": {
+      "type": "syntax_rules_transformer",
+      "clauses": [
+        {
+          "pattern": {
+            "type": "loc",
+            "t": {
+              "type": "atom",
+              "wrap": {
+                "marks": [
+                  "test-project/mod.rts rewrite-ts-visualized 0.0.0",
+                  ["top", null]
+                ],
+                "subst": [
+                  {
+                    "rib_id": "r0",
+                    "cu_id": "test-project/mod.rts rewrite-ts-visualized 0.0.0"
+                  },
+                  null
+                ],
+                "aes": null
+              },
+              "tag": "identifier",
+              "content": "fref",
+              "src": {
+                "type": "atom",
+                "tag": "identifier",
+                "content": "fref",
+                "src": {
+                  "type": "origin",
+                  "p": 88,
+                  "e": 93,
+                  "f": {
+                    "package": {
+                      "name": "rewrite-ts-visualized",
+                      "version": "0.0.0"
+                    },
+                    "path": "test-project/mod.rts"
+                  }
+                }
+              }
+            },
+            "p": {"type": "top"}
+          },
+          "template": {
+            "type": "atom",
+            "wrap": {
+              "marks": [
+                "test-project/mod.rts rewrite-ts-visualized 0.0.0",
+                ["top", null]
+              ],
+              "subst": [
+                {
+                  "rib_id": "r0",
+                  "cu_id": "test-project/mod.rts rewrite-ts-visualized 0.0.0"
+                },
+                null
+              ],
+              "aes": null
+            },
+            "tag": "identifier",
+            "content": "f",
+            "src": {
+              "type": "atom",
+              "tag": "identifier",
+              "content": "f",
+              "src": {
+                "type": "origin",
+                "p": 94,
+                "e": 96,
+                "f": {
+                  "package": {
+                    "name": "rewrite-ts-visualized",
+                    "version": "0.0.0"
+                  },
+                  "path": "test-project/mod.rts"
+                }
+              }
+            }
+          }
+        }
+      ]
+    }
   }
 }

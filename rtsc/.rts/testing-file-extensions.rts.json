@@ -1,10 +1,10 @@
 {
   "cid": "rtsc/testing-file-extensions.rts rewrite-ts-visualized 0.0.0",
-  "cookie": "rewrite-ts-010",
+  "cookie": "rewrite-ts-011",
   "exported_identifiers": {
     "x": [
       {
-        "type": "value",
+        "type": "lexical",
         "label": {
           "cuid": "rtsc/testing-file-extensions.rts rewrite-ts-visualized 0.0.0",
           "name": "l2"

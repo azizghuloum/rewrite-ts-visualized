@@ -4,7 +4,7 @@ import { Binding, CompilationUnit, Context, Label, Loc, Rib } from "./syntax-str
 type inspect = <T>(loc: Loc, reason: string, k: () => Promise<T>) => Promise<T>;
 
 export type import_resolution = {
-  type: "type" | "value";
+  type: Binding["type"];
   label: Label;
 };
 
@@ -35,19 +35,27 @@ type exported_identifiers = {
   [name: string]: import_resolution[];
 };
 
-export function get_exported_identifiers_from_rib(rib: Rib): exported_identifiers {
+export function get_exported_identifiers_from_rib(
+  rib: Rib,
+  cuid: string,
+  context: Context,
+): exported_identifiers {
   const ids: exported_identifiers = {};
   Object.entries(rib.normal_env).forEach(([lhs, rhs]) => {
     const b = (ids[lhs] ??= []);
     assert(rhs.length === 1);
     const [_marks, label] = rhs[0];
-    b.push({ type: "value", label });
+    assert(label.cuid === cuid, `export of import?`);
+    const binding = context[label.name];
+    b.push({ type: binding.type, label });
   });
   Object.entries(rib.types_env).forEach(([lhs, rhs]) => {
     const b = (ids[lhs] ??= []);
     assert(rhs.length === 1);
     const [_marks, label] = rhs[0];
-    b.push({ type: "type", label });
+    assert(label.cuid === cuid, `export of import?`);
+    const binding = context[label.name];
+    b.push({ type: binding.type, label });
   });
   return ids;
 }

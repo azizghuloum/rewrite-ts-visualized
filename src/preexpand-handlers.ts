@@ -9,7 +9,7 @@ import {
   rib_push,
 } from "./stx";
 import { syntax_error } from "./stx-error";
-import { CompilationUnit, Context, Loc, STX } from "./syntax-structures";
+import { Binding, CompilationUnit, Context, Loc, STX } from "./syntax-structures";
 import { list_tag } from "./tags";
 import { change, go_down, go_right, go_up, mkzipper } from "./zipper";
 
@@ -182,16 +182,18 @@ const import_declaration: walker = async ({ loc, helpers, ...data }) => {
         );
         assert(lexical.extensible);
         const { rib, rib_id } = lexical;
+        const where: { [k in Binding["type"]]: "types_env" | "normal_env" | "both" } = {
+          type: "types_env",
+          lexical: "normal_env",
+          imported_lexical: "normal_env",
+          imported_type: "types_env",
+          core_syntax: "both",
+          ts: "both",
+          syntax_rules_transformer: "both",
+        };
         const new_rib = resolutions.reduce((rib, resolution) => {
           assert(typeof resolution.label !== "string");
-          return rib_push(
-            rib,
-            name,
-            wrap.marks,
-            resolution.label,
-            { type: "types_env" as const, value: "normal_env" as const }[resolution.type],
-            loc0,
-          );
+          return rib_push(rib, name, wrap.marks, resolution.label, where[resolution.type], loc0);
         }, rib);
         const new_lexical: lexical_extension = { extensible: true, rib: new_rib, rib_id };
         const new_unit = extend_unit(unit, new_lexical);
