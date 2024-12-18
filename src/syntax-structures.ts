@@ -2,6 +2,7 @@ import { TaggedReconstructiveZipper } from "zipper";
 import { AST } from "./ast";
 import { atom_tag, list_tag } from "./tags";
 import { LL } from "./llhelpers";
+import { counters } from "./data";
 
 export type TopMark = "top";
 
@@ -42,9 +43,14 @@ export type Env = { [name: string]: [LL<Mark>, Label][] };
 
 export type Rib = { type: "rib"; types_env: Env; normal_env: Env };
 
-function label_generator(prefix: string): (counter: number) => [string, number] {
-  return (counter: number) => [`${prefix}${counter}`, counter + 1];
+function label_generator(prefix: string): (counters: counters) => [string, counters] {
+  return (counters: counters) => [
+    `${prefix}${counters.internal}`,
+    { ...counters, internal: counters.internal + 1 },
+  ];
 }
+
+export const new_label_id = label_generator("l");
 
 export const new_rib_id = label_generator("r");
 

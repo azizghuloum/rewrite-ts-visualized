@@ -10,6 +10,7 @@ import {
   Label,
   Loc,
   Marks,
+  new_label_id,
   new_rib_id,
   Rib,
   shift,
@@ -21,6 +22,7 @@ import {
 import { globals_cuid, init_global_unit } from "./global-module";
 import { syntax_error } from "./stx-error";
 import { preexpand_helpers } from "./preexpand-helpers";
+import { counters } from "./data";
 
 function is_top_marked(wrap: Wrap): boolean {
   function loop_marks(marks: Marks): boolean {
@@ -176,9 +178,9 @@ export function extend_rib<S>(
   cuid: string,
   name: string,
   marks: Marks,
-  counter: number,
+  counters: counters,
   env_type: "normal_env" | "types_env",
-  sk: (args: { rib: Rib; counter: number; label: Label }) => S,
+  sk: (args: { rib: Rib; counters: counters; label: Label }) => S,
   fk: (reason: string) => S,
 ): S {
   const env = rib[env_type];
@@ -186,10 +188,10 @@ export function extend_rib<S>(
   if (entry.find((x) => same_marks(x[0], marks))) {
     return fk(`${name} is already defined in ${env_type}`);
   }
-  const label: Label = { cuid, name: `l${counter}` };
-  const new_counter = counter + 1;
+  const [label_name, new_counters] = new_label_id(counters);
+  const label: Label = { cuid, name: label_name };
   const new_rib = rib_push_no_check(rib, name, marks, label, env_type);
-  return sk({ rib: new_rib, counter: new_counter, label });
+  return sk({ rib: new_rib, counters: new_counters, label });
 }
 
 export function extend_context(context: Context, label: string, binding: Binding): Context {
@@ -198,19 +200,19 @@ export function extend_context(context: Context, label: string, binding: Binding
 
 export function extend_context_lexical<S>(
   context: Context,
-  counter: number,
+  counters: counters,
   label: string,
   binding_type: "lexical" | "type",
   original_name: string,
-  k: (args: { context: Context; name: string; counter: number }) => S,
+  k: (args: { context: Context; name: string; counters: counters }) => S,
 ): S {
-  const new_name = `${original_name}_${counter}`;
-  const new_counter = counter + 1;
+  const new_name = `${original_name}_${counters.vars}`;
+  const new_counters = { ...counters, vars: counters.vars + 1 };
   const new_context: Context = {
     ...context,
     [label]: { type: binding_type, name: new_name },
   };
-  return k({ context: new_context, name: new_name, counter: new_counter });
+  return k({ context: new_context, name: new_name, counters: new_counters });
 }
 
 function llcancel<X>(ls1: [X, LL<X>], ls2: [X, LL<X>]): LL<X> {
@@ -289,19 +291,20 @@ export function init_top_level(
   global_macros: string[],
 ): {
   stx: STX;
-  counter: number;
+  counters: counters;
   unit: CompilationUnit;
   rib: Rib;
   rib_id: string;
 } {
-  const [rib_id, counter] = new_rib_id(0);
+  const initial_counters: counters = { internal: 0, vars: 1 };
+  const [rib_id, counters] = new_rib_id(initial_counters);
   const { top_wrap, rib, unit } = init_global_unit(cuid, rib_id, globals, global_macros);
   function wrap(ast: AST): STX {
     return { ...ast, wrap: top_wrap, src: ast };
   }
   return {
     stx: wrap(ast),
-    counter,
+    counters,
     unit,
     rib,
     rib_id,
