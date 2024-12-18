@@ -77,7 +77,7 @@ async function generate_imports(imp: import_req, helpers: preexpand_helpers): Pr
     const bindings_codes = await Promise.all(
       Object.entries(bindings).map(async ([label, rhs]) => {
         const binding = await helpers.manager.resolve_label({ cuid, name: label });
-        assert(binding.type === "imported_lexical");
+        assert(binding.type === "imported_lexical" || binding.type === "imported_type");
         const new_name: STX = {
           type: "atom",
           tag: "identifier",
@@ -95,7 +95,10 @@ async function generate_imports(imp: import_req, helpers: preexpand_helpers): Pr
         const code: STX = {
           type: "list",
           tag: "import_specifier",
-          content: array_to_ll([orig_name, as_keyword, new_name]),
+          content: llappend(
+            binding.type === "imported_type" ? [type_keyword, null] : null,
+            array_to_ll([orig_name, as_keyword, new_name]),
+          ),
           src: false,
           wrap: empty_wrap,
         };
@@ -340,6 +343,7 @@ const preexpand_forms =
                 case "type":
                 case "ts":
                 case "imported_lexical":
+                case "imported_type":
                   return next(loc);
                 case "core_syntax": {
                   const { name } = binding;
@@ -744,6 +748,14 @@ const import_keyword: STX = {
   src: false,
 };
 
+const type_keyword: STX = {
+  type: "atom",
+  tag: "other",
+  content: "type",
+  wrap: empty_wrap,
+  src: false,
+};
+
 const from_keyword: STX = {
   type: "atom",
   tag: "other",
@@ -880,33 +892,37 @@ const postexpand_type_alias_declaration: walker = async (data) => {
 };
 
 const postexpand_lexical_declaration: walker = async ({ loc, ...data }) => {
-  async function handle_value_initializer(loc: Loc): Promise<data> {
+  const handle_value_initializer: walker = ({ loc, ...data }) => {
     assert(loc.t.content === "=");
     return go_right(
       loc,
       (loc) => expand_expr("value")({ loc, ...data }),
       (loc) => syntax_error(loc, "expected an expression following the '=' sign"),
     );
-  }
+  };
 
-  async function handle_type_then_initializer(loc: Loc): Promise<data> {
+  const handle_type_then_initializer: walker = ({ loc, ...data }) => {
     assert(loc.t.content === ":");
     return go_right(
       loc,
       (loc) =>
         expand_expr("type")({ loc, ...data }).then(({ loc, ...data }) =>
-          go_right(loc, handle_value_initializer, (loc) => Promise.resolve({ loc, ...data })),
+          go_right(
+            loc,
+            (loc) => handle_value_initializer({ loc, ...data }),
+            (loc) => Promise.resolve({ loc, ...data }),
+          ),
         ),
-      (loc) => syntax_error(loc, "expected an expression following the '=' sign"),
+      (loc) => syntax_error(loc, "expected a type following the ':' sign"),
     );
-  }
+  };
 
   async function handle_initializer(loc: Loc): Promise<data> {
     switch (loc.t.content) {
       case "=":
-        return handle_value_initializer(loc);
+        return handle_value_initializer({ loc, ...data });
       case ":":
-        return handle_type_then_initializer(loc);
+        return handle_type_then_initializer({ loc, ...data });
       default:
         syntax_error(loc);
     }
@@ -1056,6 +1072,7 @@ const postexpand_body = (sort: "type" | "value") => (data: data) => {
                   case "lexical": {
                     return cont({ ...data, loc: rename(loc, binding.name) });
                   }
+                  case "imported_type":
                   case "imported_lexical": {
                     const { imp, counters } = data;
                     const existing = (imp[label.cuid] ?? {})[label.name];
@@ -1069,7 +1086,13 @@ const postexpand_body = (sort: "type" | "value") => (data: data) => {
                         ...imp,
                         [label.cuid]: {
                           ...(imp[label.cuid] ?? {}),
-                          [label.name]: { type: "value", new_name },
+                          [label.name]: {
+                            type: {
+                              imported_lexical: "value" as const,
+                              imported_type: "type" as const,
+                            }[binding.type],
+                            new_name,
+                          },
                         },
                       };
                       return cont({

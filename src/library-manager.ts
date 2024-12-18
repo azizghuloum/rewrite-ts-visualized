@@ -19,7 +19,7 @@ import { Binding, CompilationUnit, Context, Loc } from "./syntax-structures";
 import stringify from "json-stringify-pretty-compact";
 import { init_global_context } from "./global-module";
 
-const cookie = "rewrite-ts-008";
+const cookie = "rewrite-ts-009";
 
 type module_state =
   | { type: "initial" }
@@ -243,6 +243,8 @@ class RtsModule implements imported_module {
     switch (binding.type) {
       case "lexical":
         return { type: "imported_lexical", cuid: this.state.cid, name: binding.name };
+      case "type":
+        return { type: "imported_type", cuid: this.state.cid, name: binding.name };
       default:
         throw new Error(`unhandled binding type ${binding.type}`);
     }

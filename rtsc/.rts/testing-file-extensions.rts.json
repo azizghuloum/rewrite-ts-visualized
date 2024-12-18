@@ -1,13 +1,13 @@
 {
   "cid": "rtsc/testing-file-extensions.rts rewrite-ts-visualized 0.0.0",
-  "cookie": "rewrite-ts-008",
+  "cookie": "rewrite-ts-009",
   "exported_identifiers": {
     "x": [
       {
         "type": "value",
         "label": {
           "cuid": "rtsc/testing-file-extensions.rts rewrite-ts-visualized 0.0.0",
-          "name": "l3"
+          "name": "l2"
         }
       }
     ],
@@ -16,15 +16,15 @@
         "type": "type",
         "label": {
           "cuid": "rtsc/testing-file-extensions.rts rewrite-ts-visualized 0.0.0",
-          "name": "l8"
+          "name": "l5"
         }
       }
     ]
   },
   "context": {
-    "l1": {"type": "lexical", "name": "y_2"},
-    "l3": {"type": "lexical", "name": "x_4"},
-    "l5": {
+    "l1": {"type": "lexical", "name": "y_1"},
+    "l2": {"type": "lexical", "name": "x_2"},
+    "l3": {
       "type": "syntax_rules_transformer",
       "clauses": [
         {
@@ -107,7 +107,7 @@
         }
       ]
     },
-    "l6": {"type": "type", "name": "t_local_7"},
-    "l8": {"type": "type", "name": "t_global_9"}
+    "l4": {"type": "type", "name": "t_local_3"},
+    "l5": {"type": "type", "name": "t_global_4"}
   }
 }

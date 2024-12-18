@@ -1,3 +1,3 @@
-import { x } from "./mod.rts";
-
-console.log(x);
+import { x, t } from "./mod.rts";
+const y: t = x;
+console.log(y);

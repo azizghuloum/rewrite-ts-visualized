@@ -1,6 +1,6 @@
 {
   "cid": "test-project/main.rts rewrite-ts-visualized 0.0.0",
-  "cookie": "rewrite-ts-008",
+  "cookie": "rewrite-ts-009",
   "exported_identifiers": {},
-  "context": {}
+  "context": {"l1": {"type": "lexical", "name": "y_1"}}
 }
