@@ -2,7 +2,6 @@
 
 import { basename, dirname, join } from "node:path";
 import TS from "typescript";
-import {} from "./testing-file-extensions.rts.ts";
 import { LibraryManager } from "../src/library-manager.ts";
 import { get_globals } from "../src/global-module.ts";
 import { core_patterns } from "../src/syntax-core-patterns.ts";

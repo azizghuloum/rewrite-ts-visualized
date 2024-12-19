@@ -5,7 +5,6 @@
     "npm:@eslint/js@^9.11.1": "9.15.0",
     "npm:@types/json-stable-stringify@^1.1.0": "1.1.0",
     "npm:@types/node@^22.10.1": "22.10.1",
-    "npm:@uiw/codemirror-theme-abcdef@^4.23.6": "4.23.6",
     "npm:@vitest/coverage-v8@^2.1.8": "2.1.8_vitest@2.1.8__@types+node@22.10.1__vite@5.4.11___@types+node@22.10.1_@types+node@22.10.1",
     "npm:globals@^15.13.0": "15.13.0",
     "npm:json-stable-stringify@^1.1.1": "1.1.1",
@@ -293,20 +292,6 @@
       "integrity": "sha512-qKgsUwfHZV2WCWLAnVP1JqnpE6Im6h3Y0+fYgMTasNQ7V++CBX5OT1as0g0f+OyubbFqhf6XVNIsmN4IIhEgGQ==",
       "dependencies": [
         "undici-types"
-      ]
-    },
-    "@uiw/codemirror-theme-abcdef@4.23.6": {
-      "integrity": "sha512-0RIwTzU4E0duFQcbWfPRm0cgsYbh/F5hJQlTW8BQc+keAIHD+Xsu8BQ7CEMQ6GCReQ2q2BkAhXhd2sPjxmuNsg==",
-      "dependencies": [
-        "@uiw/codemirror-themes"
-      ]
-    },
-    "@uiw/codemirror-themes@4.23.6_@codemirror+language@6.10.5_@codemirror+state@6.4.1_@codemirror+view@6.35.0": {
-      "integrity": "sha512-0dpuLQW+V6zrKvfvor/eo71V3tpr2L2Hsu8QZAdtSzksjWABxTOzH3ShaBRxCEsrz6sU9sa9o7ShwBMMDz59bQ==",
-      "dependencies": [
-        "@codemirror/language",
-        "@codemirror/state",
-        "@codemirror/view"
       ]
     },
     "@vitest/coverage-v8@2.1.8_vitest@2.1.8__@types+node@22.10.1__vite@5.4.11___@types+node@22.10.1_@types+node@22.10.1": {
@@ -942,8 +927,8 @@
         "npm:@types/node@^22.10.2",
         "npm:@types/react-dom@^19.0.2",
         "npm:@types/react@^19.0.1",
-        "npm:@uiw/codemirror-theme-abcdef@^4.23.6",
-        "npm:@uiw/react-codemirror@^4.23.6",
+        "npm:@uiw/codemirror-theme-abcdef@^4.23.7",
+        "npm:@uiw/react-codemirror@^4.23.7",
         "npm:@vitejs/plugin-react@^4.3.4",
         "npm:@vitest/coverage-v8@^2.1.8",
         "npm:eslint-plugin-react-hooks@^5.1.0",
