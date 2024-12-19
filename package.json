@@ -20,7 +20,7 @@
     "@types/babel__code-frame": "^7.0.6",
     "@types/json-stable-stringify": "^1.1.0",
     "@types/node": "^22.10.2",
-    "@uiw/codemirror-theme-abcdef": "^4.23.6",
+    "@uiw/codemirror-theme-abcdef": "^4.23.7",
     "@uiw/react-codemirror": "^4.23.7",
     "index-to-position": "^1.0.0",
     "json-stable-stringify": "^1.1.1",
