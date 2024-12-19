@@ -23,7 +23,7 @@
     "@uiw/codemirror-theme-abcdef": "^4.23.7",
     "@uiw/react-codemirror": "^4.23.7",
     "index-to-position": "^1.0.0",
-    "json-stable-stringify": "^1.1.1",
+    "json-stable-stringify": "^1.2.0",
     "json-stringify-pretty-compact": "^4.0.0",
     "prettier": "^3.4.2",
     "react": "^19.0.0",
