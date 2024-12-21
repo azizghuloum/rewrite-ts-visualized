@@ -935,6 +935,7 @@
         "npm:eslint-plugin-react-refresh@~0.4.16",
         "npm:eslint@^9.17.0",
         "npm:globals@^15.13.0",
+        "npm:ignore@^6.0.2",
         "npm:index-to-position@1",
         "npm:json-stable-stringify@^1.1.1",
         "npm:json-stringify-pretty-compact@4",
