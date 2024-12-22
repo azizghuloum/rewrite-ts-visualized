@@ -64,9 +64,10 @@ class RtsModule implements imported_module {
     switch (this.state.type) {
       case "initial":
         return this.initialize().then(() => this.ensureUpToDate());
+      case "initializing":
+        return this.state.promise.then(() => this.ensureUpToDate());
       case "stale":
         return this.recompile().then(() => this.ensureUpToDate());
-      case "initializing":
       case "fresh":
       case "error":
         return;
@@ -102,7 +103,7 @@ class RtsModule implements imported_module {
     const json_mtime = await mtime(json_path);
     const my_mtime = await mtime(this.path);
     assert(my_mtime !== undefined);
-    if (my_mtime >= (json_mtime ?? 0)) {
+    if (json_mtime === undefined || my_mtime >= json_mtime) {
       this.state = { type: "stale", cid, pkg, pkg_relative_path };
       return;
     }
@@ -115,9 +116,9 @@ class RtsModule implements imported_module {
     assert(json.exported_identifiers !== undefined, `no exported_identifiers in ${json_path}`);
     assert(json.context !== undefined, `no exported_identifiers in ${json_path}`);
     assert(json.imports);
-    const imported_modules: imported_module[] = await Promise.all(
-      json.imports.map(
-        (x: { pkg: { name: string; version: string }; pkg_relative_path: string }) => {
+    const imported_modules = await Promise.all(
+      (json.imports as { pkg: { name: string; version: string }; pkg_relative_path: string }[]).map(
+        (x) => {
           const {
             pkg: { name, version },
             pkg_relative_path,
@@ -130,7 +131,7 @@ class RtsModule implements imported_module {
         },
       ),
     );
-    if (imported_modules.some((x) => x.get_mtime() > my_mtime)) {
+    if (imported_modules.some((x) => x.get_mtime() > json_mtime)) {
       this.state = { type: "stale", cid, pkg, pkg_relative_path };
       return;
     }
@@ -144,7 +145,7 @@ class RtsModule implements imported_module {
       exported_identifiers: json.exported_identifiers,
       context: json.context,
       unit: json.unit,
-      mtime: my_mtime,
+      mtime: json_mtime,
     };
   }
 
@@ -232,14 +233,14 @@ class RtsModule implements imported_module {
         exported_identifiers,
         context,
         unit,
-        mtime: Date.now(),
       };
       const code_path = this.get_generated_code_absolute_path();
       await fs.mkdir(dirname(code_path), { recursive: true });
       await fs.writeFile(code_path, await pprint(loc));
       await fs.writeFile(this.get_proxy_path(), proxy_code);
+      const mtime = Date.now();
       await fs.writeFile(this.get_json_path(), stringify(json_content));
-      this.state = { ...this.state, type: "fresh", ...json_content };
+      this.state = { ...this.state, type: "fresh", ...json_content, mtime };
     } catch (error) {
       if (error instanceof StxError) {
         await print_stx_error(error, this.library_manager);
@@ -320,7 +321,7 @@ class RtsModule implements imported_module {
     import_path: string,
     loc: Loc,
   ): Promise<imported_module> {
-    const mod = await this.library_manager.do_import(import_path, this.path);
+    const mod = this.library_manager.do_import(import_path, this.path);
     if (this.imported_modules.includes(mod)) return mod;
     const self = this;
     function check(mod: imported_module) {
@@ -359,8 +360,7 @@ export class LibraryManager {
   private libs: string[];
   private global_unit: CompilationUnit;
   private global_context: Context;
-  private modules_by_path: { [path: string]: imported_module } = {};
-  private modules_by_cid: { [cid: string]: imported_module } = {};
+  private modules: { [path: string]: imported_module } = {};
   private packages: { [dir: string]: Package } = {};
 
   constructor(patterns: { [k: string]: AST }, globals: string[], libs: string[]) {
@@ -370,18 +370,16 @@ export class LibraryManager {
     this.global_context = global_context;
   }
 
-  private async get_or_create_module(path: string) {
-    const existing = this.modules_by_path[path];
+  private get_or_create_module(path: string) {
+    const existing = this.modules[path];
     if (existing) return existing;
     const mod = new RtsModule(path, this, this.libs, this.global_unit, this.global_context);
-    this.modules_by_path[path] = mod;
-    await mod.initialize();
-    this.modules_by_cid[mod.get_cid()] = mod;
+    this.modules[path] = mod;
     return mod;
   }
 
   async ensureUpToDate(path: string) {
-    const mod = await this.get_or_create_module(path);
+    const mod = this.get_or_create_module(path);
     await mod.ensureUpToDate();
     return mod;
   }
