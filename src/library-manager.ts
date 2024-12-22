@@ -52,6 +52,7 @@ class RtsModule implements imported_module {
   private global_unit: CompilationUnit;
   private global_context: Context;
   public imported_modules: imported_module[] = [];
+  public dependant_modules: imported_module[] = [];
 
   constructor(
     path: string,
@@ -145,6 +146,7 @@ class RtsModule implements imported_module {
       return;
     }
     this.imported_modules = imported_modules;
+    imported_modules.forEach((x) => x.dependant_modules.push(this));
     console.log(`up to date ${cid}`);
     this.state = {
       type: "fresh",
@@ -275,6 +277,24 @@ class RtsModule implements imported_module {
     }
   }
 
+  async force_recompile() {
+    const state = this.state;
+    await this.ensureUpToDate();
+    assert(state.type === "fresh");
+    this.state = { ...state, type: "stale" };
+    const dependant_modules = this.dependant_modules;
+    dependant_modules.forEach(
+      (x) => (x.imported_modules = x.imported_modules.filter((x) => x !== this)),
+    );
+    this.dependant_modules = [];
+    this.imported_modules.forEach(
+      (x) => (x.dependant_modules = x.dependant_modules.filter((x) => x !== this)),
+    );
+    this.imported_modules = [];
+    dependant_modules.forEach((x) => x.force_recompile());
+    this.ensureUpToDate();
+  }
+
   async file_changed(): Promise<void> {
     const t = await mtime(this.path);
     await this.ensureUpToDate();
@@ -282,8 +302,7 @@ class RtsModule implements imported_module {
     switch (state.type) {
       case "fresh": {
         if (t && t > state.mtime) {
-          this.state = { ...state, type: "stale" };
-          this.ensureUpToDate();
+          this.force_recompile();
         }
         return;
       }
@@ -373,6 +392,7 @@ class RtsModule implements imported_module {
     }
     check(mod);
     this.imported_modules.push(mod);
+    mod.dependant_modules.push(self);
     return mod;
   }
 
