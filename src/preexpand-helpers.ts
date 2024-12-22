@@ -18,6 +18,7 @@ export type imported_module = {
   get_pkg_and_path(): [{ name: string; version: string }, string];
   resolve_rib: (rib_id: string) => Rib;
   get_mtime(): number;
+  file_changed(): Promise<void>;
 };
 
 export type manager = {

@@ -26,6 +26,13 @@ type module_state =
   | { type: "initializing"; promise: Promise<void> }
   | { type: "stale"; cid: string; pkg: Package; pkg_relative_path: string }
   | {
+      type: "compiling";
+      cid: string;
+      pkg: Package;
+      pkg_relative_path: string;
+      promise: Promise<void>;
+    }
+  | {
       type: "fresh";
       cid: string;
       pkg: Package;
@@ -68,6 +75,8 @@ class RtsModule implements imported_module {
         return this.state.promise.then(() => this.ensureUpToDate());
       case "stale":
         return this.recompile().then(() => this.ensureUpToDate());
+      case "compiling":
+        return this.state.promise.then(() => this.ensureUpToDate());
       case "fresh":
       case "error":
         return;
@@ -95,7 +104,7 @@ class RtsModule implements imported_module {
   }
 
   private async do_initialize() {
-    assert(this.state.type === "initial");
+    assert(this.state.type === "initial", `invalid state ${this.state.type}`);
     const [pkg, pkg_relative_path] = await this.library_manager.findPackage(this.path);
     const cid = `${pkg_relative_path} ${pkg.name} ${pkg.version}`;
     console.log(`initializing ${cid}`);
@@ -161,17 +170,18 @@ class RtsModule implements imported_module {
     }
   }
 
-  async recompile() {
-    assert(this.state.type === "stale");
-    console.log(`recompiling ${this.state.cid} ...`);
+  async do_recompile() {
+    const state = this.state;
+    assert(state.type === "stale");
+    console.log(`recompiling ${state.cid} ...`);
     const code = await fs.readFile(this.path, { encoding: "utf-8" });
-    const my_pkg = this.state.pkg;
-    const my_path = this.state.pkg_relative_path;
+    const my_pkg = state.pkg;
+    const my_path = state.pkg_relative_path;
     const source_file: source_file = {
       package: { name: my_pkg.name, version: my_pkg.version },
       path: my_path,
     };
-    const [_loc0, expand] = initial_step(parse(code, source_file), this.state.cid, this.libs);
+    const [_loc0, expand] = initial_step(parse(code, source_file), state.cid, this.libs);
     try {
       const helpers: preexpand_helpers = {
         manager: {
@@ -220,11 +230,11 @@ class RtsModule implements imported_module {
       );
       const exported_identifiers = get_exported_identifiers_from_rib(
         modular.explicit,
-        this.state.cid,
+        state.cid,
         context,
       );
       const json_content = {
-        cid: this.state.cid,
+        cid: state.cid,
         cookie,
         imports: this.imported_modules.map((x) => {
           const [pkg, path] = x.get_pkg_and_path();
@@ -240,14 +250,45 @@ class RtsModule implements imported_module {
       await fs.writeFile(this.get_proxy_path(), proxy_code);
       const mtime = Date.now();
       await fs.writeFile(this.get_json_path(), stringify(json_content));
-      this.state = { ...this.state, type: "fresh", ...json_content, mtime };
+      this.state = { ...state, type: "fresh", ...json_content, mtime };
+      console.log(`up to date ${state.cid}`);
     } catch (error) {
+      this.state = { type: "error", reason: String(error) };
       if (error instanceof StxError) {
         await print_stx_error(error, this.library_manager);
       } else {
         console.error(error);
       }
-      this.state = { type: "error", reason: String(error) };
+    }
+  }
+
+  async recompile() {
+    const state = this.state;
+    switch (state.type) {
+      case "stale": {
+        const promise = this.do_recompile();
+        this.state = { ...state, type: "compiling", promise };
+        return promise;
+      }
+      case "compiling":
+        return state.promise;
+    }
+  }
+
+  async file_changed(): Promise<void> {
+    const t = await mtime(this.path);
+    await this.ensureUpToDate();
+    const state = this.state;
+    switch (state.type) {
+      case "fresh": {
+        if (t && t > state.mtime) {
+          this.state = { ...state, type: "stale" };
+          this.ensureUpToDate();
+        }
+        return;
+      }
+      default:
+        throw new Error(`invalid state? '${state.type}'`);
     }
   }
 
@@ -264,13 +305,13 @@ class RtsModule implements imported_module {
   }
 
   get_cid(): string {
-    //await this.ensureUpToDate();
     switch (this.state.type) {
       case "fresh":
       case "stale":
+      case "compiling":
         return this.state.cid;
       default:
-        throw new Error(`invalid state`);
+        throw new Error(`invalid state ${this.state.type}`);
     }
   }
 
@@ -356,15 +397,25 @@ class Package {
   }
 }
 
+type watcher = {
+  close: () => void;
+};
+
+type host = {
+  watchFile: (path: string, callback: (path: string) => void) => watcher;
+};
+
 export class LibraryManager {
   private libs: string[];
   private global_unit: CompilationUnit;
   private global_context: Context;
   private modules: { [path: string]: imported_module } = {};
   private packages: { [dir: string]: Package } = {};
+  private host: host;
 
-  constructor(patterns: { [k: string]: AST }, globals: string[], libs: string[]) {
+  constructor(patterns: { [k: string]: AST }, globals: string[], libs: string[], host: host) {
     this.libs = libs;
+    this.host = host;
     const [global_unit, global_context] = init_global_context(patterns, globals);
     this.global_unit = global_unit;
     this.global_context = global_context;
@@ -375,6 +426,10 @@ export class LibraryManager {
     if (existing) return existing;
     const mod = new RtsModule(path, this, this.libs, this.global_unit, this.global_context);
     this.modules[path] = mod;
+    const watcher = this.host.watchFile(path, (p) => {
+      if (p !== path) return;
+      mod.file_changed();
+    });
     return mod;
   }
 

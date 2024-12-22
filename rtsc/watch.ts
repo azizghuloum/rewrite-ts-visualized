@@ -7,10 +7,6 @@ import { get_globals } from "../src/global-module.ts";
 import { core_patterns } from "../src/syntax-core-patterns.ts";
 import { parse } from "../src/parse.ts";
 
-const globals = get_globals("es2024.full");
-const patterns = core_patterns(parse);
-const library_manager = new LibraryManager(patterns, globals, ["es2024.full"]);
-
 const watch_reporter: TS.WatchStatusReporter = (diagnostics, _newline, _options, error_count) => {
   console.log(`rtsc: ${diagnostics.messageText}`);
   if (error_count) {
@@ -68,7 +64,8 @@ function check_path(path: string) {
   if (path.endsWith(suffix)) {
     const module_dir = dirname(path);
     const module_name = basename(path, suffix) + ".rts";
-    const rts_file = join(module_dir, module_name);
+    if (host.realpath === undefined) throw new Error("host has no real path");
+    const rts_file = host.realpath(join(module_dir, module_name));
     if (fileExists(rts_file)) {
       library_manager.ensureUpToDate(rts_file);
     }
@@ -95,5 +92,9 @@ host.watchDirectory = (path, callback, recursive, options) => {
   dir_watchers[path] = callback;
   return watchDirectory(path, callback, recursive, options);
 };
+
+const globals = get_globals("es2024.full");
+const patterns = core_patterns(parse);
+const library_manager = new LibraryManager(patterns, globals, ["es2024.full"], host);
 
 const prog = TS.createWatchProgram(host);
