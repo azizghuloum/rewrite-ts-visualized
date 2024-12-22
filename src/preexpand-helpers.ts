@@ -17,6 +17,7 @@ export type imported_module = {
   resolve_label(name: string): Promise<Binding>;
   get_pkg_and_path(): [{ name: string; version: string }, string];
   resolve_rib: (rib_id: string) => Rib;
+  get_mtime(): number;
 };
 
 export type manager = {
