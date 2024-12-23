@@ -381,7 +381,7 @@ class RtsModule implements imported_module {
     import_path: string,
     loc: Loc,
   ): Promise<imported_module> {
-    const mod = this.library_manager.do_import(import_path, this.path);
+    const mod = await this.library_manager.do_import(import_path, this.path);
     if (this.imported_modules.includes(mod)) return mod;
     const self = this;
     function check(mod: imported_module) {
@@ -405,15 +405,19 @@ class RtsModule implements imported_module {
   }
 }
 
+type package_props = { types_file?: string };
+
 class Package {
   name: string;
   version: string;
   dir: string;
+  props: package_props;
 
-  constructor(name: string, version: string, dir: string) {
+  constructor(name: string, version: string, dir: string, props?: package_props) {
     this.name = name;
     this.version = version;
     this.dir = dir;
+    this.props = props ?? {};
   }
 }
 
@@ -444,7 +448,15 @@ export class LibraryManager {
   private get_or_create_module(path: string) {
     const existing = this.modules[path];
     if (existing) return existing;
-    const mod = new RtsModule(path, this, this.libs, this.global_unit, this.global_context);
+    const mod = (() => {
+      if (path.endsWith(".rts")) {
+        return new RtsModule(path, this, this.libs, this.global_unit, this.global_context);
+      } else if (path.endsWith(".d.ts")) {
+        throw new Error(`TODO import .d.ts ${path}`);
+      } else {
+        throw new Error(`don't know how to import ${path}`);
+      }
+    })();
     this.modules[path] = mod;
     const watcher = this.host.watchFile(path, (p) => {
       if (p !== path) return;
@@ -465,20 +477,20 @@ export class LibraryManager {
 
   async findPackage(path: string): Promise<[Package, string]> {
     const base = basename(path);
-    const dir = dirname(path);
-    const existing = this.packages[dir];
+    const pkg_dir = dirname(path);
+    const existing = this.packages[pkg_dir];
     if (existing) return [existing, base];
-    const pkg_path = join(dir, "package.json");
+    const pkg_path = join(pkg_dir, "package.json");
     try {
       const content = await fs.readFile(pkg_path, { encoding: "utf8" });
       const json = JSON.parse(content);
       const { name, version } = json;
       assert(typeof name === "string");
       assert(typeof version === "string");
-      return [(this.packages[dir] ??= new Package(name, version, dir)), base];
+      return [(this.packages[pkg_dir] ??= new Package(name, version, pkg_dir)), base];
     } catch (err: any) {
       if (err?.code === "ENOENT") {
-        const [pkg, pkg_base] = await this.findPackage(dir);
+        const [pkg, pkg_base] = await this.findPackage(pkg_dir);
         return [pkg, join(pkg_base, base)];
       } else {
         throw err;
@@ -486,7 +498,31 @@ export class LibraryManager {
     }
   }
 
-  do_import(import_path: string, importer_path: string) {
+  async resolve_node_module_package(pkg_name: string, dir: string): Promise<Package> {
+    const pkg_dir = `${dir}/node_modules/${pkg_name}`;
+    const existing = this.packages[pkg_dir];
+    if (existing) return existing;
+    const pkg_path = join(pkg_dir, "package.json");
+    try {
+      const content = await fs.readFile(pkg_path, { encoding: "utf8" });
+      const json = JSON.parse(content);
+      const { name, version, types } = json;
+      assert(name === pkg_name);
+      assert(typeof version === "string");
+      assert(typeof types === "string");
+      return (this.packages[pkg_dir] ??= new Package(pkg_name, version, pkg_dir, {
+        types_file: types,
+      }));
+    } catch (err: any) {
+      if (err?.code === "ENOENT") {
+        return this.resolve_node_module_package(pkg_name, dirname(dir));
+      } else {
+        throw err;
+      }
+    }
+  }
+
+  async do_import(import_path: string, importer_path: string) {
     function is_relative(path: string): boolean {
       return path.startsWith("./") || path.startsWith("../");
     }
@@ -494,12 +530,20 @@ export class LibraryManager {
       const path = dirname(importer_path) + "/" + import_path;
       return normalize(path);
     }
-    function find_absolute_path(_import_path: string): string {
-      throw new Error("TODO find_absolute_path");
-    }
+    const find_absolute_path = async (import_path: string) => {
+      const b = basename(import_path);
+      if (b === import_path) {
+        const pkg = await this.resolve_node_module_package(b, dirname(importer_path));
+        assert(pkg.props.types_file !== undefined, `no types_file found in ${pkg.name}`);
+        const types_path = join(pkg.dir, pkg.props.types_file);
+        return types_path;
+      } else {
+        throw new Error(`TODO nested import of ${b} from ${dirname(import_path)}`);
+      }
+    };
     const actual_path = is_relative(import_path)
       ? join_relative(import_path, importer_path)
-      : find_absolute_path(import_path);
+      : await find_absolute_path(import_path);
     const mod = this.get_or_create_module(actual_path);
     return mod;
   }
