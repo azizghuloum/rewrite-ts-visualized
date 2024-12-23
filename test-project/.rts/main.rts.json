@@ -1,6 +1,12 @@
 {
   "cid": "test-project/main.rts rewrite-ts-visualized 0.0.0",
-  "cookie": "rewrite-ts-013",
+  "cookie": "rewrite-ts-016",
+  "imports": [
+    {
+      "pkg": {"name": "rewrite-ts-visualized", "version": "0.0.0"},
+      "pkg_relative_path": "test-project/mod.rts"
+    }
+  ],
   "exported_identifiers": {},
   "context": {"l1": {"type": "lexical", "name": "y_1"}},
   "unit": {

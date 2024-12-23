@@ -10,6 +10,7 @@ export type import_resolution = {
 
 export type imported_module = {
   imported_modules: imported_module[];
+  dependant_modules: imported_module[];
   resolve_exported_identifier: (name: string, loc: Loc) => Promise<import_resolution[]>;
   ensureUpToDate(): Promise<void>;
   get_cid(): string;
@@ -17,6 +18,9 @@ export type imported_module = {
   resolve_label(name: string): Promise<Binding>;
   get_pkg_and_path(): [{ name: string; version: string }, string];
   resolve_rib: (rib_id: string) => Rib;
+  get_mtime(): number;
+  file_changed(): Promise<void>;
+  force_recompile(): Promise<void>;
 };
 
 export type manager = {
