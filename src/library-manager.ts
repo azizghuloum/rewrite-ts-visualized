@@ -420,8 +420,8 @@ class DtsModule extends Module {
     const my_pkg = state.pkg;
     const my_path = state.pkg_relative_path;
     const code = await fs.readFile(this.path, { encoding: "utf-8" });
-    const stuff = parse_dts(code, my_path);
-    console.log(stuff);
+    const ts_exports = parse_dts(code, my_path);
+    console.log(ts_exports);
     throw new Error("not yet");
   }
 }

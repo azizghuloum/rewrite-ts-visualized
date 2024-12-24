@@ -1,7 +1,13 @@
 import TS from "typescript";
 import { assert } from "./assert";
 
-function parse_statements(statements: TS.NodeArray<TS.Statement>) {
+export type ts_export_binding =
+  | { type: "local"; name: string; is_type: boolean; is_lexical: boolean }
+  | { type: "imported"; name: string | undefined; module: string; type_only: boolean };
+
+export type ts_exports = { [id: string]: ts_export_binding };
+
+function parse_statements(statements: TS.NodeArray<TS.Statement>): ts_exports {
   // type id = ...
   const types: { [id: string]: { global: boolean } } = {};
   // const id = ...
@@ -26,6 +32,45 @@ function parse_statements(statements: TS.NodeArray<TS.Statement>) {
       origin_module: string | undefined;
     };
   } = {};
+
+  function extract_exports(): ts_exports {
+    const all_exports: ts_exports = {};
+    Object.entries(exported).forEach(([id, { global, type_only, origin_name, origin_module }]) => {
+      if (global) return;
+      assert(!all_exports[id]);
+      if (origin_module === undefined) {
+        if (imported[origin_name]) {
+          assert(!types[origin_name]);
+          assert(!namespace_imported[origin_name]);
+          assert(!lexicals[origin_name]);
+          assert(!id_namespaces[origin_name]);
+          const { origin_name: name, origin_module: module, global } = imported[origin_name];
+          assert(!global);
+          all_exports[id] = { type: "imported", name, module, type_only };
+        } else if (type_only) {
+          const t = types[origin_name];
+          assert(t !== undefined);
+          all_exports[id] = { type: "local", name: origin_name, is_type: true, is_lexical: false };
+        } else if (namespace_imported[origin_name]) {
+          assert(!types[origin_name]);
+          assert(!lexicals[origin_name]);
+          assert(!id_namespaces[origin_name]);
+          const { origin_module: module, global } = namespace_imported[origin_name];
+          assert(!global);
+          all_exports[id] = { type: "imported", name: undefined, module, type_only: false };
+        } else {
+          const is_type = !!types[origin_name];
+          const is_lexical = !!lexicals[origin_name];
+          assert(is_type || is_lexical);
+          assert(!id_namespaces[origin_name]);
+          all_exports[id] = { type: "local", name: origin_name, is_type, is_lexical };
+        }
+      } else {
+        all_exports[id] = { type: "imported", name: origin_name, module: origin_module, type_only };
+      }
+    });
+    return all_exports;
+  }
 
   function handle_main_definition(global: boolean) {
     function push_lexical(name: string) {
@@ -222,24 +267,15 @@ function parse_statements(statements: TS.NodeArray<TS.Statement>) {
     return handle_statement;
   }
   statements.forEach(handle_main_definition(false));
-  return {
-    types,
-    lexicals,
-    imported,
-    namespace_imported,
-    exported,
-    id_namespaces,
-    literal_namespaces,
-  };
+  return extract_exports();
 }
 
-export function parse_dts(code: string, my_path: string) {
+export function parse_dts(code: string, my_path: string): ts_exports {
   const options: TS.CreateSourceFileOptions = {
     languageVersion: TS.ScriptTarget.ESNext,
     jsDocParsingMode: TS.JSDocParsingMode.ParseNone,
   };
   const src = TS.createSourceFile(my_path, code, options);
   if (src.libReferenceDirectives.length !== 0) throw new Error("not handled");
-  const data = parse_statements(src.statements);
-  console.log(data);
+  return parse_statements(src.statements);
 }
