@@ -18,6 +18,7 @@ import { normalize } from "node:path";
 import { Binding, CompilationUnit, Context, Loc, Rib } from "./syntax-structures";
 import stringify from "json-stringify-pretty-compact";
 import { init_global_context } from "./global-module";
+import { parse_dts } from "./parse-dts";
 
 const cookie = "rewrite-ts-016";
 
@@ -44,15 +45,17 @@ type module_state =
     }
   | { type: "error"; reason: string };
 
-class RtsModule implements imported_module {
-  private path: string;
-  private library_manager: LibraryManager;
-  private state: module_state = { type: "initial" };
-  private libs: string[];
-  private global_unit: CompilationUnit;
-  private global_context: Context;
-  public imported_modules: imported_module[] = [];
-  public dependant_modules: imported_module[] = [];
+abstract class Module implements imported_module {
+  path: string;
+  library_manager: LibraryManager;
+  state: module_state = { type: "initial" };
+  libs: string[];
+  global_unit: CompilationUnit;
+  global_context: Context;
+  imported_modules: imported_module[] = [];
+  dependant_modules: imported_module[] = [];
+
+  abstract do_recompile(): Promise<void>;
 
   constructor(
     path: string,
@@ -88,20 +91,8 @@ class RtsModule implements imported_module {
     }
   }
 
-  private get_json_path(): string {
+  get_json_path(): string {
     return join(dirname(this.path), ".rts", basename(this.path) + ".json");
-  }
-
-  private get_generated_code_absolute_path(): string {
-    return join(dirname(this.path), ".rts", basename(this.path) + ".ts");
-  }
-
-  private get_generated_code_relative_path(): string {
-    return "./.rts/" + basename(this.path) + ".ts";
-  }
-
-  private get_proxy_path(): string {
-    return this.path + ".ts";
   }
 
   private async do_initialize() {
@@ -169,98 +160,6 @@ class RtsModule implements imported_module {
       }
       case "initializing":
         return this.state.promise;
-    }
-  }
-
-  async do_recompile() {
-    const state = this.state;
-    assert(state.type === "stale");
-    console.log(`recompiling ${state.cid} ...`);
-    const code = await fs.readFile(this.path, { encoding: "utf-8" });
-    const my_pkg = state.pkg;
-    const my_path = state.pkg_relative_path;
-    const source_file: source_file = {
-      package: { name: my_pkg.name, version: my_pkg.version },
-      path: my_path,
-    };
-    const [_loc0, expand] = initial_step(parse(code, source_file), state.cid, this.libs);
-    try {
-      const helpers: preexpand_helpers = {
-        manager: {
-          resolve_import: async (loc) => {
-            assert(loc.t.tag === "string");
-            const import_path = JSON.parse(loc.t.content);
-            const mod = this.get_imported_modules_for_path(import_path, loc);
-            return mod;
-          },
-          resolve_label: async (label) => {
-            const mod = this.find_module_by_cid(label.cuid);
-            if (!mod) throw new Error(`cannot find module with cuid = ${label.cuid}`);
-            return mod.resolve_label(label.name);
-          },
-          get_import_path: async (cuid) => {
-            const mod = this.find_module_by_cid(cuid);
-            if (!mod) throw new Error(`cannot find module with cuid = ${cuid}`);
-            const [mod_pkg, mod_path] = mod.get_pkg_and_path();
-            if (mod_pkg === my_pkg) {
-              const dir0 = join(dirname(my_path), ".rts");
-              const dir1 = join(dirname(mod_path), ".rts");
-              if (dir0 !== dir1) throw new Error(`TODO relative path imports`);
-              return `./${basename(mod_path)}.ts`;
-            } else {
-              throw new Error(`TODO cross package imports`);
-            }
-          },
-          resolve_rib: (rib_id, cuid) => {
-            const mod = this.find_module_by_cid(cuid);
-            if (!mod) throw new Error(`cannot find module with cuid = ${cuid}`);
-            return mod.resolve_rib(rib_id);
-          },
-        },
-        global_unit: this.global_unit,
-        global_context: this.global_context,
-        inspect(_loc, _reason, k) {
-          return k();
-        },
-      };
-      const { loc, unit, context, modular } = await expand(helpers);
-      assert(modular.extensible);
-      const proxy_code = generate_proxy_code(
-        this.get_generated_code_relative_path(),
-        modular,
-        context,
-      );
-      const exported_identifiers = get_exported_identifiers_from_rib(
-        modular.explicit,
-        state.cid,
-        context,
-      );
-      const json_content = {
-        cid: state.cid,
-        cookie,
-        imports: this.imported_modules.map((x) => {
-          const [pkg, path] = x.get_pkg_and_path();
-          return { pkg: { name: pkg.name, version: pkg.version }, pkg_relative_path: path };
-        }),
-        exported_identifiers,
-        context,
-        unit,
-      };
-      const code_path = this.get_generated_code_absolute_path();
-      await fs.mkdir(dirname(code_path), { recursive: true });
-      await fs.writeFile(code_path, await pprint(loc));
-      await fs.writeFile(this.get_proxy_path(), proxy_code);
-      const mtime = Date.now();
-      await fs.writeFile(this.get_json_path(), stringify(json_content));
-      this.state = { ...state, type: "fresh", ...json_content, mtime };
-      console.log(`up to date ${state.cid}`);
-    } catch (error) {
-      this.state = { type: "error", reason: String(error) };
-      if (error instanceof StxError) {
-        await print_stx_error(error, this.library_manager);
-      } else {
-        console.error(error);
-      }
     }
   }
 
@@ -377,10 +276,7 @@ class RtsModule implements imported_module {
     return [this.state.pkg, this.state.pkg_relative_path];
   }
 
-  private async get_imported_modules_for_path(
-    import_path: string,
-    loc: Loc,
-  ): Promise<imported_module> {
+  async get_imported_modules_for_path(import_path: string, loc: Loc): Promise<imported_module> {
     const mod = await this.library_manager.do_import(import_path, this.path);
     if (this.imported_modules.includes(mod)) return mod;
     const self = this;
@@ -402,6 +298,131 @@ class RtsModule implements imported_module {
     const rib = unit.store[rib_id];
     assert(rib !== undefined);
     return rib;
+  }
+
+  get_preexpand_helpers(my_pkg: Package, my_path: string): preexpand_helpers {
+    const helpers: preexpand_helpers = {
+      manager: {
+        resolve_import: async (loc) => {
+          assert(loc.t.tag === "string");
+          const import_path = JSON.parse(loc.t.content);
+          const mod = this.get_imported_modules_for_path(import_path, loc);
+          return mod;
+        },
+        resolve_label: async (label) => {
+          const mod = this.find_module_by_cid(label.cuid);
+          if (!mod) throw new Error(`cannot find module with cuid = ${label.cuid}`);
+          return mod.resolve_label(label.name);
+        },
+        get_import_path: async (cuid) => {
+          const mod = this.find_module_by_cid(cuid);
+          if (!mod) throw new Error(`cannot find module with cuid = ${cuid}`);
+          const [mod_pkg, mod_path] = mod.get_pkg_and_path();
+          if (mod_pkg === my_pkg) {
+            const dir0 = join(dirname(my_path), ".rts");
+            const dir1 = join(dirname(mod_path), ".rts");
+            if (dir0 !== dir1) throw new Error(`TODO relative path imports`);
+            return `./${basename(mod_path)}.ts`;
+          } else {
+            throw new Error(`TODO cross package imports`);
+          }
+        },
+        resolve_rib: (rib_id, cuid) => {
+          const mod = this.find_module_by_cid(cuid);
+          if (!mod) throw new Error(`cannot find module with cuid = ${cuid}`);
+          return mod.resolve_rib(rib_id);
+        },
+      },
+      global_unit: this.global_unit,
+      global_context: this.global_context,
+      inspect(_loc, _reason, k) {
+        return k();
+      },
+    };
+    return helpers;
+  }
+}
+
+class RtsModule extends Module {
+  private get_generated_code_absolute_path(): string {
+    return join(dirname(this.path), ".rts", basename(this.path) + ".ts");
+  }
+
+  private get_generated_code_relative_path(): string {
+    return "./.rts/" + basename(this.path) + ".ts";
+  }
+
+  private get_proxy_path(): string {
+    return this.path + ".ts";
+  }
+
+  async do_recompile() {
+    const state = this.state;
+    assert(state.type === "stale");
+    console.log(`recompiling ${state.cid} ...`);
+    const code = await fs.readFile(this.path, { encoding: "utf-8" });
+    const my_pkg = state.pkg;
+    const my_path = state.pkg_relative_path;
+    const source_file: source_file = {
+      package: { name: my_pkg.name, version: my_pkg.version },
+      path: my_path,
+    };
+    const [_loc0, expand] = initial_step(parse(code, source_file), state.cid, this.libs);
+    try {
+      const helpers = this.get_preexpand_helpers(my_pkg, my_path);
+      const { loc, unit, context, modular } = await expand(helpers);
+      assert(modular.extensible);
+      const proxy_code = generate_proxy_code(
+        this.get_generated_code_relative_path(),
+        modular,
+        context,
+      );
+      const exported_identifiers = get_exported_identifiers_from_rib(
+        modular.explicit,
+        state.cid,
+        context,
+      );
+      const json_content = {
+        cid: state.cid,
+        cookie,
+        imports: this.imported_modules.map((x) => {
+          const [pkg, path] = x.get_pkg_and_path();
+          return { pkg: { name: pkg.name, version: pkg.version }, pkg_relative_path: path };
+        }),
+        exported_identifiers,
+        context,
+        unit,
+      };
+      const code_path = this.get_generated_code_absolute_path();
+      await fs.mkdir(dirname(code_path), { recursive: true });
+      await fs.writeFile(code_path, await pprint(loc));
+      await fs.writeFile(this.get_proxy_path(), proxy_code);
+      const mtime = Date.now();
+      await fs.writeFile(this.get_json_path(), stringify(json_content));
+      this.state = { ...state, type: "fresh", ...json_content, mtime };
+      console.log(`up to date ${state.cid}`);
+    } catch (error) {
+      this.state = { type: "error", reason: String(error) };
+      if (error instanceof StxError) {
+        await print_stx_error(error, this.library_manager);
+      } else {
+        console.error(error);
+      }
+    }
+  }
+}
+
+class DtsModule extends Module {
+  async do_recompile() {
+    const state = this.state;
+    assert(state.type === "stale");
+    console.log(`recompiling ${state.cid} ...`);
+    const my_pkg = state.pkg;
+    const my_path = state.pkg_relative_path;
+    const code = await fs.readFile(this.path, { encoding: "utf-8" });
+    const stuff = parse_dts(code, my_path);
+    console.log(stuff);
+    throw new Error("not yet");
   }
 }
 
@@ -452,7 +473,7 @@ export class LibraryManager {
       if (path.endsWith(".rts")) {
         return new RtsModule(path, this, this.libs, this.global_unit, this.global_context);
       } else if (path.endsWith(".d.ts")) {
-        throw new Error(`TODO import .d.ts ${path}`);
+        return new DtsModule(path, this, this.libs, this.global_unit, this.global_context);
       } else {
         throw new Error(`don't know how to import ${path}`);
       }
