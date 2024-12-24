@@ -24,7 +24,6 @@ const pass_through: { [k in SyntaxKind]?: list_tag } = {
   [SyntaxKind.ModuleDeclaration]: "module_declaration",
   [SyntaxKind.TypeOperator]: "type_operator",
   [SyntaxKind.MappedType]: "mapped_type",
-  [SyntaxKind.TypeReference]: "type_reference",
   [SyntaxKind.CallSignature]: "call_signature",
   [SyntaxKind.ArrayType]: "array_type",
   [SyntaxKind.TypeLiteral]: "type_literal",
