@@ -1,3 +1,4 @@
 import { x, t, fref } from "./mod.rts";
+import { expect, test, suite } from "vitest";
 const y: t = x + fref;
 console.log(y);
