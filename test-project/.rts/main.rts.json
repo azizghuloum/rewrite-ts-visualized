@@ -5,6 +5,10 @@
     {
       "pkg": {"name": "rewrite-ts-visualized", "version": "0.0.0"},
       "pkg_relative_path": "test-project/mod.rts"
+    },
+    {
+      "pkg": {"name": "vitest", "version": "2.1.8"},
+      "pkg_relative_path": "./dist/index.d.ts"
     }
   ],
   "exported_identifiers": {},
@@ -37,6 +41,39 @@
                 "cuid": "test-project/mod.rts rewrite-ts-visualized 0.0.0",
                 "name": "l1"
               }
+            ]
+          ],
+          "suite": [
+            [
+              [
+                "test-project/main.rts rewrite-ts-visualized 0.0.0",
+                ["top", null]
+              ],
+              {
+                "cuid": "dist/index.d.ts vitest 2.1.8",
+                "name": "e.suite.@vitest/runner"
+              }
+            ]
+          ],
+          "test": [
+            [
+              [
+                "test-project/main.rts rewrite-ts-visualized 0.0.0",
+                ["top", null]
+              ],
+              {
+                "cuid": "dist/index.d.ts vitest 2.1.8",
+                "name": "e.test.@vitest/runner"
+              }
+            ]
+          ],
+          "expect": [
+            [
+              [
+                "test-project/main.rts rewrite-ts-visualized 0.0.0",
+                ["top", null]
+              ],
+              {"cuid": "dist/index.d.ts vitest 2.1.8", "name": "l.globalExpect"}
             ]
           ],
           "y": [
@@ -74,6 +111,30 @@
               {
                 "cuid": "test-project/mod.rts rewrite-ts-visualized 0.0.0",
                 "name": "l2"
+              }
+            ]
+          ],
+          "suite": [
+            [
+              [
+                "test-project/main.rts rewrite-ts-visualized 0.0.0",
+                ["top", null]
+              ],
+              {
+                "cuid": "dist/index.d.ts vitest 2.1.8",
+                "name": "e.suite.@vitest/runner"
+              }
+            ]
+          ],
+          "test": [
+            [
+              [
+                "test-project/main.rts rewrite-ts-visualized 0.0.0",
+                ["top", null]
+              ],
+              {
+                "cuid": "dist/index.d.ts vitest 2.1.8",
+                "name": "e.test.@vitest/runner"
               }
             ]
           ]

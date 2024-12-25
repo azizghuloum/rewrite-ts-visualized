@@ -67,7 +67,9 @@ function check_path(path: string) {
     if (host.realpath === undefined) throw new Error("host has no real path");
     const rts_file = host.realpath(join(module_dir, module_name));
     if (fileExists(rts_file)) {
-      library_manager.ensureUpToDate(rts_file);
+      library_manager
+        .findPackage(rts_file)
+        .then(([pkg, rel]) => library_manager.ensureUpToDate(pkg, rel, rts_file));
     }
   }
 }

@@ -1,6 +1,6 @@
 import { assert } from "./assert";
 import fs from "node:fs/promises";
-import { dirname, basename, join } from "node:path";
+import { dirname, basename, join, relative } from "node:path";
 import { mtime } from "./fs-helpers";
 import { parse } from "./parse";
 import { initial_step } from "./expander";
@@ -26,19 +26,15 @@ const cookie = "rewrite-ts-016";
 type module_state =
   | { type: "initial" }
   | { type: "initializing"; promise: Promise<void> }
-  | { type: "stale"; cid: string; pkg: Package; pkg_relative_path: string }
+  | { type: "stale"; cid: string }
   | {
       type: "compiling";
       cid: string;
-      pkg: Package;
-      pkg_relative_path: string;
       promise: Promise<void>;
     }
   | {
       type: "fresh";
       cid: string;
-      pkg: Package;
-      pkg_relative_path: string;
       exported_identifiers: { [name: string]: import_resolution[] };
       context: Context;
       unit: CompilationUnit;
@@ -47,6 +43,8 @@ type module_state =
   | { type: "error"; reason: string };
 
 abstract class Module implements imported_module {
+  pkg: Package;
+  pkg_relative_path: string;
   path: string;
   library_manager: LibraryManager;
   state: module_state = { type: "initial" };
@@ -59,12 +57,16 @@ abstract class Module implements imported_module {
   abstract do_recompile(): Promise<void>;
 
   constructor(
+    pkg: Package,
+    pkg_relative_path: string,
     path: string,
     library_manager: LibraryManager,
     libs: string[],
     global_unit: CompilationUnit,
     global_context: Context,
   ) {
+    this.pkg = pkg;
+    this.pkg_relative_path = pkg_relative_path;
     this.path = path;
     this.library_manager = library_manager;
     this.libs = libs;
@@ -106,12 +108,12 @@ abstract class Module implements imported_module {
     const my_mtime = await mtime(this.path);
     assert(my_mtime !== undefined);
     if (json_mtime === undefined || my_mtime >= json_mtime) {
-      this.state = { type: "stale", cid, pkg, pkg_relative_path };
+      this.state = { type: "stale", cid };
       return;
     }
     const json = JSON.parse(await fs.readFile(json_path, { encoding: "utf8" }));
     if (json.cookie !== cookie) {
-      this.state = { type: "stale", cid, pkg, pkg_relative_path };
+      this.state = { type: "stale", cid };
       return;
     }
     assert(json.cid === cid);
@@ -127,14 +129,14 @@ abstract class Module implements imported_module {
           } = x;
           const pkg = this.library_manager.get_package(name, version);
           assert(pkg !== undefined);
-          const path = join(pkg.dir, pkg_relative_path);
-          const mod = this.library_manager.ensureUpToDate(path);
+          const path = normalize(join(pkg.dir, pkg_relative_path));
+          const mod = this.library_manager.ensureUpToDate(pkg, pkg_relative_path, path);
           return mod;
         },
       ),
     );
     if (imported_modules.some((x) => x.get_mtime() > json_mtime)) {
-      this.state = { type: "stale", cid, pkg, pkg_relative_path };
+      this.state = { type: "stale", cid };
       return;
     }
     this.imported_modules = imported_modules;
@@ -143,8 +145,6 @@ abstract class Module implements imported_module {
     this.state = {
       type: "fresh",
       cid,
-      pkg,
-      pkg_relative_path,
       exported_identifiers: json.exported_identifiers,
       context: json.context,
       unit: json.unit,
@@ -273,12 +273,11 @@ abstract class Module implements imported_module {
   }
 
   get_pkg_and_path(): [{ name: string; version: string }, string] {
-    assert(this.state.type === "fresh");
-    return [this.state.pkg, this.state.pkg_relative_path];
+    return [this.pkg, this.pkg_relative_path];
   }
 
   async get_imported_modules_for_path(import_path: string, loc: Loc): Promise<imported_module> {
-    const mod = await this.library_manager.do_import(import_path, this.path);
+    const mod = await this.library_manager.do_import(import_path, this.path, this.pkg);
     if (this.imported_modules.includes(mod)) return mod;
     const self = this;
     function check(mod: imported_module) {
@@ -362,8 +361,8 @@ class RtsModule extends Module {
     assert(state.type === "stale");
     console.log(`recompiling ${state.cid} ...`);
     const code = await fs.readFile(this.path, { encoding: "utf-8" });
-    const my_pkg = state.pkg;
-    const my_path = state.pkg_relative_path;
+    const my_pkg = this.pkg;
+    const my_path = this.pkg_relative_path;
     const source_file: source_file = {
       package: { name: my_pkg.name, version: my_pkg.version },
       path: my_path,
@@ -418,10 +417,10 @@ class DtsModule extends Module {
     const state = this.state;
     assert(state.type === "stale");
     console.log(`recompiling ${state.cid} ...`);
-    const my_pkg = state.pkg;
-    const my_path = state.pkg_relative_path;
+    const my_pkg = this.pkg;
+    const my_path = this.pkg_relative_path;
     const code = await fs.readFile(this.path, { encoding: "utf-8" });
-    const ts_exports = parse_dts(code, my_path);
+    const ts_exports = parse_dts(code, my_path, this.path);
     const cid = state.cid;
     const rib: Rib = { type: "rib", types_env: {}, normal_env: {} };
     const unit: CompilationUnit = {
@@ -436,7 +435,7 @@ class DtsModule extends Module {
       }
     }
     for (const module_name of Object.keys(unique_imports)) {
-      const mod = await this.library_manager.do_import(module_name, this.path);
+      const mod = await this.library_manager.do_import(module_name, this.path, this.pkg);
       if (!this.imported_modules.includes(mod)) {
         this.imported_modules.push(mod);
       }
@@ -534,16 +533,34 @@ export class LibraryManager {
     this.global_context = global_context;
   }
 
-  private get_or_create_module(path: string) {
+  private get_or_create_module(pkg: Package, pkg_relative_path: string, path: string) {
     const existing = this.modules[path];
     if (existing) return existing;
     const mod = (() => {
       if (path.endsWith(".rts")) {
-        return new RtsModule(path, this, this.libs, this.global_unit, this.global_context);
+        return new RtsModule(
+          pkg,
+          pkg_relative_path,
+          path,
+          this,
+          this.libs,
+          this.global_unit,
+          this.global_context,
+        );
       } else if (path.endsWith(".d.ts") || path.endsWith(".d.cts")) {
-        return new DtsModule(path, this, this.libs, this.global_unit, this.global_context);
+        return new DtsModule(
+          pkg,
+          pkg_relative_path,
+          path,
+          this,
+          this.libs,
+          this.global_unit,
+          this.global_context,
+        );
       } else if (path.endsWith(".js")) {
         return new DtsModule(
+          pkg,
+          pkg_relative_path.replace(/\.js$/, ".d.ts"),
           path.replace(/\.js$/, ".d.ts"),
           this,
           this.libs,
@@ -562,8 +579,8 @@ export class LibraryManager {
     return mod;
   }
 
-  async ensureUpToDate(path: string) {
-    const mod = this.get_or_create_module(path);
+  async ensureUpToDate(pkg: Package, pkg_relative_path: string, path: string) {
+    const mod = this.get_or_create_module(pkg, pkg_relative_path, path);
     await mod.ensureUpToDate();
     return mod;
   }
@@ -597,7 +614,6 @@ export class LibraryManager {
 
   async resolve_node_module_package(pkg_name: string, dir: string): Promise<Package> {
     const pkg_dir = `${dir}/node_modules/${pkg_name}`;
-    console.log(`resolve_node_module_package   ${pkg_dir}`);
     assert(dir !== "/");
     const existing = this.packages[pkg_dir];
     if (existing) return existing;
@@ -622,7 +638,7 @@ export class LibraryManager {
     }
   }
 
-  async do_import(import_path: string, importer_path: string) {
+  async do_import(import_path: string, importer_path: string, importer_pkg: Package) {
     function is_relative(path: string): boolean {
       return path.startsWith("./") || path.startsWith("../");
     }
@@ -633,25 +649,31 @@ export class LibraryManager {
     function is_scoped(path: string): boolean {
       return path.startsWith("@");
     }
-    const find_normal_path = async (import_path: string) => {
+    type T = (path: string) => Promise<[Package, string, string]>;
+    const find_relative_path: T = async (import_path: string) => {
+      const absolute_path = join_relative(import_path, importer_path);
+      const pkg_relative_path = relative(importer_pkg.dir, absolute_path);
+      return [importer_pkg, pkg_relative_path, absolute_path];
+    };
+    const find_normal_path: T = async (import_path: string) => {
       const [pkg_name, ...import_parts] = import_path.split("/");
       const pkg = await this.resolve_node_module_package(pkg_name, dirname(importer_path));
       if (import_parts.length !== 0) throw new Error(`TODO import parts`);
       if (pkg.props.types) {
-        return normalize(pkg.dir + "/" + pkg.props.types);
+        return [pkg, pkg.props.types, normalize(pkg.dir + "/" + pkg.props.types)];
       } else if (pkg.props.main) {
-        return normalize(pkg.dir + "/" + pkg.props.main);
+        return [pkg, pkg.props.main, normalize(pkg.dir + "/" + pkg.props.main)];
       } else {
         throw new Error(`cannot find main file in ${pkg.dir}`);
       }
     };
-    const find_scoped_path = async (import_path: string) => {
+    const find_scoped_path: T = async (import_path: string) => {
       const [scope_name, scoped_name, ...import_parts] = import_path.split("/");
       const pkg_name = scope_name + "/" + scoped_name;
       const pkg = await this.resolve_node_module_package(pkg_name, dirname(importer_path));
       if (import_parts.length === 0) {
         assert(pkg.props.types !== undefined);
-        return normalize(pkg.dir + "/" + pkg.props.types);
+        return [pkg, pkg.props.types, normalize(pkg.dir + "/" + pkg.props.types)];
       } else {
         const p = "./" + import_parts.join("/");
         const entry = pkg.props.exports?.[p];
@@ -660,16 +682,15 @@ export class LibraryManager {
         const types_file = entry.types;
         if (types_file === undefined) throw new Error(`not types for ${import_path} in ${pkg.dir}`);
         const filepath = normalize(pkg.dir + "/" + types_file);
-        return filepath;
+        return [pkg, types_file, filepath];
       }
     };
-    const actual_path = is_relative(import_path)
-      ? join_relative(import_path, importer_path)
+    const [module_pkg, module_pkg_relative_path, actual_path] = is_relative(import_path)
+      ? await find_relative_path(import_path)
       : is_scoped(import_path)
         ? await find_scoped_path(import_path)
         : await find_normal_path(import_path);
-    console.log(`import of ${import_path} from ${importer_path} resolved to ${actual_path}`);
-    const mod = this.get_or_create_module(actual_path);
+    const mod = this.get_or_create_module(module_pkg, module_pkg_relative_path, actual_path);
     return mod;
   }
 }
