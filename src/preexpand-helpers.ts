@@ -22,7 +22,14 @@ export type imported_module = {
   get_cid(): string;
   find_module_by_cid(cid: string): imported_module | undefined;
   resolve_label(name: string): Promise<Binding>;
-  get_pkg_and_path(): [{ name: string; version: string }, string];
+  get_pkg_and_path(): [
+    {
+      name: string;
+      version: string;
+      reverse_resolve(path: string): string;
+    },
+    string,
+  ];
   resolve_rib: (rib_id: string) => Rib;
   get_mtime(): number;
   file_changed(): Promise<void>;

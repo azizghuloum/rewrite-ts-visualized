@@ -273,7 +273,14 @@ abstract class Module implements imported_module {
     }
   }
 
-  get_pkg_and_path(): [{ name: string; version: string }, string] {
+  get_pkg_and_path(): [
+    {
+      name: string;
+      version: string;
+      reverse_resolve(path: string): string;
+    },
+    string,
+  ] {
     return [this.pkg, this.pkg_relative_path];
   }
 
@@ -325,7 +332,7 @@ abstract class Module implements imported_module {
             if (dir0 !== dir1) throw new Error(`TODO relative path imports`);
             return `./${basename(mod_path)}.ts`;
           } else {
-            throw new Error(`TODO cross package imports`);
+            return mod_pkg.reverse_resolve(mod_path);
           }
         },
         resolve_rib: (rib_id, cuid) => {
@@ -418,8 +425,9 @@ class DtsModule extends Module {
     const state = this.state;
     assert(state.type === "stale");
     console.log(`recompiling ${state.cid} ...`);
-    const my_pkg = this.pkg;
     const my_path = this.pkg_relative_path;
+    const dts_mtime = await mtime(this.path);
+    assert(dts_mtime !== undefined, `error reading mtime of ${this.path}`);
     const code = await fs.readFile(this.path, { encoding: "utf-8" });
     const ts_exports = parse_dts(code, my_path, this.path);
     const cid = state.cid;
@@ -449,12 +457,12 @@ class DtsModule extends Module {
             const res: import_resolution[] = [];
             if (binding.is_type) {
               const label = `t.${binding.name}`;
-              context[label] = { type: "type", name: binding.name };
+              context[label] = { type: "type", name };
               res.push({ type: "type", label: { cuid: cid, name: label } });
             }
             if (binding.is_lexical) {
               const label = `l.${binding.name}`;
-              context[label] = { type: "lexical", name: binding.name };
+              context[label] = { type: "lexical", name };
               res.push({ type: "lexical", label: { cuid: cid, name: label } });
             }
             return [name, res];
@@ -484,12 +492,12 @@ class DtsModule extends Module {
       context,
       unit,
     };
+    console.log(json_content);
     // const json_path = this.get_json_path();
     // await fs.mkdir(dirname(json_path), { recursive: true });
-    const mtime = Date.now();
+    //const mtime = Date.now();
     // await fs.writeFile(this.get_json_path(), stringify(json_content));
-
-    this.state = { ...state, type: "fresh", ...json_content, mtime };
+    this.state = { ...state, type: "fresh", ...json_content, mtime: dts_mtime };
     console.log(`up to date ${state.cid}`);
   }
 }
@@ -511,6 +519,11 @@ class Package {
     this.version = version;
     this.dir = dir;
     this.props = props ?? {};
+  }
+
+  reverse_resolve(path: string): string {
+    if (path === this.props.types) return this.name;
+    throw new Error(`reverse resolving ${path} in '${this.name}'`);
   }
 }
 
@@ -577,7 +590,7 @@ export class LibraryManager {
       }
     })();
     this.modules[path] = mod;
-    const watcher = this.host.watchFile(path, (p) => {
+    this.host.watchFile(path, (p) => {
       if (p !== path) return;
       mod.file_changed();
     });
