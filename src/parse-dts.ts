@@ -7,7 +7,7 @@ export type ts_export_binding =
 
 export type ts_exports = { [id: string]: ts_export_binding };
 
-function parse_statements(statements: TS.NodeArray<TS.Statement>): ts_exports {
+function parse_statements(statements: TS.NodeArray<TS.Statement>, path: string): ts_exports {
   // type id = ...
   const types: { [id: string]: { global: boolean } } = {};
   // const id = ...
@@ -74,7 +74,7 @@ function parse_statements(statements: TS.NodeArray<TS.Statement>): ts_exports {
 
   function handle_main_definition(global: boolean) {
     function push_lexical(name: string) {
-      assert(!lexicals[name], `lexical '${name}' is multiply defined`);
+      assert(!lexicals[name], `lexical '${name}' is multiply defined in '${path}'`);
       lexicals[name] = { global };
     }
     function push_type(name: string) {
@@ -291,5 +291,5 @@ export function parse_dts(code: string, my_path: string, full_path: string): ts_
   };
   const src = TS.createSourceFile(my_path, code, options);
   if (src.libReferenceDirectives.length !== 0) throw new Error("not handled");
-  return parse_statements(src.statements);
+  return parse_statements(src.statements, full_path);
 }

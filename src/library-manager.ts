@@ -106,7 +106,7 @@ abstract class Module implements imported_module {
     const json_path = this.get_json_path();
     const json_mtime = await mtime(json_path);
     const my_mtime = await mtime(this.path);
-    assert(my_mtime !== undefined);
+    assert(my_mtime !== undefined, `no mtime for '${this.path}'`);
     if (json_mtime === undefined || my_mtime >= json_mtime) {
       this.state = { type: "stale", cid };
       return;
@@ -122,13 +122,13 @@ abstract class Module implements imported_module {
     assert(json.imports);
     const imported_modules = await Promise.all(
       (json.imports as { pkg: { name: string; version: string }; pkg_relative_path: string }[]).map(
-        (x) => {
+        async (x) => {
           const {
             pkg: { name, version },
             pkg_relative_path,
           } = x;
-          const pkg = this.library_manager.get_package(name, version);
-          assert(pkg !== undefined);
+          const pkg = await this.library_manager.load_package(name, version, this.path);
+          assert(pkg !== undefined, `failed to get package '${name}:${version}'`);
           const path = normalize(join(pkg.dir, pkg_relative_path));
           const mod = this.library_manager.ensureUpToDate(pkg, pkg_relative_path, path);
           return mod;
@@ -239,7 +239,7 @@ abstract class Module implements imported_module {
       case "fresh":
         return this.state.mtime;
       default:
-        throw new Error(`invalid state`);
+        throw new Error(`invalid state for '${this.path}'`);
     }
   }
 
@@ -492,7 +492,7 @@ class DtsModule extends Module {
       context,
       unit,
     };
-    console.log(json_content);
+    //console.log(json_content);
     // const json_path = this.get_json_path();
     // await fs.mkdir(dirname(json_path), { recursive: true });
     //const mtime = Date.now();
@@ -551,7 +551,7 @@ export class LibraryManager {
     this.global_context = global_context;
   }
 
-  private get_or_create_module(pkg: Package, pkg_relative_path: string, path: string) {
+  get_or_create_module(pkg: Package, pkg_relative_path: string, path: string) {
     const existing = this.modules[path];
     if (existing) return existing;
     const mod = (() => {
@@ -605,6 +605,17 @@ export class LibraryManager {
 
   get_package(name: string, version: string): Package | undefined {
     return Object.values(this.packages).find((x) => x.name === name && x.version === version);
+  }
+
+  async load_package(name: string, version: string, importing_path: string): Promise<Package> {
+    const existing = this.get_package(name, version);
+    if (existing) return existing;
+    const pkg = await this.resolve_node_module_package(name, dirname(importing_path));
+    assert(
+      pkg.version === version,
+      `package version mismatch; expected ${version}, found ${pkg.version}`,
+    );
+    return pkg;
   }
 
   async findPackage(path: string): Promise<[Package, string]> {
