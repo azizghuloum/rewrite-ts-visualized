@@ -565,21 +565,11 @@ export class LibraryManager {
           this.global_unit,
           this.global_context,
         );
-      } else if (path.endsWith(".d.ts") || path.endsWith(".d.cts")) {
+      } else if (path.endsWith(".d.ts") || path.endsWith(".d.cts") || path.endsWith(".js")) {
         return new DtsModule(
           pkg,
           pkg_relative_path,
           path,
-          this,
-          this.libs,
-          this.global_unit,
-          this.global_context,
-        );
-      } else if (path.endsWith(".js")) {
-        return new DtsModule(
-          pkg,
-          pkg_relative_path.replace(/\.js$/, ".d.ts"),
-          path.replace(/\.js$/, ".d.ts"),
           this,
           this.libs,
           this.global_unit,

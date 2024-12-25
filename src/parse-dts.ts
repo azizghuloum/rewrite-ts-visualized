@@ -74,7 +74,6 @@ function parse_statements(statements: TS.NodeArray<TS.Statement>, path: string):
 
   function handle_main_definition(global: boolean) {
     function push_lexical(name: string) {
-      assert(!lexicals[name], `lexical '${name}' is multiply defined in '${path}'`);
       lexicals[name] = { global };
     }
     function push_type(name: string) {
@@ -97,6 +96,14 @@ function parse_statements(statements: TS.NodeArray<TS.Statement>, path: string):
     ) {
       assert(!exported[name], `duplicate export ${origin_name} as ${name}`);
       exported[name] = { type_only, origin_name, origin_module, global };
+    }
+    function push_exported_local_type(name: string) {
+      assert(!exported[name], `duplicate export ${name}`);
+      exported[name] = { type_only: true, origin_name: name, origin_module: undefined, global };
+    }
+    function push_exported_local_value(name: string) {
+      assert(!exported[name], `duplicate export ${name}`);
+      exported[name] = { type_only: false, origin_name: name, origin_module: undefined, global };
     }
     function push_namespace(name: string, literal: boolean) {
       const ns = literal ? literal_namespaces : id_namespaces;
@@ -203,40 +210,45 @@ function parse_statements(statements: TS.NodeArray<TS.Statement>, path: string):
       const declared =
         decl.modifiers?.some((x) => x.kind === TS.SyntaxKind.DeclareKeyword) ?? false;
       assert(!declared);
-      assert(!exported);
       push_type(name);
+      if (exported) push_exported_local_type(name);
     }
     function handle_type_alias_declaration(decl: TS.TypeAliasDeclaration) {
       const exported = decl.modifiers?.some((x) => x.kind === TS.SyntaxKind.ExportKeyword) ?? false;
       const declared =
         decl.modifiers?.some((x) => x.kind === TS.SyntaxKind.DeclareKeyword) ?? false;
       assert(!declared);
-      assert(!exported);
       const name = decl.name.text;
       push_type(name);
+      if (exported) push_exported_local_type(name);
     }
     function handle_function_declaration(decl: TS.FunctionDeclaration) {
       const name = decl.name?.text;
       const exported = decl.modifiers?.some((x) => x.kind === TS.SyntaxKind.ExportKeyword) ?? false;
       assert(!exported);
-      const declared =
-        decl.modifiers?.some((x) => x.kind === TS.SyntaxKind.DeclareKeyword) ?? false;
       assert(name !== undefined);
-      assert(declared);
       push_lexical(name);
     }
     function handle_variable_statement(decl: TS.VariableStatement) {
       const exported = decl.modifiers?.some((x) => x.kind === TS.SyntaxKind.ExportKeyword) ?? false;
-      assert(!exported);
-      const declared =
-        decl.modifiers?.some((x) => x.kind === TS.SyntaxKind.DeclareKeyword) ?? false;
-      assert(declared);
+      function handle_binding_element(binding: TS.BindingElement) {
+        handle_binding_name(binding.name);
+      }
       function handle_binding_name(binding: TS.BindingName) {
         switch (binding.kind) {
-          case TS.SyntaxKind.Identifier:
-            return push_lexical(binding.text);
+          case TS.SyntaxKind.Identifier: {
+            push_lexical(binding.text);
+            if (exported) push_exported_local_value(binding.text);
+            return;
+          }
+          case TS.SyntaxKind.ObjectBindingPattern: {
+            binding.elements.forEach(handle_binding_element);
+            return;
+          }
           default:
-            throw new Error(`unhandled binding type '${TS.SyntaxKind[binding.kind]}'`);
+            throw new Error(
+              `unhandled binding type '${TS.SyntaxKind[binding.kind]}' in ${path}:${binding.pos}`,
+            );
         }
       }
       function handle_decl(decl: TS.VariableDeclaration) {
@@ -273,6 +285,9 @@ function parse_statements(statements: TS.NodeArray<TS.Statement>, path: string):
           return handle_variable_statement(stmt as TS.VariableStatement);
         case TS.SyntaxKind.ClassDeclaration:
           return handle_class_declaration(stmt as TS.ClassDeclaration);
+        case TS.SyntaxKind.ExpressionStatement:
+        case TS.SyntaxKind.TryStatement:
+          return;
         default:
           throw new Error(`unhandled statement in d.ts file '${TS.SyntaxKind[stmt.kind]}'`);
       }
