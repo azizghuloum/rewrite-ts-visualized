@@ -7,6 +7,12 @@ export type import_resolution = {
   type: Binding["type"];
   label: Label;
 };
+//  | {
+//      type: "imported";
+//      name: string | undefined;
+//      module: string;
+//      type_only: boolean;
+//    };
 
 export type imported_module = {
   imported_modules: imported_module[];
