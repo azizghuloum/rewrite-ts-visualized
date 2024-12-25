@@ -256,6 +256,7 @@ abstract class Module implements imported_module {
     assert(this.state.type === "fresh");
     const context = this.state.context;
     const binding = context[name];
+    if (!binding) throw new Error(`binding missing for ${name} in ${this.path}`);
     switch (binding.type) {
       case "lexical":
         return { type: "imported_lexical", cuid: this.state.cid, name: binding.name };
@@ -268,7 +269,7 @@ abstract class Module implements imported_module {
           clauses: binding.clauses,
         };
       default:
-        throw new Error(`unhandled binding type ${binding.type}`);
+        throw new Error(`unhandled binding type ${binding.type} for label '${name}'`);
     }
   }
 
@@ -447,10 +448,14 @@ class DtsModule extends Module {
           case "local": {
             const res: import_resolution[] = [];
             if (binding.is_type) {
-              res.push({ type: "type", label: { cuid: cid, name: `t.${binding.name}` } });
+              const label = `t.${binding.name}`;
+              context[label] = { type: "type", name: binding.name };
+              res.push({ type: "type", label: { cuid: cid, name: label } });
             }
             if (binding.is_lexical) {
-              res.push({ type: "lexical", label: { cuid: cid, name: `l.${binding.name}` } });
+              const label = `l.${binding.name}`;
+              context[label] = { type: "lexical", name: binding.name };
+              res.push({ type: "lexical", label: { cuid: cid, name: label } });
             }
             return [name, res];
           }

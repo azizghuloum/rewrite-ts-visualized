@@ -74,7 +74,7 @@ function parse_statements(statements: TS.NodeArray<TS.Statement>): ts_exports {
 
   function handle_main_definition(global: boolean) {
     function push_lexical(name: string) {
-      assert(!lexicals[name]);
+      assert(!lexicals[name], `lexical '${name}' is multiply defined`);
       lexicals[name] = { global };
     }
     function push_type(name: string) {
@@ -244,6 +244,17 @@ function parse_statements(statements: TS.NodeArray<TS.Statement>): ts_exports {
       }
       decl.declarationList.declarations.forEach(handle_decl);
     }
+    function handle_class_declaration(decl: TS.ClassDeclaration) {
+      const name = decl.name?.text;
+      const exported = decl.modifiers?.some((x) => x.kind === TS.SyntaxKind.ExportKeyword) ?? false;
+      assert(!exported);
+      const declared =
+        decl.modifiers?.some((x) => x.kind === TS.SyntaxKind.DeclareKeyword) ?? false;
+      assert(declared);
+      assert(name !== undefined);
+      push_lexical(name);
+      push_type(name);
+    }
     function handle_statement(stmt: TS.Statement) {
       switch (stmt.kind) {
         case TS.SyntaxKind.ImportDeclaration:
@@ -260,6 +271,8 @@ function parse_statements(statements: TS.NodeArray<TS.Statement>): ts_exports {
           return handle_function_declaration(stmt as TS.FunctionDeclaration);
         case TS.SyntaxKind.VariableStatement:
           return handle_variable_statement(stmt as TS.VariableStatement);
+        case TS.SyntaxKind.ClassDeclaration:
+          return handle_class_declaration(stmt as TS.ClassDeclaration);
         default:
           throw new Error(`unhandled statement in d.ts file '${TS.SyntaxKind[stmt.kind]}'`);
       }
