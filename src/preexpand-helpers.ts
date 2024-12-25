@@ -37,7 +37,7 @@ export type preexpand_helpers = {
   global_context: Context;
 };
 
-type exported_identifiers = {
+export type exported_identifiers = {
   [name: string]: import_resolution[];
 };
 

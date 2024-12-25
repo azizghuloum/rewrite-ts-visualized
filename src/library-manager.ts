@@ -12,6 +12,7 @@ import {
   import_resolution,
   preexpand_helpers,
   get_exported_identifiers_from_rib,
+  exported_identifiers,
 } from "./preexpand-helpers";
 import { AST, source_file } from "./ast";
 import { normalize } from "node:path";
@@ -421,8 +422,59 @@ class DtsModule extends Module {
     const my_path = state.pkg_relative_path;
     const code = await fs.readFile(this.path, { encoding: "utf-8" });
     const ts_exports = parse_dts(code, my_path);
-    console.log(ts_exports);
-    throw new Error("not yet");
+    const cid = state.cid;
+    const rib: Rib = { type: "rib", types_env: {}, normal_env: {} };
+    const unit: CompilationUnit = {
+      cu_id: cid,
+      store: { r0: rib },
+    };
+    const context: Context = {};
+    const unique_imports: { [k: string]: boolean } = {};
+    for (const x of Object.values(ts_exports)) {
+      if (x.type === "imported") {
+        const module_name = x.module;
+        unique_imports[module_name] = true;
+      }
+    }
+    for (const module_name of Object.keys(unique_imports)) {
+      const mod = await this.library_manager.do_import(module_name, this.path);
+      if (!this.imported_modules.includes(mod)) {
+        this.imported_modules.push(mod);
+      }
+    }
+    const export_ids = Object.entries(ts_exports).map(([name, binding]) => {
+      switch (binding.type) {
+        case "local": {
+          throw new Error("local");
+        }
+        case "imported": {
+          console.log(binding);
+          throw new Error("imported");
+        }
+        default:
+          const invalid: never = binding;
+          throw invalid;
+      }
+    });
+    const exported_identifiers: exported_identifiers = {};
+    const json_content = {
+      cid: state.cid,
+      cookie,
+      imports: this.imported_modules.map((x) => {
+        const [pkg, path] = x.get_pkg_and_path();
+        return { pkg: { name: pkg.name, version: pkg.version }, pkg_relative_path: path };
+      }),
+      exported_identifiers,
+      context,
+      unit,
+    };
+    // const json_path = this.get_json_path();
+    // await fs.mkdir(dirname(json_path), { recursive: true });
+    const mtime = Date.now();
+    // await fs.writeFile(this.get_json_path(), stringify(json_content));
+
+    this.state = { ...state, type: "fresh", ...json_content, mtime };
+    console.log(`up to date ${state.cid}`);
   }
 }
 
@@ -474,6 +526,14 @@ export class LibraryManager {
         return new RtsModule(path, this, this.libs, this.global_unit, this.global_context);
       } else if (path.endsWith(".d.ts")) {
         return new DtsModule(path, this, this.libs, this.global_unit, this.global_context);
+      } else if (path.endsWith(".js")) {
+        return new DtsModule(
+          path.replace(/\.js$/, ".d.ts"),
+          this,
+          this.libs,
+          this.global_unit,
+          this.global_context,
+        );
       } else {
         throw new Error(`don't know how to import ${path}`);
       }
@@ -521,6 +581,8 @@ export class LibraryManager {
 
   async resolve_node_module_package(pkg_name: string, dir: string): Promise<Package> {
     const pkg_dir = `${dir}/node_modules/${pkg_name}`;
+    console.log(`resolve_node_module_package   ${pkg_dir}`);
+    assert(dir !== "/");
     const existing = this.packages[pkg_dir];
     if (existing) return existing;
     const pkg_path = join(pkg_dir, "package.json");
@@ -559,12 +621,24 @@ export class LibraryManager {
         const types_path = join(pkg.dir, pkg.props.types_file);
         return types_path;
       } else {
-        throw new Error(`TODO nested import of ${b} from ${dirname(import_path)}`);
+        const pkg = await this.resolve_node_module_package(import_path, dirname(importer_path));
+        assert(pkg.props.types_file !== undefined);
+        return join(pkg.dir, pkg.props.types_file);
+        //throw new Error(`TODO nested import '${import_path}' of ${b} from ${dirname(import_path)}`);
       }
     };
+    // const resolve_import_path: (import_path: string, importer_path: string) => Promise<[]> = async (
+    //   import_path,
+    //   importer_path,
+    // ) => {
+    //   const dir = dirname(importer_path);
+    //   const pkg_file = `${dir}/node_modules/${import_path}/package.json`;
+    //   const dts_file = `${dir}/node_modules/${import_path}.d.ts`;
+    // };
     const actual_path = is_relative(import_path)
       ? join_relative(import_path, importer_path)
       : await find_absolute_path(import_path);
+    console.log(`import of ${import_path} from ${importer_path} resolved to ${actual_path}`);
     const mod = this.get_or_create_module(actual_path);
     return mod;
   }
