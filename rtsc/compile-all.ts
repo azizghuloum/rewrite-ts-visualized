@@ -10,10 +10,6 @@ import { core_patterns } from "../src/syntax-core-patterns.ts";
 import { parse } from "../src/parse.ts";
 import { assert } from "../src/assert.ts";
 
-const globals = get_globals("es2024.full");
-const patterns = core_patterns(parse);
-const library_manager = new LibraryManager(patterns, globals, ["es2024.full"]);
-
 class DirWatcher {
   private fswatcher: FSWatcher;
   constructor(fswatcher: FSWatcher) {
@@ -75,9 +71,22 @@ class WatchFS {
   }
 }
 
-function check_path(path: string) {
-  assert(path.endsWith(".rts"));
-  library_manager.ensureUpToDate(path);
+const globals = get_globals("es2024.full");
+const patterns = core_patterns(parse);
+const library_manager = new LibraryManager(patterns, globals, ["es2024.full"], {
+  watchFile(path, callback) {
+    const watcher = {
+      close() {},
+    };
+    return watcher;
+  },
+});
+
+function check_path(rts_file: string) {
+  assert(rts_file.endsWith(".rts"));
+  library_manager
+    .findPackage(rts_file)
+    .then(([pkg, rel]) => library_manager.ensureUpToDate(pkg, rel, rts_file));
   //const suffix = ".rts";
   //if (path.endsWith(suffix)) {
   //  const module_dir = dirname(path);
