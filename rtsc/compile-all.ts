@@ -22,13 +22,14 @@ class DirWatcher {
     const filename = basename(path);
     assert(!this.callbacks[filename], `multiple watches for same path '${path}'`);
     this.callbacks[filename] = callback;
-    return {
-      close() {
-        throw new Error(`close is not yet done`);
-      },
+    const close = () => {
+      assert(this.callbacks[filename] !== undefined, `no callback registered`);
+      assert(this.callbacks[filename] === callback, `closing wrong watch`);
+      delete this.callbacks[filename];
     };
+    return { close };
   }
-  processEvent(event: "rename" | "change", file: string) {
+  processEvent(file: string) {
     this.onEvent?.(file);
     const callback = this.callbacks[file];
     if (callback) callback(join(this.dir, file));
@@ -52,12 +53,12 @@ class WatchFS {
   private get_or_create_watcher(abspath: string): DirWatcher {
     const existing = this.dir_watchers[abspath];
     if (existing) return existing;
-    const fswatcher = watch(abspath, { encoding: "utf8", recursive: false }, (event, file) => {
-      assert(file !== null);
-      watcher.processEvent(event, file);
-    });
     const watcher = new DirWatcher(abspath);
     this.dir_watchers[abspath] = watcher;
+    watch(abspath, { encoding: "utf8", recursive: false }, (_event, file) => {
+      assert(file !== null);
+      watcher.processEvent(file);
+    });
     return watcher;
   }
 
@@ -118,19 +119,6 @@ function check_path(rts_file: string) {
   library_manager
     .findPackage(rts_file)
     .then(([pkg, rel]) => library_manager.ensureUpToDate(pkg, rel, rts_file));
-  //const suffix = ".rts";
-  //if (path.endsWith(suffix)) {
-  //  const module_dir = dirname(path);
-  //  const module_name = basename(path, suffix) + ".rts";
-  //  const rts_file = join(module_dir, module_name);
-  //  fs.stat(rts_file).then((stats) => {
-  //    library_manager.ensureUpToDate(rts_file);
-  //  });
-  //}
 }
 
 const FS = new WatchFS(check_path);
-
-//console.log(path.relative("/x/a/b/c", "/x/a/b2/c2"));
-
-//const watcher = watch(".", {}, (event, filename) => console.log({ event, filename }));

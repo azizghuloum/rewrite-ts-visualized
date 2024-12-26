@@ -299,7 +299,6 @@ function parse_statements(statements: TS.NodeArray<TS.Statement>, path: string):
 }
 
 export function parse_dts(code: string, my_path: string, full_path: string): ts_exports {
-  console.log(`parsing ${full_path}`);
   const options: TS.CreateSourceFileOptions = {
     languageVersion: TS.ScriptTarget.ESNext,
     jsDocParsingMode: TS.JSDocParsingMode.ParseNone,
