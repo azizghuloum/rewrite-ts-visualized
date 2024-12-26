@@ -1,8 +1,18 @@
 import { FSWatcher, watch } from "node:fs";
 import fs from "node:fs/promises";
 import process from "node:process";
-import path from "node:path";
+import path, { basename, dirname, join } from "node:path";
 import ignore from "ignore";
+
+import { LibraryManager } from "../src/library-manager.ts";
+import { get_globals } from "../src/global-module.ts";
+import { core_patterns } from "../src/syntax-core-patterns.ts";
+import { parse } from "../src/parse.ts";
+import { assert } from "../src/assert.ts";
+
+const globals = get_globals("es2024.full");
+const patterns = core_patterns(parse);
+const library_manager = new LibraryManager(patterns, globals, ["es2024.full"]);
 
 class DirWatcher {
   private fswatcher: FSWatcher;
@@ -65,7 +75,21 @@ class WatchFS {
   }
 }
 
-const FS = new WatchFS((path) => console.log({ path }));
+function check_path(path: string) {
+  assert(path.endsWith(".rts"));
+  library_manager.ensureUpToDate(path);
+  //const suffix = ".rts";
+  //if (path.endsWith(suffix)) {
+  //  const module_dir = dirname(path);
+  //  const module_name = basename(path, suffix) + ".rts";
+  //  const rts_file = join(module_dir, module_name);
+  //  fs.stat(rts_file).then((stats) => {
+  //    library_manager.ensureUpToDate(rts_file);
+  //  });
+  //}
+}
+
+const FS = new WatchFS(check_path);
 
 //console.log(path.relative("/x/a/b/c", "/x/a/b2/c2"));
 
