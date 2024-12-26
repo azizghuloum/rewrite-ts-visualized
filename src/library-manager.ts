@@ -191,8 +191,8 @@ abstract class Module implements imported_module {
       (x) => (x.dependant_modules = x.dependant_modules.filter((x) => x !== this)),
     );
     this.imported_modules = [];
-    dependant_modules.forEach((x) => x.force_recompile());
-    this.ensureUpToDate();
+    await Promise.all(dependant_modules.map((x) => x.force_recompile()));
+    await this.ensureUpToDate();
   }
 
   async file_changed(): Promise<void> {
@@ -202,7 +202,7 @@ abstract class Module implements imported_module {
     switch (state.type) {
       case "fresh": {
         if (t && t > state.mtime) {
-          this.force_recompile();
+          await this.force_recompile();
         }
         return;
       }

@@ -1,4 +1,4 @@
-import { FSWatcher, watch } from "node:fs";
+import { watch } from "node:fs";
 import fs from "node:fs/promises";
 import process from "node:process";
 import path, { basename, dirname, join } from "node:path";
@@ -11,9 +11,27 @@ import { parse } from "../src/parse.ts";
 import { assert } from "../src/assert.ts";
 
 class DirWatcher {
-  private fswatcher: FSWatcher;
-  constructor(fswatcher: FSWatcher) {
-    this.fswatcher = fswatcher;
+  private dir: string;
+  private callbacks: { [filename: string]: (path: string) => void } = {};
+  public onEvent: ((file: string) => void) | undefined = undefined;
+  constructor(dir: string) {
+    this.dir = dir;
+  }
+  watchFile(path: string, callback: (path: string) => void): { close(): void } {
+    assert(dirname(path) === this.dir);
+    const filename = basename(path);
+    assert(!this.callbacks[filename], `multiple watches for same path '${path}'`);
+    this.callbacks[filename] = callback;
+    return {
+      close() {
+        throw new Error(`close is not yet done`);
+      },
+    };
+  }
+  processEvent(event: "rename" | "change", file: string) {
+    this.onEvent?.(file);
+    const callback = this.callbacks[file];
+    if (callback) callback(join(this.dir, file));
   }
 }
 
@@ -23,6 +41,24 @@ class WatchFS {
   constructor(onRTSFile: (path: string) => void) {
     this.onRTSFile = onRTSFile;
     this.init();
+  }
+
+  watchFile(path: string, callback: (path: string) => void): { close(): void } {
+    const dir = dirname(path);
+    const watcher = this.get_or_create_watcher(dir);
+    return watcher.watchFile(path, callback);
+  }
+
+  private get_or_create_watcher(abspath: string): DirWatcher {
+    const existing = this.dir_watchers[abspath];
+    if (existing) return existing;
+    const fswatcher = watch(abspath, { encoding: "utf8", recursive: false }, (event, file) => {
+      assert(file !== null);
+      watcher.processEvent(event, file);
+    });
+    const watcher = new DirWatcher(abspath);
+    this.dir_watchers[abspath] = watcher;
+    return watcher;
   }
 
   private async init() {
@@ -57,11 +93,9 @@ class WatchFS {
     };
 
     const seed_dir = async (relpath: string, abspath: string) => {
-      const fswatcher = watch(abspath, { encoding: "utf8", recursive: false }, (event, file) => {
-        console.log(`watch ${event} ${file} in ${abspath}`);
-        if (file !== null) check_file(file, relpath, abspath);
-      });
-      this.dir_watchers[abspath] = new DirWatcher(fswatcher);
+      const watcher = this.get_or_create_watcher(abspath);
+      assert(!watcher.onEvent);
+      watcher.onEvent = (file) => check_file(file, relpath, abspath);
       fs.readdir(relpath).then((files) =>
         files.forEach((file) => check_file(file, relpath, abspath)),
       );
@@ -75,10 +109,7 @@ const globals = get_globals("es2024.full");
 const patterns = core_patterns(parse);
 const library_manager = new LibraryManager(patterns, globals, ["es2024.full"], {
   watchFile(path, callback) {
-    const watcher = {
-      close() {},
-    };
-    return watcher;
+    return FS.watchFile(path, callback);
   },
 });
 
