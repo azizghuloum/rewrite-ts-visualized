@@ -17,6 +17,25 @@ const pass_through: { [k in SyntaxKind]?: list_tag } = {
   [SyntaxKind.ImportClause]: "import_clause",
   [SyntaxKind.ImportDeclaration]: "import_declaration",
   [SyntaxKind.NamespaceImport]: "namespace_import",
+  [SyntaxKind.FunctionType]: "function_type",
+  [SyntaxKind.PropertySignature]: "property_signature",
+  [SyntaxKind.InterfaceDeclaration]: "interface_declaration",
+  [SyntaxKind.ModuleBlock]: "module_block",
+  [SyntaxKind.ModuleDeclaration]: "module_declaration",
+  [SyntaxKind.TypeOperator]: "type_operator",
+  [SyntaxKind.MappedType]: "mapped_type",
+  [SyntaxKind.CallSignature]: "call_signature",
+  [SyntaxKind.ArrayType]: "array_type",
+  [SyntaxKind.TypeLiteral]: "type_literal",
+  [SyntaxKind.FunctionDeclaration]: "function_declaration",
+  [SyntaxKind.IndexedAccessType]: "indexed_access_type",
+  [SyntaxKind.ExpressionWithTypeArguments]: "expression_with_type_arguments",
+  [SyntaxKind.HeritageClause]: "heritage_clause",
+  [SyntaxKind.ConditionalType]: "conditional_type",
+  [SyntaxKind.TypeQuery]: "type_query",
+  [SyntaxKind.MethodSignature]: "method_signature",
+  [SyntaxKind.ParenthesizedType]: "parenthesized_type",
+  [SyntaxKind.TypePredicate]: "type_predicate",
   [SyntaxKind.SyntaxList]: "syntax_list",
 };
 
@@ -103,6 +122,25 @@ function absurdly(node: TS.Node, source: TS.SourceFile, f: source_file): AST {
       case SyntaxKind.NullKeyword:
       case SyntaxKind.StringKeyword:
       case SyntaxKind.NumberKeyword:
+      case SyntaxKind.DeclareKeyword:
+      case SyntaxKind.NamespaceKeyword:
+      case SyntaxKind.InterfaceKeyword:
+      case SyntaxKind.AnyKeyword:
+      case SyntaxKind.VoidKeyword:
+      case SyntaxKind.InKeyword:
+      case SyntaxKind.KeyOfKeyword:
+      case SyntaxKind.ModuleKeyword:
+      case SyntaxKind.NeverKeyword:
+      case SyntaxKind.BooleanKeyword:
+      case SyntaxKind.UndefinedKeyword:
+      case SyntaxKind.UnknownKeyword:
+      case SyntaxKind.FunctionKeyword:
+      case SyntaxKind.FalseKeyword:
+      case SyntaxKind.TrueKeyword:
+      case SyntaxKind.TypeOfKeyword:
+      case SyntaxKind.IsKeyword:
+      case SyntaxKind.SymbolKeyword:
+      case SyntaxKind.ReadonlyKeyword:
         return { type: "atom", tag: "other", content, src };
       case SyntaxKind.EndOfFileToken:
         return { type: "atom", tag: "other", content, src };

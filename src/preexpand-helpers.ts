@@ -7,16 +7,33 @@ export type import_resolution = {
   type: Binding["type"];
   label: Label;
 };
+//  | {
+//      type: "imported";
+//      name: string | undefined;
+//      module: string;
+//      type_only: boolean;
+//    };
 
 export type imported_module = {
   imported_modules: imported_module[];
+  dependant_modules: imported_module[];
   resolve_exported_identifier: (name: string, loc: Loc) => Promise<import_resolution[]>;
   ensureUpToDate(): Promise<void>;
   get_cid(): string;
   find_module_by_cid(cid: string): imported_module | undefined;
   resolve_label(name: string): Promise<Binding>;
-  get_pkg_and_path(): [{ name: string; version: string }, string];
+  get_pkg_and_path(): [
+    {
+      name: string;
+      version: string;
+      reverse_resolve(path: string): string;
+    },
+    string,
+  ];
   resolve_rib: (rib_id: string) => Rib;
+  get_mtime(): number;
+  file_changed(): Promise<void>;
+  force_recompile(): Promise<void>;
 };
 
 export type manager = {
@@ -33,7 +50,7 @@ export type preexpand_helpers = {
   global_context: Context;
 };
 
-type exported_identifiers = {
+export type exported_identifiers = {
   [name: string]: import_resolution[];
 };
 

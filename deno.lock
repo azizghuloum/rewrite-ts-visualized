@@ -828,7 +828,7 @@
         "npm:@types/json-stable-stringify@^1.1.0",
         "npm:@types/node@^22.10.2",
         "npm:@types/react-dom@^19.0.2",
-        "npm:@types/react@^19.0.1",
+        "npm:@types/react@^19.0.2",
         "npm:@uiw/codemirror-theme-abcdef@^4.23.7",
         "npm:@uiw/react-codemirror@^4.23.7",
         "npm:@vitejs/plugin-react@^4.3.4",
@@ -836,18 +836,22 @@
         "npm:eslint-plugin-react-hooks@^5.1.0",
         "npm:eslint-plugin-react-refresh@~0.4.16",
         "npm:eslint@^9.17.0",
+<<<<<<< HEAD
         "npm:globals@^15.13.0",
         "npm:ignore@^6.0.2",
+=======
+        "npm:globals@^15.14.0",
+>>>>>>> main
         "npm:index-to-position@1",
-        "npm:json-stable-stringify@^1.1.1",
+        "npm:json-stable-stringify@^1.2.1",
         "npm:json-stringify-pretty-compact@4",
         "npm:prettier@^3.4.2",
         "npm:react-dom@19",
-        "npm:react-router-dom@^7.0.2",
+        "npm:react-router-dom@^7.1.1",
         "npm:react@19",
-        "npm:typescript-eslint@^8.18.1",
+        "npm:typescript-eslint@^8.18.2",
         "npm:typescript@^5.5.3",
-        "npm:vite@^6.0.3",
+        "npm:vite@^6.0.5",
         "npm:vitest@^2.1.5"
       ]
     }
