@@ -1,14 +1,22 @@
-import { watch } from "node:fs";
+import { watch as node_watch } from "node:fs";
 import fs from "node:fs/promises";
 import process from "node:process";
 import path, { basename, dirname, join } from "node:path";
 import ignore from "ignore";
+import * as commander from "commander";
 
 import { LibraryManager } from "../src/library-manager.ts";
 import { get_globals } from "../src/global-module.ts";
 import { core_patterns } from "../src/syntax-core-patterns.ts";
 import { parse } from "../src/parse.ts";
 import { assert } from "../src/assert.ts";
+
+type watch_proc = (
+  path: string,
+  callback: (file: string) => void,
+) => {
+  close(): void;
+};
 
 class DirWatcher {
   private dir: string;
@@ -39,7 +47,9 @@ class DirWatcher {
 class WatchFS {
   dir_watchers: { [path: string]: DirWatcher } = {};
   onRTSFile: (path: string) => void;
-  constructor(onRTSFile: (path: string) => void) {
+  watch: watch_proc;
+  constructor(watch: watch_proc, onRTSFile: (path: string) => void) {
+    this.watch = watch;
     this.onRTSFile = onRTSFile;
     this.init();
   }
@@ -55,8 +65,7 @@ class WatchFS {
     if (existing) return existing;
     const watcher = new DirWatcher(abspath);
     this.dir_watchers[abspath] = watcher;
-    watch(abspath, { encoding: "utf8", recursive: false }, (_event, file) => {
-      assert(file !== null);
+    this.watch(abspath, (file) => {
       watcher.processEvent(file);
     });
     return watcher;
@@ -121,4 +130,17 @@ function check_path(rts_file: string) {
     .then(([pkg, rel]) => library_manager.ensureUpToDate(pkg, rel, rts_file));
 }
 
-const FS = new WatchFS(check_path);
+const program = new commander.Command();
+program.option("-w, --watch", "watch files and directories for changes");
+program.parse();
+const options = program.opts();
+
+const watch_proc: watch_proc = options.watch
+  ? (path, callback) =>
+      node_watch(path, { encoding: "utf8", recursive: false }, (_event, file) => {
+        assert(file !== null);
+        callback(file);
+      })
+  : (path, callback) => ({ close() {} });
+
+const FS = new WatchFS(watch_proc, check_path);
