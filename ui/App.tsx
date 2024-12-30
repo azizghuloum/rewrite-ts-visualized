@@ -162,7 +162,7 @@ function Example({ code, onChange }: ExampleProps) {
     state.pointer === null || state.pointer >= state.prev_steps.length
       ? [state.last_step, state.step_number]
       : [state.prev_steps[state.pointer], state.pointer];
-  const code_to_display = useMemo(() => pprint(display_step.loc), [display_step]);
+  const code_to_display = useMemo(() => pprint(display_step.loc, true), [display_step]);
   return (
     <div>
       <input

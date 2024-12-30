@@ -65,7 +65,7 @@ async function compile_script(filename: string, test_name: string) {
   function q(str: string): string {
     return "`" + str + "`";
   }
-  const prog = await pprint(result.loc);
+  const prog = await pprint(result.loc, true);
   const out =
     `## ${q(test_name)}\n\n` +
     `### Status: ${q(result.name)}\n\n` +

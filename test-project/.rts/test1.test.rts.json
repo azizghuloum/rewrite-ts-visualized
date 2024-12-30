@@ -1,6 +1,6 @@
 {
   "cid": "test-project/test1.test.rts rewrite-ts-visualized 0.0.0",
-  "cookie": "rewrite-ts-016",
+  "cookie": "rewrite-ts-017",
   "imports": [
     {
       "pkg": {"name": "vitest", "version": "2.1.8"},

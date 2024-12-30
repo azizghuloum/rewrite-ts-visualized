@@ -21,7 +21,7 @@ import stringify from "json-stringify-pretty-compact";
 import { init_global_context } from "./global-module";
 import { parse_dts } from "./parse-dts";
 
-const cookie = "rewrite-ts-016";
+const cookie = "rewrite-ts-017";
 
 type module_state =
   | { type: "initial" }
@@ -406,7 +406,7 @@ class RtsModule extends Module {
       };
       const code_path = this.get_generated_code_absolute_path();
       await fs.mkdir(dirname(code_path), { recursive: true });
-      await fs.writeFile(code_path, await pprint(loc));
+      await fs.writeFile(code_path, await pprint(loc, false));
       await fs.writeFile(this.get_proxy_path(), proxy_code);
       const mtime = Date.now();
       await fs.writeFile(this.get_json_path(), stringify(json_content));

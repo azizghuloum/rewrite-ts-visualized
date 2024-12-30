@@ -17,8 +17,21 @@ const children_need_semi: { [k in list_tag]?: boolean } = {
 function loc_to_ns(loc: Loc): ns {
   /* */
 
+  function push_semi(ns: ns, semi: string): ns {
+    if (typeof ns === "string") {
+      return ns.endsWith(";") ? ns : [ns, semi];
+    } else {
+      if (ns.length === 0) {
+        return semi;
+      } else {
+        return ns.map((x, i) => (i === ns.length - 1 ? push_semi(x, semi) : x));
+      }
+    }
+  }
   function stx_to_ns(stx: AST, semi: boolean): ns {
-    if (semi && stx.tag !== "other") return [stx_to_ns(stx, false), ";"];
+    if (stx.tag === "empty_statement") return "";
+    if (stx.tag === "slice") return ll_to_array(stx.content).map((x) => stx_to_ns(x, true));
+    if (semi && stx.tag !== "other") return push_semi(stx_to_ns(stx, false), `;`);
     switch (stx.type) {
       case "list": {
         const semi = children_need_semi[stx.tag] ?? false;
@@ -113,7 +126,9 @@ function ns_to_string(main_ns: ns) {
   }
 
   conv(main_ns);
-  return ac;
+  ac.push("\n");
+
+  return ac[0] === " " ? ac.slice(1) : ac;
 }
 
 export async function pretty_print(code: string) {
@@ -129,7 +144,7 @@ export async function pretty_print(code: string) {
   }
 }
 
-export async function pprint(loc: Loc) {
+export async function pprint(loc: Loc, prettify: boolean) {
   const src = ns_to_string(loc_to_ns(loc)).join("");
-  return await pretty_print(src);
+  return prettify ? await pretty_print(src) : src;
 }
