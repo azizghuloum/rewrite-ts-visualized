@@ -109,7 +109,7 @@ function loc_to_ns(loc: Loc): ns {
   }
 }
 
-function ns_to_string(main_ns: ns) {
+function ns_flatten(main_ns: ns) {
   const ac: string[] = [];
 
   function push(x: string) {
@@ -145,6 +145,6 @@ export async function pretty_print(code: string) {
 }
 
 export async function pprint(loc: Loc, prettify: boolean) {
-  const src = ns_to_string(loc_to_ns(loc)).join("");
+  const src = ns_flatten(loc_to_ns(loc)).join("");
   return prettify ? await pretty_print(src) : src;
 }
