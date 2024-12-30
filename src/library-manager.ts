@@ -268,6 +268,9 @@ abstract class Module implements imported_module {
           cuid: this.state.cid,
           clauses: binding.clauses,
         };
+      case "imported_type":
+      case "imported_lexical":
+        return binding;
       default:
         throw new Error(`unhandled binding type ${binding.type} for label '${name}'`);
     }
@@ -468,9 +471,20 @@ class DtsModule extends Module {
             return [name, res];
           }
           case "imported": {
+            const label = `e.${binding.name}.${binding.module}`;
+            //assert(binding.name !== undefined, `namespace reexports not handled yet`);
+            if (binding.name) {
+              context[label] = {
+                type: "imported_lexical",
+                cuid: binding.module,
+                name: binding.name,
+              };
+            } else {
+              console.error(`nameless reexports not handled yet`);
+            }
             const res: import_resolution = {
               type: "ts",
-              label: { cuid: cid, name: `e.${binding.name}.${binding.module}` },
+              label: { cuid: cid, name: label },
             };
             return [name, [res]];
           }

@@ -1,0 +1,82 @@
+{
+  "cid": "test-project/test1.test.rts rewrite-ts-visualized 0.0.0",
+  "cookie": "rewrite-ts-016",
+  "imports": [
+    {
+      "pkg": {"name": "vitest", "version": "2.1.8"},
+      "pkg_relative_path": "./dist/index.d.ts"
+    }
+  ],
+  "exported_identifiers": {},
+  "context": {},
+  "unit": {
+    "cu_id": "test-project/test1.test.rts rewrite-ts-visualized 0.0.0",
+    "store": {
+      "r0": {
+        "type": "rib",
+        "normal_env": {
+          "suite": [
+            [
+              [
+                "test-project/test1.test.rts rewrite-ts-visualized 0.0.0",
+                ["top", null]
+              ],
+              {
+                "cuid": "dist/index.d.ts vitest 2.1.8",
+                "name": "e.suite.@vitest/runner"
+              }
+            ]
+          ],
+          "test": [
+            [
+              [
+                "test-project/test1.test.rts rewrite-ts-visualized 0.0.0",
+                ["top", null]
+              ],
+              {
+                "cuid": "dist/index.d.ts vitest 2.1.8",
+                "name": "e.test.@vitest/runner"
+              }
+            ]
+          ],
+          "expect": [
+            [
+              [
+                "test-project/test1.test.rts rewrite-ts-visualized 0.0.0",
+                ["top", null]
+              ],
+              {"cuid": "dist/index.d.ts vitest 2.1.8", "name": "l.globalExpect"}
+            ]
+          ]
+        },
+        "types_env": {
+          "suite": [
+            [
+              [
+                "test-project/test1.test.rts rewrite-ts-visualized 0.0.0",
+                ["top", null]
+              ],
+              {
+                "cuid": "dist/index.d.ts vitest 2.1.8",
+                "name": "e.suite.@vitest/runner"
+              }
+            ]
+          ],
+          "test": [
+            [
+              [
+                "test-project/test1.test.rts rewrite-ts-visualized 0.0.0",
+                ["top", null]
+              ],
+              {
+                "cuid": "dist/index.d.ts vitest 2.1.8",
+                "name": "e.test.@vitest/runner"
+              }
+            ]
+          ]
+        },
+        "libs": ["es2024.full"]
+      }
+    }
+  }
+}
