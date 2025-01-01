@@ -1,10 +1,11 @@
-import { AST } from "./serialize";
 import { llmap, llreverse, ll_to_array } from "./llhelpers";
-import { Loc } from "./syntax-structures";
+import { Loc, STX } from "./syntax-structures";
 import { list_tag } from "./tags";
 import * as prettier from "prettier/standalone";
 import * as prettier_ts from "prettier/plugins/typescript";
 import * as prettier_estree from "prettier/plugins/estree";
+import { assert } from "./assert";
+import { AST } from "./ast";
 
 type ns = string | ns[];
 
@@ -28,9 +29,19 @@ function loc_to_ns(loc: Loc): ns {
       }
     }
   }
-  function stx_to_ns(stx: AST, semi: boolean): ns {
-    if (stx.tag === "empty_statement") return "";
-    if (stx.tag === "slice") return ll_to_array(stx.content).map((x) => stx_to_ns(x, true));
+  type src = (AST | STX)["src"];
+  function wrap_src(src: src, content: string): ns {
+    if (!src) return content;
+    if (src.type !== "origin") return wrap_src(src.src, content);
+    // add src
+    return content;
+  }
+  function stx_to_ns(stx: AST | STX, semi: boolean): ns {
+    if (stx.tag === "empty_statement") return [];
+    if (stx.tag === "slice")
+      return ll_to_array(stx.content)
+        .map((x) => stx_to_ns(x, true))
+        .filter((x) => x.length > 0);
     if (semi && stx.tag !== "other") return push_semi(stx_to_ns(stx, false), `;`);
     switch (stx.type) {
       case "list": {
@@ -46,9 +57,9 @@ function loc_to_ns(loc: Loc): ns {
           case "string":
           case "regex":
           case "other":
-            return stx.content;
+            return wrap_src(stx.src, stx.content);
           case "ERROR":
-            return "!!!ERROR!!! " + stx.content + " !!!ERROR!!!";
+            return ["!!!ERROR!!!", wrap_src(stx.src, stx.content), "!!!ERROR!!!"];
           default:
             const invalid: never = stx;
             throw invalid;
