@@ -13,6 +13,7 @@ export type source = {
   e: pos;
   name: string | undefined;
   f: source_file;
+  cuid: string;
 };
 
 export type src = no_source | source;

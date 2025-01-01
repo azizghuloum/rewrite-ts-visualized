@@ -96,7 +96,8 @@ function Example({ code, onChange }: ExampleProps) {
       package: { name: "@rewrite-ts/example", version: "0.0.0" },
       path: "example",
     };
-    const [loc0, expand] = initial_step(parse(code, source_file), "example", ["es2024.full"]);
+    const cuid = "example";
+    const [loc0, expand] = initial_step(parse(code, source_file, cuid), cuid, ["es2024.full"]);
     return [initial_state(loc0), expand];
   }
   const globals = get_globals("es2024.full");

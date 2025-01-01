@@ -21,7 +21,7 @@ import stringify from "json-stringify-pretty-compact";
 import { init_global_context } from "./global-module";
 import { parse_dts } from "./parse-dts";
 
-const cookie = "rewrite-ts-018";
+const cookie = "rewrite-ts-019";
 
 type module_state =
   | { type: "initial" }
@@ -378,7 +378,7 @@ class RtsModule extends Module {
       package: { name: my_pkg.name, version: my_pkg.version },
       path: my_path,
     };
-    const [_loc0, expand] = initial_step(parse(code, source_file), state.cid, this.libs);
+    const [_loc0, expand] = initial_step(parse(code, source_file, state.cid), state.cid, this.libs);
     try {
       const helpers = this.get_preexpand_helpers(my_pkg, my_path);
       const { loc, unit, context, modular } = await expand(helpers);

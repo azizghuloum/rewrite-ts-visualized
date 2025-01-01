@@ -82,7 +82,7 @@ function left_associate(op: string, [head, tail]: [AST, LL<AST>]): AST {
   }
 }
 
-function absurdly(node: TS.Node, source: TS.SourceFile, f: source_file): AST {
+function absurdly(node: TS.Node, source: TS.SourceFile, f: source_file, cuid: string): AST {
   const children = node.getChildren(source);
   if (children.length === 0 && node.kind !== SyntaxKind.SyntaxList) {
     const content = node.getText(source);
@@ -92,6 +92,7 @@ function absurdly(node: TS.Node, source: TS.SourceFile, f: source_file): AST {
       e: node.end,
       f,
       name: node.kind === TS.SyntaxKind.Identifier ? content : undefined,
+      cuid,
     };
     switch (node.kind) {
       case SyntaxKind.NumericLiteral:
@@ -160,8 +161,8 @@ function absurdly(node: TS.Node, source: TS.SourceFile, f: source_file): AST {
       }
     }
   } else {
-    const ls = children.filter((x) => x.kind !== null).map((x) => absurdly(x, source, f));
-    const src: src = { type: "origin", s: node.pos, e: node.end, f, name: undefined };
+    const ls = children.filter((x) => x.kind !== null).map((x) => absurdly(x, source, f, cuid));
+    const src: src = { type: "origin", s: node.pos, e: node.end, f, name: undefined, cuid };
     const content = array_to_ll(ls);
     {
       const tag = remove_singleton_identifier[node.kind];
@@ -352,14 +353,14 @@ function remap_source(ast: AST, code: string) {
   remap(ast);
 }
 
-export function parse(code: string, f: source_file): AST {
+export function parse(code: string, f: source_file, cuid: string): AST {
   try {
     const options: TS.CreateSourceFileOptions = {
       languageVersion: TS.ScriptTarget.ESNext,
       jsDocParsingMode: TS.JSDocParsingMode.ParseNone,
     };
     const src = TS.createSourceFile("code.tsx", code, options);
-    const ast = absurdly(src, src, f);
+    const ast = absurdly(src, src, f, cuid);
     remap_source(ast, code);
     return ast;
   } catch (err) {

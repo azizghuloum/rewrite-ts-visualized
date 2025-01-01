@@ -43,7 +43,9 @@ async function compile_script(filename: string, test_name: string) {
     package: { name: "@rewrite-ts/test", version: "0.0.0" },
     path: filename,
   };
-  const [_loc0, expand] = initial_step(parse(code, source_file), test_name, ["es2024.full"]);
+  const [_loc0, expand] = initial_step(parse(code, source_file, test_name), test_name, [
+    "es2024.full",
+  ]);
   const result = await (async () => {
     try {
       const { loc } = await expand(helpers);

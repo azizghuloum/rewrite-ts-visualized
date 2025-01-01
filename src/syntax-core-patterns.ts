@@ -592,13 +592,15 @@ export const core_handlers: { [k: string]: walker } = {
   define_rewrite_rules,
 };
 
-export const core_patterns = (parse: (code: string, source_file: source_file) => AST) => {
+export const core_patterns = (
+  parse: (code: string, source_file: source_file, cuid: string) => AST,
+) => {
   const pattern = (code: string) => {
     const src: source_file = {
       package: { name: "rewrite-ts", version: "0.0.0" },
       path: "internal-patterns",
     };
-    const ast = parse(code, src);
+    const ast = parse(code, src, "internal-patterns rewrite-ts 0.0.0");
     assert(ast.type === "list" && ast.tag === "program");
     const bodies = ast.content;
     assert(bodies !== null);
