@@ -48,11 +48,11 @@ export async function print_stx_error(error: StxError, library_manager: LibraryM
     assert(pkg !== undefined);
     const full_path = pkg.dir + "/" + x.f.path;
     const code = await fs.readFile(full_path, { encoding: "utf8" });
-    const pos0 = indexToPosition(code, x.p + 1, { oneBased: true });
-    const pos1 = indexToPosition(code, x.e, { oneBased: true });
+    const pos0 = typeof x.s === "number" ? indexToPosition(code, x.s + 1, { oneBased: true }) : x.s;
+    const pos1 = typeof x.e === "number" ? indexToPosition(code, x.e, { oneBased: true }) : x.e;
     const cf = codeFrameColumns(code, { start: pos0, end: pos1 }, { highlightCode: true });
     console.error(cf);
-    console.error(`In ${full_path}:${x.p}-${x.e}`);
+    console.error(`In ${full_path}:${x.s}-${x.e}`);
   }
 }
 

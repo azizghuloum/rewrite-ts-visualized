@@ -16,6 +16,13 @@ export function llmap<X, Y>(ls: LL<X>, f: (x: X) => Y): LL<Y> {
   return ls === null ? null : [f(ls[0]), llmap(ls[1], f)];
 }
 
+export function llforeach<X, Y>(ls: LL<X>, f: (x: X) => Y): void {
+  if (ls !== null) {
+    f(ls[0]);
+    llforeach(ls[1], f);
+  }
+}
+
 export function array_to_ll<X>(a: X[]): LL<X> {
   let ll: LL<X> = null;
   for (let i = a.length - 1; i >= 0; i--) ll = [a[i], ll];
