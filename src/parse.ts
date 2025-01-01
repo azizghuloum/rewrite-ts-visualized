@@ -1,4 +1,4 @@
-import { AST, source_file, src } from "./ast";
+import { AST, src } from "./ast";
 import { atom_tag, list_tag } from "./tags";
 import { array_to_ll, LL, llappend, llforeach } from "./llhelpers";
 import TS, { SyntaxKind } from "typescript";
@@ -82,7 +82,7 @@ function left_associate(op: string, [head, tail]: [AST, LL<AST>]): AST {
   }
 }
 
-function absurdly(node: TS.Node, source: TS.SourceFile, f: source_file, cuid: string): AST {
+function absurdly(node: TS.Node, source: TS.SourceFile, cuid: string): AST {
   const children = node.getChildren(source);
   if (children.length === 0 && node.kind !== SyntaxKind.SyntaxList) {
     const content = node.getText(source);
@@ -90,7 +90,6 @@ function absurdly(node: TS.Node, source: TS.SourceFile, f: source_file, cuid: st
       type: "origin",
       s: node.end - content.length,
       e: node.end,
-      f,
       name: node.kind === TS.SyntaxKind.Identifier ? content : undefined,
       cuid,
     };
@@ -161,8 +160,8 @@ function absurdly(node: TS.Node, source: TS.SourceFile, f: source_file, cuid: st
       }
     }
   } else {
-    const ls = children.filter((x) => x.kind !== null).map((x) => absurdly(x, source, f, cuid));
-    const src: src = { type: "origin", s: node.pos, e: node.end, f, name: undefined, cuid };
+    const ls = children.filter((x) => x.kind !== null).map((x) => absurdly(x, source, cuid));
+    const src: src = { type: "origin", s: node.pos, e: node.end, name: undefined, cuid };
     const content = array_to_ll(ls);
     {
       const tag = remove_singleton_identifier[node.kind];
@@ -234,7 +233,7 @@ function absurdly(node: TS.Node, source: TS.SourceFile, f: source_file, cuid: st
         assert(
           lt.src &&
             rt.src &&
-            lt.src.f === rt.src.f &&
+            lt.src.cuid === rt.src.cuid &&
             typeof lt.src.s === "number" &&
             typeof rt.src.e === "number" &&
             lt.src.s < rt.src.e,
@@ -353,14 +352,14 @@ function remap_source(ast: AST, code: string) {
   remap(ast);
 }
 
-export function parse(code: string, f: source_file, cuid: string): AST {
+export function parse(code: string, cuid: string): AST {
   try {
     const options: TS.CreateSourceFileOptions = {
       languageVersion: TS.ScriptTarget.ESNext,
       jsDocParsingMode: TS.JSDocParsingMode.ParseNone,
     };
     const src = TS.createSourceFile("code.tsx", code, options);
-    const ast = absurdly(src, src, f, cuid);
+    const ast = absurdly(src, src, cuid);
     remap_source(ast, code);
     return ast;
   } catch (err) {

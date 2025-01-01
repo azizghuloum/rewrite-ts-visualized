@@ -1,6 +1,6 @@
 {
   "cid": "test-project/mod.rts rewrite-ts-visualized 0.0.0",
-  "cookie": "rewrite-ts-019",
+  "cookie": "rewrite-ts-020",
   "imports": [],
   "exported_identifiers": {
     "x": [
@@ -67,13 +67,6 @@
                   "type": "origin",
                   "s": {"line": 5, "column": 28, "offset": 89},
                   "e": {"line": 5, "column": 32, "offset": 93},
-                  "f": {
-                    "package": {
-                      "name": "rewrite-ts-visualized",
-                      "version": "0.0.0"
-                    },
-                    "path": "test-project/mod.rts"
-                  },
                   "name": "fref",
                   "cuid": "test-project/mod.rts rewrite-ts-visualized 0.0.0"
                 }
@@ -107,13 +100,6 @@
                 "type": "origin",
                 "s": {"line": 5, "column": 40, "offset": 101},
                 "e": {"line": 5, "column": 41, "offset": 102},
-                "f": {
-                  "package": {
-                    "name": "rewrite-ts-visualized",
-                    "version": "0.0.0"
-                  },
-                  "path": "test-project/mod.rts"
-                },
                 "name": "f",
                 "cuid": "test-project/mod.rts rewrite-ts-visualized 0.0.0"
               }

@@ -7,7 +7,6 @@ import { initial_step } from "./src/expander";
 import { pprint } from "./src/pprint";
 import { StxError, syntax_error } from "./src/stx-error";
 import { preexpand_helpers } from "./src/preexpand-helpers";
-import { source_file } from "./src/ast";
 import { get_globals, init_global_context } from "./src/global-module";
 
 const test_dir = __dirname + "/tests";
@@ -39,13 +38,7 @@ async function compile_script(filename: string, test_name: string) {
       return k();
     },
   };
-  const source_file: source_file = {
-    package: { name: "@rewrite-ts/test", version: "0.0.0" },
-    path: filename,
-  };
-  const [_loc0, expand] = initial_step(parse(code, source_file, test_name), test_name, [
-    "es2024.full",
-  ]);
+  const [_loc0, expand] = initial_step(parse(code, test_name), test_name, ["es2024.full"]);
   const result = await (async () => {
     try {
       const { loc } = await expand(helpers);

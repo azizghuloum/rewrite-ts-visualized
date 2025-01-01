@@ -1,6 +1,6 @@
 {
   "cid": "test-project/main.rts rewrite-ts-visualized 0.0.0",
-  "cookie": "rewrite-ts-019",
+  "cookie": "rewrite-ts-020",
   "imports": [
     {
       "pkg": {"name": "rewrite-ts-visualized", "version": "0.0.0"},
