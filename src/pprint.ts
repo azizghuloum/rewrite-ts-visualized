@@ -8,6 +8,7 @@ import * as prettier_estree from "prettier/plugins/estree";
 import { SourceMapGenerator } from "source-map";
 import { Base64 } from "js-base64";
 import { assert } from "./assert";
+import * as Diff from "diff";
 
 type n = { val: string; src: source | false };
 type ns = n | ns[];
@@ -202,7 +203,9 @@ async function add_src_map(code: string, ls: n[], options: map_options): Promise
   });
   const map_string = srcmap.toString();
   const base64 = Base64.encode(map_string);
-  return `${code}\n//# sourceMappingURL=data:application/json;charset=utf-8;base64,${base64}\n`;
+  return (
+    `${code}\n` + `//# sourceMappingURL=data:application/json;charset=utf-8;base64,${base64}\n`
+  );
 }
 
 export async function pretty_print(code: string) {
@@ -223,12 +226,54 @@ type options = {
   map?: map_options;
 };
 
+type d = { added: boolean; removed: boolean; value: string };
+
+function remap(ls: n[], diffs: d[]): n[] {
+  const new_ls: n[] = [];
+  let i = 0,
+    j = 0;
+  while (i < diffs.length) {
+    const { added, removed, value } = diffs[i];
+    if (added) {
+      if (removed) {
+        throw new Error("invalid diff");
+      } else {
+        // new text added
+        new_ls.push({ src: false, val: value });
+      }
+    } else {
+      if (removed) {
+        /* nothing added but stuff removed */
+        let k = 0;
+        while (k < value.length) {
+          const item = ls[j];
+          k += item.val.length;
+          j += 1;
+        }
+        assert(k === value.length);
+      } else {
+        /* nothing added and nothing removed */
+        let k = 0;
+        while (k < value.length) {
+          const item = ls[j];
+          new_ls.push(item);
+          k += item.val.length;
+          j += 1;
+        }
+        assert(k === value.length);
+      }
+    }
+    i += 1;
+  }
+  assert(j === ls.length);
+  return new_ls;
+}
+
 export async function pprint(loc: Loc, options: options): Promise<string> {
   const ls = ns_flatten(loc_to_ns(loc));
   const code = ls.map((x) => x.val).join("");
-  return options.prettify
-    ? await pretty_print(code)
-    : options.map
-      ? add_src_map(code, ls, options.map)
-      : code;
+  const pretty = await pretty_print(code);
+  const diff = Diff.diffWordsWithSpace(code, pretty);
+  const pretty_ls = remap(ls, diff);
+  return options.map ? add_src_map(pretty, pretty_ls, options.map) : pretty;
 }
