@@ -280,6 +280,9 @@ const list_handlers_table: { [tag in list_tag]: "descend" | "stop" | "todo" } = 
   type_operator: "todo",
   type_predicate: "todo",
   type_reference: "todo",
+  new_expression: "descend",
+  throw_statement: "descend",
+  element_access_expression: "descend",
   syntax_list: "descend",
 };
 

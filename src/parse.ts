@@ -36,6 +36,9 @@ const pass_through: { [k in SyntaxKind]?: list_tag } = {
   [SyntaxKind.MethodSignature]: "method_signature",
   [SyntaxKind.ParenthesizedType]: "parenthesized_type",
   [SyntaxKind.TypePredicate]: "type_predicate",
+  [SyntaxKind.NewExpression]: "new_expression",
+  [SyntaxKind.ThrowStatement]: "throw_statement",
+  [SyntaxKind.ElementAccessExpression]: "element_access_expression",
   [SyntaxKind.SyntaxList]: "syntax_list",
 };
 
@@ -152,6 +155,8 @@ function absurdly(node: TS.Node, source: TS.SourceFile, cuid: string): AST {
       case SyntaxKind.IsKeyword:
       case SyntaxKind.SymbolKeyword:
       case SyntaxKind.ReadonlyKeyword:
+      case SyntaxKind.NewKeyword:
+      case SyntaxKind.ThrowKeyword:
         return { type: "atom", tag: "other", content, src };
       case SyntaxKind.EndOfFileToken:
         return { type: "atom", tag: "other", content, src };

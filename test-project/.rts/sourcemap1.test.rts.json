@@ -1,5 +1,5 @@
 {
-  "cid": "test-project/test1.test.rts rewrite-ts-visualized 0.0.0",
+  "cid": "test-project/sourcemap1.test.rts rewrite-ts-visualized 0.0.0",
   "cookie": "rewrite-ts-021",
   "imports": [
     {
@@ -8,9 +8,12 @@
     }
   ],
   "exported_identifiers": {},
-  "context": {},
+  "context": {
+    "l3": {"type": "lexical", "name": "err_3"},
+    "l4": {"type": "lexical", "name": "trace_4"}
+  },
   "unit": {
-    "cu_id": "test-project/test1.test.rts rewrite-ts-visualized 0.0.0",
+    "cu_id": "test-project/sourcemap1.test.rts rewrite-ts-visualized 0.0.0",
     "store": {
       "r0": {
         "type": "rib",
@@ -18,7 +21,7 @@
           "suite": [
             [
               [
-                "test-project/test1.test.rts rewrite-ts-visualized 0.0.0",
+                "test-project/sourcemap1.test.rts rewrite-ts-visualized 0.0.0",
                 ["top", null]
               ],
               {
@@ -30,7 +33,7 @@
           "test": [
             [
               [
-                "test-project/test1.test.rts rewrite-ts-visualized 0.0.0",
+                "test-project/sourcemap1.test.rts rewrite-ts-visualized 0.0.0",
                 ["top", null]
               ],
               {
@@ -42,7 +45,7 @@
           "expect": [
             [
               [
-                "test-project/test1.test.rts rewrite-ts-visualized 0.0.0",
+                "test-project/sourcemap1.test.rts rewrite-ts-visualized 0.0.0",
                 ["top", null]
               ],
               {"cuid": "dist/index.d.ts vitest 2.1.8", "name": "l.globalExpect"}
@@ -53,7 +56,7 @@
           "suite": [
             [
               [
-                "test-project/test1.test.rts rewrite-ts-visualized 0.0.0",
+                "test-project/sourcemap1.test.rts rewrite-ts-visualized 0.0.0",
                 ["top", null]
               ],
               {
@@ -65,7 +68,7 @@
           "test": [
             [
               [
-                "test-project/test1.test.rts rewrite-ts-visualized 0.0.0",
+                "test-project/sourcemap1.test.rts rewrite-ts-visualized 0.0.0",
                 ["top", null]
               ],
               {

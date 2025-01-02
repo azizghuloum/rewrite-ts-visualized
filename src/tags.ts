@@ -68,5 +68,8 @@ export type list_tag =
   | "method_signature"
   | "parenthesized_type"
   | "type_predicate"
+  | "new_expression"
+  | "throw_statement"
   | "syntax_list"
+  | "element_access_expression"
   | "ERROR";

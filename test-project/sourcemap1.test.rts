@@ -1,0 +1,11 @@
+import { expect, test, suite } from "vitest";
+
+suite("source mapping for errors", () => {
+  test("simple error", () => {
+    const err = new Error("HERE"); 
+    //          ^--- error origin
+    // put cursor on the new keyword and check that position is 5:17
+    const trace = err.stack.split("\n");
+    expect(trace[1]).toMatch(/\/sourcemap1\.test\.rts:5:17$/);
+  });
+});
