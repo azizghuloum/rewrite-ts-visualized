@@ -15,6 +15,7 @@ export type import_resolution = {
 //    };
 
 export type imported_module = {
+  path: string;
   imported_modules: imported_module[];
   dependant_modules: imported_module[];
   resolve_exported_identifier: (name: string, loc: Loc) => Promise<import_resolution[]>;

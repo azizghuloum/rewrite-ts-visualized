@@ -1,6 +1,6 @@
-import { AST, source_file, src } from "./ast";
-import { list_tag } from "./tags";
-import { array_to_ll, LL, llappend } from "./llhelpers";
+import { AST, src } from "./ast";
+import { atom_tag, list_tag } from "./tags";
+import { array_to_ll, LL, llappend, llforeach } from "./llhelpers";
 import TS, { SyntaxKind } from "typescript";
 import { assert } from "./assert";
 
@@ -36,6 +36,9 @@ const pass_through: { [k in SyntaxKind]?: list_tag } = {
   [SyntaxKind.MethodSignature]: "method_signature",
   [SyntaxKind.ParenthesizedType]: "parenthesized_type",
   [SyntaxKind.TypePredicate]: "type_predicate",
+  [SyntaxKind.NewExpression]: "new_expression",
+  [SyntaxKind.ThrowStatement]: "throw_statement",
+  [SyntaxKind.ElementAccessExpression]: "element_access_expression",
   [SyntaxKind.SyntaxList]: "syntax_list",
 };
 
@@ -54,7 +57,7 @@ const remove_singleton_identifier: { [k in SyntaxKind]?: list_tag } = {
   [SyntaxKind.ImportSpecifier]: "import_specifier",
 };
 
-function left_associate(op: string, [head, tail]: [AST, LL<AST>], src: src): AST {
+function left_associate(op: string, [head, tail]: [AST, LL<AST>]): AST {
   function f(head: AST, tail: LL<AST>): AST {
     if (tail === null) {
       return head;
@@ -63,6 +66,11 @@ function left_associate(op: string, [head, tail]: [AST, LL<AST>], src: src): AST
       assert(t0.content === op);
       assert(t1 !== null);
       const [t2, t3] = t1;
+      const src0 = head.src;
+      assert(src0 !== false);
+      const src1 = t2.src;
+      assert(src1 !== false);
+      const src: src = { ...src0, e: src1.e };
       return f(
         { type: "list", tag: "binary_expression", content: [head, [t0, [t2, null]]], src },
         t3,
@@ -77,11 +85,17 @@ function left_associate(op: string, [head, tail]: [AST, LL<AST>], src: src): AST
   }
 }
 
-function absurdly(node: TS.Node, source: TS.SourceFile, f: source_file): AST {
-  const src: src = { type: "origin", p: node.pos, e: node.end, f };
+function absurdly(node: TS.Node, source: TS.SourceFile, cuid: string): AST {
   const children = node.getChildren(source);
   if (children.length === 0 && node.kind !== SyntaxKind.SyntaxList) {
     const content = node.getText(source);
+    const src: src = {
+      type: "origin",
+      s: node.end - content.length,
+      e: node.end,
+      name: node.kind === TS.SyntaxKind.Identifier ? content : undefined,
+      cuid,
+    };
     switch (node.kind) {
       case SyntaxKind.NumericLiteral:
         return { type: "atom", tag: "number", content, src };
@@ -111,6 +125,7 @@ function absurdly(node: TS.Node, source: TS.SourceFile, f: source_file): AST {
       case SyntaxKind.GreaterThanToken:
       case SyntaxKind.EqualsToken:
       case SyntaxKind.BarToken:
+      case SyntaxKind.BarBarToken:
       case SyntaxKind.AmpersandToken:
       case SyntaxKind.ImportKeyword:
       case SyntaxKind.ExportKeyword:
@@ -141,6 +156,8 @@ function absurdly(node: TS.Node, source: TS.SourceFile, f: source_file): AST {
       case SyntaxKind.IsKeyword:
       case SyntaxKind.SymbolKeyword:
       case SyntaxKind.ReadonlyKeyword:
+      case SyntaxKind.NewKeyword:
+      case SyntaxKind.ThrowKeyword:
         return { type: "atom", tag: "other", content, src };
       case SyntaxKind.EndOfFileToken:
         return { type: "atom", tag: "other", content, src };
@@ -149,7 +166,8 @@ function absurdly(node: TS.Node, source: TS.SourceFile, f: source_file): AST {
       }
     }
   } else {
-    const ls = children.filter((x) => x.kind !== null).map((x) => absurdly(x, source, f));
+    const ls = children.filter((x) => x.kind !== null).map((x) => absurdly(x, source, cuid));
+    const src: src = { type: "origin", s: node.pos, e: node.end, name: undefined, cuid };
     const content = array_to_ll(ls);
     {
       const tag = remove_singleton_identifier[node.kind];
@@ -198,6 +216,7 @@ function absurdly(node: TS.Node, source: TS.SourceFile, f: source_file): AST {
               ls[0].content[0], // export keyword
               llappend(ls[1].content, [ls[2], null]),
             ],
+            src,
           };
         } else {
           return { type: "list", tag: "ERROR", content, src };
@@ -217,13 +236,27 @@ function absurdly(node: TS.Node, source: TS.SourceFile, f: source_file): AST {
         assert(ls.length === 5, ls);
         const [lt, fmls, rt, ar, body] = ls;
         assert(fmls.tag === "syntax_list", fmls);
+        assert(
+          lt.src &&
+            rt.src &&
+            lt.src.cuid === rt.src.cuid &&
+            typeof lt.src.s === "number" &&
+            typeof rt.src.e === "number" &&
+            lt.src.s < rt.src.e,
+        );
+        const args_src = { ...lt.src, p: lt.src.s, e: rt.src.e };
         const args: AST = {
           type: "list",
           tag: "formal_parameters",
           content: [lt, llappend(fmls.content, [rt, null])],
-          src,
+          src: args_src,
         };
-        return { type: "list", tag: "arrow_function", content: [args, [ar, [body, null]]], src };
+        return {
+          type: "list",
+          tag: "arrow_function",
+          content: [args, [ar, [body, null]]],
+          src: src,
+        };
       }
       case SyntaxKind.ShorthandPropertyAssignment:
       case SyntaxKind.LiteralType:
@@ -249,14 +282,14 @@ function absurdly(node: TS.Node, source: TS.SourceFile, f: source_file): AST {
         const x = ls[0];
         assert(x.tag === "syntax_list");
         assert(x.content !== null);
-        return left_associate("|", x.content, src);
+        return left_associate("|", x.content);
       }
       case SyntaxKind.IntersectionType: {
         assert(ls.length === 1);
         const x = ls[0];
         assert(x.tag === "syntax_list");
         assert(x.content !== null);
-        return left_associate("&", x.content, src);
+        return left_associate("&", x.content);
       }
       case SyntaxKind.AsExpression: {
         assert(ls.length === 3);
@@ -284,14 +317,56 @@ function absurdly(node: TS.Node, source: TS.SourceFile, f: source_file): AST {
   }
 }
 
-export function parse(code: string, f: source_file): AST {
+function remap_source(ast: AST, code: string) {
+  let offset = 0;
+  let line = 0;
+  let column = 0;
+
+  function get_src(
+    p: number,
+    tag: list_tag | atom_tag,
+    content: any,
+  ): { line: number; column: number; offset: number } {
+    if (p > offset) {
+      const frag = code.slice(offset, p);
+      const lines = frag.split(/\(\r\n\)|\r|\n/g);
+      if (lines.length === 1) {
+        const l0 = lines[0];
+        column += l0.split("").length;
+      } else {
+        assert(lines.length > 1);
+        line += lines.length - 1;
+        column = lines[lines.length - 1].split("").length;
+      }
+      offset = p;
+    }
+    assert(p === offset, `rewind from ${offset} to ${p} in ${tag} ${content}`);
+    return { line, column, offset };
+  }
+
+  function remap(ast: AST) {
+    assert(ast.src !== false);
+    assert(typeof ast.src.s === "number", JSON.stringify(ast));
+    ast.src.s = get_src(ast.src.s, ast.tag, ast.content);
+    if (ast.type === "list") {
+      llforeach(ast.content, remap);
+    }
+    assert(typeof ast.src.e === "number");
+    ast.src.e = get_src(ast.src.e, ast.tag, ast.content);
+  }
+
+  remap(ast);
+}
+
+export function parse(code: string, cuid: string): AST {
   try {
     const options: TS.CreateSourceFileOptions = {
       languageVersion: TS.ScriptTarget.ESNext,
       jsDocParsingMode: TS.JSDocParsingMode.ParseNone,
     };
     const src = TS.createSourceFile("code.tsx", code, options);
-    const ast = absurdly(src, src, f);
+    const ast = absurdly(src, src, cuid);
+    remap_source(ast, code);
     return ast;
   } catch (err) {
     console.error(err);

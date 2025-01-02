@@ -14,14 +14,14 @@ import {
   get_exported_identifiers_from_rib,
   exported_identifiers,
 } from "./preexpand-helpers";
-import { AST, source_file } from "./ast";
+import { AST } from "./ast";
 import { normalize } from "node:path";
 import { Binding, CompilationUnit, Context, Loc, Rib } from "./syntax-structures";
 import stringify from "json-stringify-pretty-compact";
 import { init_global_context } from "./global-module";
 import { parse_dts } from "./parse-dts";
 
-const cookie = "rewrite-ts-016";
+const cookie = "rewrite-ts-021";
 
 type module_state =
   | { type: "initial" }
@@ -374,11 +374,7 @@ class RtsModule extends Module {
     const code = await fs.readFile(this.path, { encoding: "utf-8" });
     const my_pkg = this.pkg;
     const my_path = this.pkg_relative_path;
-    const source_file: source_file = {
-      package: { name: my_pkg.name, version: my_pkg.version },
-      path: my_path,
-    };
-    const [_loc0, expand] = initial_step(parse(code, source_file), state.cid, this.libs);
+    const [_loc0, expand] = initial_step(parse(code, state.cid), state.cid, this.libs);
     try {
       const helpers = this.get_preexpand_helpers(my_pkg, my_path);
       const { loc, unit, context, modular } = await expand(helpers);
@@ -406,7 +402,20 @@ class RtsModule extends Module {
       };
       const code_path = this.get_generated_code_absolute_path();
       await fs.mkdir(dirname(code_path), { recursive: true });
-      await fs.writeFile(code_path, await pprint(loc));
+      await fs.writeFile(
+        code_path,
+        await pprint(loc, {
+          prettify: false,
+          map: {
+            filename: basename(code_path),
+            resolve: async (cuid: string) => {
+              const mod = this.find_module_by_cid(cuid);
+              assert(mod !== undefined);
+              return relative(dirname(code_path), mod.path);
+            },
+          },
+        }),
+      );
       await fs.writeFile(this.get_proxy_path(), proxy_code);
       const mtime = Date.now();
       await fs.writeFile(this.get_json_path(), stringify(json_content));
@@ -415,7 +424,12 @@ class RtsModule extends Module {
     } catch (error) {
       this.state = { type: "error", reason: String(error) };
       if (error instanceof StxError) {
-        await print_stx_error(error, this.library_manager);
+        await print_stx_error(error, {
+          get_module_by_cuid: (cuid) => {
+            return this.find_module_by_cid(cuid);
+          },
+          //this.library_manager
+        });
       } else {
         console.error(error);
       }

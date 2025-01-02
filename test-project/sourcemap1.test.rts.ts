@@ -1,2 +1,2 @@
 /* This is an automatically generated file.  Do not edit. */
-import {  } from "./.rts/test1.test.rts.ts";
+import {  } from "./.rts/sourcemap1.test.rts.ts";

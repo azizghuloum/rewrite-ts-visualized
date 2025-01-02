@@ -1,4 +1,3 @@
-import { assert } from "./assert";
 import { Loc, STX } from "./syntax-structures";
 import { isolate, unisolate } from "./zipper";
 import indexToPosition from "index-to-position";
@@ -6,6 +5,7 @@ import { codeFrameColumns } from "@babel/code-frame";
 import fs from "node:fs/promises";
 import { llmap, llreduce } from "./llhelpers";
 import { AST, source } from "./ast";
+import { assert } from "./assert";
 
 export class StxError {
   name: string;
@@ -36,7 +36,7 @@ export const in_isolation: <G extends { loc: Loc }>(
 };
 
 type LibraryManager = {
-  get_package: (name: string, version: string) => { dir: string } | undefined;
+  get_module_by_cuid: (cuid: string) => { path: string } | undefined;
 };
 
 export async function print_stx_error(error: StxError, library_manager: LibraryManager) {
@@ -44,15 +44,15 @@ export async function print_stx_error(error: StxError, library_manager: LibraryM
   if (error.info) console.error(error.info);
   const ls = loc_src_origins(error.loc.t);
   for (const x of ls) {
-    const pkg = library_manager.get_package(x.f.package.name, x.f.package.version);
-    assert(pkg !== undefined);
-    const full_path = pkg.dir + "/" + x.f.path;
+    const mod = library_manager.get_module_by_cuid(x.cuid);
+    assert(mod !== undefined, `cannot find module with cuid ${x.cuid}`);
+    const full_path = mod.path;
     const code = await fs.readFile(full_path, { encoding: "utf8" });
-    const pos0 = indexToPosition(code, x.p + 1, { oneBased: true });
-    const pos1 = indexToPosition(code, x.e, { oneBased: true });
+    const pos0 = typeof x.s === "number" ? indexToPosition(code, x.s + 1, { oneBased: true }) : x.s;
+    const pos1 = typeof x.e === "number" ? indexToPosition(code, x.e, { oneBased: true }) : x.e;
     const cf = codeFrameColumns(code, { start: pos0, end: pos1 }, { highlightCode: true });
     console.error(cf);
-    console.error(`In ${full_path}:${x.p}-${x.e}`);
+    console.error(`In ${full_path}:${x.s}-${x.e}`);
   }
 }
 

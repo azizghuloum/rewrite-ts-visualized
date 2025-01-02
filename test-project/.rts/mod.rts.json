@@ -1,6 +1,6 @@
 {
   "cid": "test-project/mod.rts rewrite-ts-visualized 0.0.0",
-  "cookie": "rewrite-ts-016",
+  "cookie": "rewrite-ts-021",
   "imports": [],
   "exported_identifiers": {
     "x": [
@@ -65,15 +65,10 @@
                 "content": "fref",
                 "src": {
                   "type": "origin",
-                  "p": 88,
-                  "e": 93,
-                  "f": {
-                    "package": {
-                      "name": "rewrite-ts-visualized",
-                      "version": "0.0.0"
-                    },
-                    "path": "test-project/mod.rts"
-                  }
+                  "s": {"line": 5, "column": 28, "offset": 89},
+                  "e": {"line": 5, "column": 32, "offset": 93},
+                  "name": "fref",
+                  "cuid": "test-project/mod.rts rewrite-ts-visualized 0.0.0"
                 }
               }
             },
@@ -103,15 +98,10 @@
               "content": "f",
               "src": {
                 "type": "origin",
-                "p": 94,
-                "e": 96,
-                "f": {
-                  "package": {
-                    "name": "rewrite-ts-visualized",
-                    "version": "0.0.0"
-                  },
-                  "path": "test-project/mod.rts"
-                }
+                "s": {"line": 5, "column": 40, "offset": 101},
+                "e": {"line": 5, "column": 41, "offset": 102},
+                "name": "f",
+                "cuid": "test-project/mod.rts rewrite-ts-visualized 0.0.0"
               }
             }
           }

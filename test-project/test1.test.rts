@@ -1,7 +1,0 @@
-import { expect, test, suite } from "vitest";
-
-suite("sample test", () => {
-  test("should work", () => {
-    expect(5).toBe(5);
-  });
-});

@@ -11,7 +11,6 @@ import { parse } from "../src/parse";
 import { pprint } from "../src/pprint";
 import { StxError, syntax_error } from "../src/stx-error";
 import { preexpand_helpers } from "../src/preexpand-helpers";
-import { source_file } from "../src/ast";
 import { get_globals, init_global_context } from "../src/global-module";
 
 type ExampleProps = {
@@ -92,11 +91,8 @@ function StepperView({ step, step_number }: { step: Step; step_number: number })
 function Example({ code, onChange }: ExampleProps) {
   type expand = (helpers: preexpand_helpers) => Promise<{ loc: Loc }>;
   function init_state(code: string): [State, expand] {
-    const source_file: source_file = {
-      package: { name: "@rewrite-ts/example", version: "0.0.0" },
-      path: "example",
-    };
-    const [loc0, expand] = initial_step(parse(code, source_file), "example", ["es2024.full"]);
+    const cuid = "example";
+    const [loc0, expand] = initial_step(parse(code, cuid), cuid, ["es2024.full"]);
     return [initial_state(loc0), expand];
   }
   const globals = get_globals("es2024.full");
@@ -162,7 +158,10 @@ function Example({ code, onChange }: ExampleProps) {
     state.pointer === null || state.pointer >= state.prev_steps.length
       ? [state.last_step, state.step_number]
       : [state.prev_steps[state.pointer], state.pointer];
-  const code_to_display = useMemo(() => pprint(display_step.loc), [display_step]);
+  const code_to_display = useMemo(
+    () => pprint(display_step.loc, { prettify: true }),
+    [display_step],
+  );
   return (
     <div>
       <input

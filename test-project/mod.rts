@@ -3,6 +3,6 @@ export type t = number;
 
 const f = 13;
 
-define_rewrite_rules([fref, fref, f]);
+define_rewrite_rules([fref, fref,       f]);
 
 export {fref};
