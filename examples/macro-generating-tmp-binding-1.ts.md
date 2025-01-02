@@ -19,9 +19,9 @@ const tmp = 17; // which has nothing to do with this tmp
 ### Output Program
 
 ```typescript
-export const x_1 = 1;
-export const tmp_2 = x_1;
-console.log(tmp_2);
-export const tmp_3 = 17;
+export const x$1 = 1;
+export const tmp$2 = x$1;
+console.log(tmp$2);
+export const tmp$3 = 17;
 ```
 

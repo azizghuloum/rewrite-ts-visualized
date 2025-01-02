@@ -1,6 +1,6 @@
 {
   "cid": "test-project/mod.rts rewrite-ts-visualized 0.0.0",
-  "cookie": "rewrite-ts-022",
+  "cookie": "rewrite-ts-024",
   "imports": [],
   "exported_identifiers": {
     "x": [
@@ -32,9 +32,9 @@
     ]
   },
   "context": {
-    "l1": {"type": "lexical", "name": "x_1"},
-    "l2": {"type": "type", "name": "t_2"},
-    "l3": {"type": "lexical", "name": "f_3"},
+    "l1": {"type": "lexical", "name": "x$1"},
+    "l2": {"type": "type", "name": "t$2"},
+    "l3": {"type": "lexical", "name": "f$3"},
     "l4": {
       "type": "syntax_rules_transformer",
       "clauses": [

@@ -21,7 +21,7 @@ import stringify from "json-stringify-pretty-compact";
 import { init_global_context } from "./global-module";
 import { parse_dts } from "./parse-dts";
 
-const cookie = "rewrite-ts-022";
+const cookie = "rewrite-ts-024";
 
 type module_state =
   | { type: "initial" }

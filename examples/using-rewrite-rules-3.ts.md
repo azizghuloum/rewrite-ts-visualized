@@ -15,7 +15,7 @@ const x = 12;
 ### Output Program
 
 ```typescript
-(foo_2) => x_1 + x_1;
-export const x_1 = 12;
+(foo$2) => x$1 + x$1;
+export const x$1 = 12;
 ```
 

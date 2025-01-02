@@ -1,9 +1,9 @@
-import { suite as suite_1, test as test_2, expect as expect_5 } from "vitest";
-suite_1("source mapping for errors", () => {
-  test_2("simple error", () => {
-    const err_3 = new Error("HERE");
-    const trace_4 = (err_3.stack || "").split("\n");
-    expect_5(trace_4[1]).toMatch(/\/sourcemap1\.test\.rts:5:17$/);
+import { suite as suite$1, test as test$2, expect as expect$5 } from "vitest";
+suite$1("source mapping for errors", () => {
+  test$2("simple error", () => {
+    const err$3 = new Error("HERE");
+    const trace$4 = (err$3.stack || "").split("\n");
+    expect$5(trace$4[1]).toMatch(/\/sourcemap1\.test\.rts:5:17$/);
   });
 });
 

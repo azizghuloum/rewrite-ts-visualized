@@ -22,9 +22,9 @@ using_rewrite_rules(
 ### Output Program
 
 ```typescript
-(x_1) => {
-  const using_rewrite_rules_2 = 10;
-  (x_3) => x_3 + x_1;
+(x$1) => {
+  const using_rewrite_rules$2 = 10;
+  (x$3) => x$3 + x$1;
 };
 ```
 

@@ -13,8 +13,8 @@ type q = number;
 ### Output Program
 
 ```typescript
-export type t_1 = string;
-export const t_2 = 12;
-export type q_3 = number;
+export type t$1 = string;
+export const t$2 = 12;
+export type q$3 = number;
 ```
 

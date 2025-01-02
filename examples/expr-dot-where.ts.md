@@ -20,6 +20,6 @@ console.log(x + y).where(x = 1, y = x + 2);
 ### Output Program
 
 ```typescript
-((x_1) => ((y_2) => console.log(x_1 + y_2))(x_1 + 2))(1);
+((x$1) => ((y$2) => console.log(x$1 + y$2))(x$1 + 2))(1);
 ```
 

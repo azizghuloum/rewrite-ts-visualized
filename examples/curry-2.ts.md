@@ -19,6 +19,6 @@ const curried =
 ### Output Program
 
 ```typescript
-export const curried_1 = (a_2) => (b_3) => (c_4) => (d_5) => a_2 + b_3 + c_4 + d_5;
+export const curried$1 = (a$2) => (b$3) => (c$4) => (d$5) => a$2 + b$3 + c$4 + d$5;
 ```
 

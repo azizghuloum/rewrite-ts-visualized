@@ -241,7 +241,7 @@ export function extend_context_lexical<S>(
   original_name: string,
   k: (args: { context: Context; name: string; counters: counters }) => S,
 ): S {
-  const new_name = `${original_name}_${counters.vars}`;
+  const new_name = `${original_name}$${counters.vars}`;
   const new_counters = { ...counters, vars: counters.vars + 1 };
   const new_context: Context = {
     ...context,
