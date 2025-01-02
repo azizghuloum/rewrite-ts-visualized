@@ -12,7 +12,7 @@ export type explicitly_exported_type = number; // this should stay exported in t
 ### Output Program
 
 ```typescript
-export type not_explicitly_exported_type_1 = string;
-export type explicitly_exported_type_2 = number;
+export type not_explicitly_exported_type$1 = string;
+export type explicitly_exported_type$2 = number;
 ```
 

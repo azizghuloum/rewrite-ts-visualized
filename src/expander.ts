@@ -1118,7 +1118,7 @@ const sort_env = { type: "types_env" as const, value: "normal_env" as const };
 const postexpand_forms = (sort: "type" | "value") => non_modular(postexpand_body(sort));
 
 function cleanup_name(name: string): string {
-  return name.replace(/(_\d+)+$/, "");
+  return name.replace(/(\$\d+)+$/, "");
 }
 
 const postexpand_body = (sort: "type" | "value") => (data: data) => {
@@ -1164,7 +1164,7 @@ const postexpand_body = (sort: "type" | "value") => (data: data) => {
                       return cont({ ...data, loc: rename(loc, existing.new_name) });
                     } else {
                       const { name } = binding;
-                      const new_name = `${cleanup_name(name)}_${counters.vars}`;
+                      const new_name = `${cleanup_name(name)}$${counters.vars}`;
                       const new_counters = { ...counters, vars: counters.vars + 1 };
                       const new_imp: import_req = {
                         ...imp,

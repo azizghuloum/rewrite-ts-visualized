@@ -1,6 +1,6 @@
 {
   "cid": "test-project/sourcemap1.test.rts rewrite-ts-visualized 0.0.0",
-  "cookie": "rewrite-ts-022",
+  "cookie": "rewrite-ts-025",
   "imports": [
     {
       "pkg": {"name": "vitest", "version": "2.1.8"},
@@ -9,8 +9,8 @@
   ],
   "exported_identifiers": {},
   "context": {
-    "l3": {"type": "lexical", "name": "err_3"},
-    "l4": {"type": "lexical", "name": "trace_4"}
+    "l3": {"type": "lexical", "name": "err$3"},
+    "l4": {"type": "lexical", "name": "trace$4"}
   },
   "unit": {
     "cu_id": "test-project/sourcemap1.test.rts rewrite-ts-visualized 0.0.0",

@@ -16,9 +16,9 @@ const foo = (x) => {
 ### Output Program
 
 ```typescript
-export const foo_1 = (x_2) => {
-  x_2;
-  x_2;
+export const foo$1 = (x$2) => {
+  x$2;
+  x$2;
 };
 ```
 

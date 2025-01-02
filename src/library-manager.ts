@@ -21,7 +21,7 @@ import stringify from "json-stringify-pretty-compact";
 import { init_global_context } from "./global-module";
 import { parse_dts } from "./parse-dts";
 
-const cookie = "rewrite-ts-022";
+const cookie = "rewrite-ts-025";
 
 type module_state =
   | { type: "initial" }
@@ -406,6 +406,7 @@ class RtsModule extends Module {
         code_path,
         await pprint(loc, {
           prettify: false,
+          add_warning: true,
           map: {
             filename: basename(code_path),
             resolve: async (cuid: string) => {
