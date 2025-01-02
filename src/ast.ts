@@ -3,8 +3,6 @@ import { atom_tag, list_tag } from "./tags";
 
 export type no_source = false;
 
-//export type source_file = { package: { name: string; version: string }; path: string };
-
 export type pos = number | { line: number; column: number; offset: number };
 
 export type source = {

@@ -125,6 +125,7 @@ function absurdly(node: TS.Node, source: TS.SourceFile, cuid: string): AST {
       case SyntaxKind.GreaterThanToken:
       case SyntaxKind.EqualsToken:
       case SyntaxKind.BarToken:
+      case SyntaxKind.BarBarToken:
       case SyntaxKind.AmpersandToken:
       case SyntaxKind.ImportKeyword:
       case SyntaxKind.ExportKeyword:
