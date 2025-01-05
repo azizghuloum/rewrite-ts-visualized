@@ -1,6 +1,6 @@
 {
   "cid": "test-project/sourcemap1.test.rts rewrite-ts-visualized 0.0.0",
-  "cookie": "rewrite-ts-025",
+  "cookie": "rewrite-ts-026",
   "imports": [
     {
       "pkg": {"name": "vitest", "version": "2.1.8"},
@@ -25,7 +25,7 @@
                 ["top", null]
               ],
               {
-                "cuid": "dist/index.d.ts vitest 2.1.8",
+                "cuid": "./dist/index.d.ts vitest 2.1.8",
                 "name": "e.suite.@vitest/runner"
               }
             ]
@@ -37,7 +37,7 @@
                 ["top", null]
               ],
               {
-                "cuid": "dist/index.d.ts vitest 2.1.8",
+                "cuid": "./dist/index.d.ts vitest 2.1.8",
                 "name": "e.test.@vitest/runner"
               }
             ]
@@ -48,7 +48,10 @@
                 "test-project/sourcemap1.test.rts rewrite-ts-visualized 0.0.0",
                 ["top", null]
               ],
-              {"cuid": "dist/index.d.ts vitest 2.1.8", "name": "l.globalExpect"}
+              {
+                "cuid": "./dist/index.d.ts vitest 2.1.8",
+                "name": "l.globalExpect"
+              }
             ]
           ]
         },
@@ -60,7 +63,7 @@
                 ["top", null]
               ],
               {
-                "cuid": "dist/index.d.ts vitest 2.1.8",
+                "cuid": "./dist/index.d.ts vitest 2.1.8",
                 "name": "e.suite.@vitest/runner"
               }
             ]
@@ -72,7 +75,7 @@
                 ["top", null]
               ],
               {
-                "cuid": "dist/index.d.ts vitest 2.1.8",
+                "cuid": "./dist/index.d.ts vitest 2.1.8",
                 "name": "e.test.@vitest/runner"
               }
             ]

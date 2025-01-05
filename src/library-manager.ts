@@ -21,7 +21,7 @@ import stringify from "json-stringify-pretty-compact";
 import { init_global_context } from "./global-module";
 import { parse_dts } from "./parse-dts";
 
-const cookie = "rewrite-ts-025";
+const cookie = "rewrite-ts-026";
 
 type module_state =
   | { type: "initial" }
@@ -38,7 +38,7 @@ type module_state =
       unit: CompilationUnit;
       mtime: number;
     }
-  | { type: "error"; reason: string };
+  | { type: "error"; reason: string; mtime: number };
 
 abstract class Module implements imported_module {
   pkg: Package;
@@ -177,7 +177,7 @@ abstract class Module implements imported_module {
   async force_recompile() {
     const state = this.state;
     await this.ensureUpToDate();
-    assert(state.type === "fresh");
+    assert(state.type === "fresh" || state.type === "error");
     this.state = { ...state, type: "stale" };
     const dependant_modules = this.dependant_modules;
     dependant_modules.forEach(
@@ -197,7 +197,8 @@ abstract class Module implements imported_module {
     await this.ensureUpToDate();
     const state = this.state;
     switch (state.type) {
-      case "fresh": {
+      case "fresh":
+      case "error": {
         if (t && t > state.mtime) {
           await this.force_recompile();
         }
@@ -223,6 +224,7 @@ abstract class Module implements imported_module {
   get_mtime(): number {
     switch (this.state.type) {
       case "fresh":
+      case "error":
         return this.state.mtime;
       default:
         throw new Error(`invalid state for '${this.path}'`);
@@ -409,7 +411,8 @@ class RtsModule extends Module {
       this.state = { ...state, type: "fresh", ...json_content, mtime };
       console.log(`up to date ${this.cuid}`);
     } catch (error) {
-      this.state = { type: "error", reason: String(error) };
+      const mtime = Date.now();
+      this.state = { type: "error", reason: String(error), mtime };
       if (error instanceof StxError) {
         await print_stx_error(error, {
           get_module_by_cuid: (cuid) => {
