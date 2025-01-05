@@ -223,6 +223,7 @@ function absurdly(node: TS.Node, source: TS.SourceFile, cuid: string): AST {
         }
       }
       case SyntaxKind.CallExpression: {
+        if (ls.length !== 4) return { type: "list", tag: "ERROR", content, src };
         assert(ls.length === 4, ls);
         assert(ls[2].tag === "syntax_list");
         return {

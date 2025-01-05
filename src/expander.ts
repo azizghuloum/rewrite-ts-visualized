@@ -418,9 +418,11 @@ const preexpand_forms =
           switch (loc.t.tag) {
             case "export_declaration":
             case "arrow_function":
+            case "ERROR":
               return next(loc);
             case "member_expression":
               return descend(loc);
+
             default: {
               if (list_handlers_table[loc.t.tag] === "todo") {
                 debug(loc, `todo list handler for '${loc.t.tag}'`);
@@ -1239,6 +1241,8 @@ const postexpand_body = (sort: "type" | "value") => (data: data) => {
                 .then(cont),
             );
           }
+          case "ERROR":
+            return cont({ ...data, loc });
           default: {
             if (list_handlers_table[loc.t.tag] !== "descend") {
               debug(loc, `unhandled '${loc.t.tag}' form in postexpand_body`);
