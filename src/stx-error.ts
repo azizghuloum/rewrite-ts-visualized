@@ -48,11 +48,17 @@ export async function print_stx_error(error: StxError, library_manager: LibraryM
     assert(mod !== undefined, `cannot find module with cuid ${x.cuid}`);
     const full_path = mod.path;
     const code = await fs.readFile(full_path, { encoding: "utf8" });
-    const pos0 = typeof x.s === "number" ? indexToPosition(code, x.s + 1, { oneBased: true }) : x.s;
-    const pos1 = typeof x.e === "number" ? indexToPosition(code, x.e, { oneBased: true }) : x.e;
+    const pos0 =
+      typeof x.s === "number"
+        ? indexToPosition(code, x.s + 1, { oneBased: true })
+        : { line: x.s.line + 1, column: x.s.column + 1 };
+    const pos1 =
+      typeof x.e === "number"
+        ? indexToPosition(code, x.e, { oneBased: true })
+        : { line: x.e.line + 1, column: x.e.column + 1 };
     const cf = codeFrameColumns(code, { start: pos0, end: pos1 }, { highlightCode: true });
     console.error(cf);
-    console.error(`In ${full_path}:${x.s}-${x.e}`);
+    console.error(`In ${full_path}:${pos0.line}:${pos0.column}-${pos1.line}:${pos1.column}`);
   }
 }
 

@@ -26,15 +26,13 @@ const cookie = "rewrite-ts-025";
 type module_state =
   | { type: "initial" }
   | { type: "initializing"; promise: Promise<void> }
-  | { type: "stale"; cid: string }
+  | { type: "stale" }
   | {
       type: "compiling";
-      cid: string;
       promise: Promise<void>;
     }
   | {
       type: "fresh";
-      cid: string;
       exported_identifiers: { [name: string]: import_resolution[] };
       context: Context;
       unit: CompilationUnit;
@@ -53,6 +51,7 @@ abstract class Module implements imported_module {
   global_context: Context;
   imported_modules: imported_module[] = [];
   dependant_modules: imported_module[] = [];
+  cuid: string;
 
   abstract do_recompile(): Promise<void>;
 
@@ -65,6 +64,7 @@ abstract class Module implements imported_module {
     global_unit: CompilationUnit,
     global_context: Context,
   ) {
+    this.cuid = `${pkg_relative_path} ${pkg.name} ${pkg.version}`;
     this.pkg = pkg;
     this.pkg_relative_path = pkg_relative_path;
     this.path = path;
@@ -100,23 +100,21 @@ abstract class Module implements imported_module {
 
   private async do_initialize() {
     assert(this.state.type === "initial", `invalid state ${this.state.type}`);
-    const [pkg, pkg_relative_path] = await this.library_manager.findPackage(this.path);
-    const cid = `${pkg_relative_path} ${pkg.name} ${pkg.version}`;
-    console.log(`initializing ${cid}`);
+    console.log(`initializing ${this.cuid}`);
     const json_path = this.get_json_path();
     const json_mtime = await mtime(json_path);
     const my_mtime = await mtime(this.path);
     assert(my_mtime !== undefined, `no mtime for '${this.path}'`);
     if (json_mtime === undefined || my_mtime >= json_mtime) {
-      this.state = { type: "stale", cid };
+      this.state = { type: "stale" };
       return;
     }
     const json = JSON.parse(await fs.readFile(json_path, { encoding: "utf8" }));
     if (json.cookie !== cookie) {
-      this.state = { type: "stale", cid };
+      this.state = { type: "stale" };
       return;
     }
-    assert(json.cid === cid);
+    assert(json.cid === this.cuid);
     assert(json.exported_identifiers !== undefined, `no exported_identifiers in ${json_path}`);
     assert(json.context !== undefined, `no exported_identifiers in ${json_path}`);
     assert(json.imports);
@@ -136,15 +134,14 @@ abstract class Module implements imported_module {
       ),
     );
     if (imported_modules.some((x) => x.get_mtime() > json_mtime)) {
-      this.state = { type: "stale", cid };
+      this.state = { type: "stale" };
       return;
     }
     this.imported_modules = imported_modules;
     imported_modules.forEach((x) => x.dependant_modules.push(this));
-    console.log(`up to date ${cid}`);
+    console.log(`up to date ${this.cuid}`);
     this.state = {
       type: "fresh",
-      cid,
       exported_identifiers: json.exported_identifiers,
       context: json.context,
       unit: json.unit,
@@ -223,17 +220,6 @@ abstract class Module implements imported_module {
     return resolutions;
   }
 
-  get_cid(): string {
-    switch (this.state.type) {
-      case "fresh":
-      case "stale":
-      case "compiling":
-        return this.state.cid;
-      default:
-        throw new Error(`invalid state ${this.state.type}`);
-    }
-  }
-
   get_mtime(): number {
     switch (this.state.type) {
       case "fresh":
@@ -244,7 +230,7 @@ abstract class Module implements imported_module {
   }
 
   find_module_by_cid(cid: string): imported_module | undefined {
-    if (this.get_cid() === cid) return this;
+    if (this.cuid === cid) return this;
     for (const m of this.imported_modules) {
       const r = m.find_module_by_cid(cid);
       if (r) return r;
@@ -259,13 +245,13 @@ abstract class Module implements imported_module {
     if (!binding) throw new Error(`binding missing for ${name} in ${this.path}`);
     switch (binding.type) {
       case "lexical":
-        return { type: "imported_lexical", cuid: this.state.cid, name: binding.name };
+        return { type: "imported_lexical", cuid: this.cuid, name: binding.name };
       case "type":
-        return { type: "imported_type", cuid: this.state.cid, name: binding.name };
+        return { type: "imported_type", cuid: this.cuid, name: binding.name };
       case "syntax_rules_transformer":
         return {
           type: "imported_syntax_rules_transformer",
-          cuid: this.state.cid,
+          cuid: this.cuid,
           clauses: binding.clauses,
         };
       case "imported_type":
@@ -370,11 +356,11 @@ class RtsModule extends Module {
   async do_recompile() {
     const state = this.state;
     assert(state.type === "stale");
-    console.log(`recompiling ${state.cid} ...`);
+    console.log(`recompiling ${this.cuid} ...`);
     const code = await fs.readFile(this.path, { encoding: "utf-8" });
     const my_pkg = this.pkg;
     const my_path = this.pkg_relative_path;
-    const [_loc0, expand] = initial_step(parse(code, state.cid), state.cid, this.libs);
+    const [_loc0, expand] = initial_step(parse(code, this.cuid), this.cuid, this.libs);
     try {
       const helpers = this.get_preexpand_helpers(my_pkg, my_path);
       const { loc, unit, context, modular } = await expand(helpers);
@@ -386,11 +372,11 @@ class RtsModule extends Module {
       );
       const exported_identifiers = get_exported_identifiers_from_rib(
         modular.explicit,
-        state.cid,
+        this.cuid,
         context,
       );
       const json_content = {
-        cid: state.cid,
+        cid: this.cuid,
         cookie,
         imports: this.imported_modules.map((x) => {
           const [pkg, path] = x.get_pkg_and_path();
@@ -421,7 +407,7 @@ class RtsModule extends Module {
       const mtime = Date.now();
       await fs.writeFile(this.get_json_path(), stringify(json_content));
       this.state = { ...state, type: "fresh", ...json_content, mtime };
-      console.log(`up to date ${state.cid}`);
+      console.log(`up to date ${this.cuid}`);
     } catch (error) {
       this.state = { type: "error", reason: String(error) };
       if (error instanceof StxError) {
@@ -442,16 +428,15 @@ class DtsModule extends Module {
   async do_recompile() {
     const state = this.state;
     assert(state.type === "stale");
-    console.log(`recompiling ${state.cid} ...`);
+    console.log(`recompiling ${this.cuid} ...`);
     const my_path = this.pkg_relative_path;
     const dts_mtime = await mtime(this.path);
     assert(dts_mtime !== undefined, `error reading mtime of ${this.path}`);
     const code = await fs.readFile(this.path, { encoding: "utf-8" });
     const ts_exports = parse_dts(code, my_path, this.path);
-    const cid = state.cid;
     const rib: Rib = { type: "rib", types_env: {}, normal_env: {} };
     const unit: CompilationUnit = {
-      cu_id: cid,
+      cu_id: this.cuid,
       store: { r0: rib },
     };
     const unique_imports: { [k: string]: boolean } = {};
@@ -476,12 +461,12 @@ class DtsModule extends Module {
             if (binding.is_type) {
               const label = `t.${binding.name}`;
               context[label] = { type: "type", name };
-              res.push({ type: "type", label: { cuid: cid, name: label } });
+              res.push({ type: "type", label: { cuid: this.cuid, name: label } });
             }
             if (binding.is_lexical) {
               const label = `l.${binding.name}`;
               context[label] = { type: "lexical", name };
-              res.push({ type: "lexical", label: { cuid: cid, name: label } });
+              res.push({ type: "lexical", label: { cuid: this.cuid, name: label } });
             }
             return [name, res];
           }
@@ -499,7 +484,7 @@ class DtsModule extends Module {
             }
             const res: import_resolution = {
               type: "ts",
-              label: { cuid: cid, name: label },
+              label: { cuid: this.cuid, name: label },
             };
             return [name, [res]];
           }
@@ -511,7 +496,7 @@ class DtsModule extends Module {
     );
     const exported_identifiers: exported_identifiers = Object.fromEntries(export_entries);
     const json_content = {
-      cid: state.cid,
+      cid: this.cuid,
       cookie,
       imports: this.imported_modules.map((x) => {
         const [pkg, path] = x.get_pkg_and_path();
@@ -527,7 +512,7 @@ class DtsModule extends Module {
     //const mtime = Date.now();
     // await fs.writeFile(this.get_json_path(), stringify(json_content));
     this.state = { ...state, type: "fresh", ...json_content, mtime: dts_mtime };
-    console.log(`up to date ${state.cid}`);
+    console.log(`up to date ${this.cuid}`);
   }
 }
 

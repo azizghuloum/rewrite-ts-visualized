@@ -16,11 +16,11 @@ export type import_resolution = {
 
 export type imported_module = {
   path: string;
+  cuid: string;
   imported_modules: imported_module[];
   dependant_modules: imported_module[];
   resolve_exported_identifier: (name: string, loc: Loc) => Promise<import_resolution[]>;
   ensureUpToDate(): Promise<void>;
-  get_cid(): string;
   find_module_by_cid(cid: string): imported_module | undefined;
   resolve_label(name: string): Promise<Binding>;
   get_pkg_and_path(): [
