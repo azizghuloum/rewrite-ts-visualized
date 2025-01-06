@@ -32,7 +32,15 @@ export const in_isolation: <G extends { loc: Loc }>(
   loc: Loc,
   f: (loc: Loc) => Promise<G>,
 ) => Promise<Omit<G, "loc"> & { loc: Loc }> = async (loc, f) => {
-  return f(isolate(loc)).then(({ loc: res, ...g }) => ({ ...g, loc: unisolate(loc, res) }));
+  return f(isolate(loc))
+    .then(({ loc: res, ...g }) => ({ ...g, loc: unisolate(loc, res) }))
+    .catch((err) => {
+      if (err instanceof StxError) {
+        throw new StxError(err.name, unisolate(loc, err.loc), err.error, err.info);
+      } else {
+        throw err;
+      }
+    });
 };
 
 type LibraryManager = {

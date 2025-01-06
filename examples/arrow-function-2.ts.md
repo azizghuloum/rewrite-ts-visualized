@@ -18,6 +18,8 @@ const foo = (x) => {
 ### Output Program
 
 ```typescript
-const /*>>>*/ x /*<<<*/ = 13;
+const foo$1 = (x$2) => {
+  const /*>>>*/ x /*<<<*/ = 13;
+};
 ```
 

@@ -15,6 +15,7 @@ consoel.log("hello world");
 ### Output Program
 
 ```typescript
-consoel;
+/*>>>*/ consoel /*<<<*/
+  .log("hello world");
 ```
 
