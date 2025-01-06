@@ -233,7 +233,7 @@ const import_declaration: walker = async ({ loc, helpers, ...data }) => {
     type: "list",
     tag: "slice",
     content: null,
-    src: loc.t,
+    origin: loc.t,
     wrap: undefined,
   };
   return go_down(

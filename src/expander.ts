@@ -81,14 +81,14 @@ async function generate_imports(imp: import_req, helpers: preexpand_helpers): Pr
           type: "atom",
           tag: "identifier",
           content: rhs.new_name,
-          src: false,
+          origin: false,
           wrap: empty_wrap,
         };
         const orig_name: STX = {
           type: "atom",
           tag: "identifier",
           content: binding.name,
-          src: false,
+          origin: false,
           wrap: empty_wrap,
         };
         const code: STX = {
@@ -98,7 +98,7 @@ async function generate_imports(imp: import_req, helpers: preexpand_helpers): Pr
             binding.type === "imported_type" ? [type_keyword, null] : null,
             array_to_ll([orig_name, as_keyword, new_name]),
           ),
-          src: false,
+          origin: false,
           wrap: empty_wrap,
         };
         return code;
@@ -108,7 +108,6 @@ async function generate_imports(imp: import_req, helpers: preexpand_helpers): Pr
     return {
       type: "list",
       tag: "import_declaration",
-      src: false,
       wrap: empty_wrap,
       content: array_to_ll([
         import_keyword,
@@ -124,11 +123,13 @@ async function generate_imports(imp: import_req, helpers: preexpand_helpers): Pr
               null,
             ]),
           ),
+          origin: false,
         },
         from_keyword,
         string_literal(import_path),
         semi_keyword,
       ]),
+      origin: false,
     };
   }
   return Promise.all(Object.entries(imp).map(([cuid, bindings]) => generate(cuid, bindings)));
@@ -165,14 +166,14 @@ async function expand_program({ loc, ...data }: data): Promise<{
       tag: "export_declaration",
       wrap: empty_wrap,
       content: array_to_ll([export_keyword, lt_brace_keyword, rt_brace_keyword]),
-      src: false,
+      origin: false,
     };
     const empty_program: STX = {
       type: "list",
       tag: "program",
       wrap: empty_wrap,
       content: array_to_ll([empty_export]),
-      src: false,
+      origin: false,
     };
     return { loc: mkzipper(empty_program), ...data };
   }
@@ -720,7 +721,7 @@ function string_literal(value: string): STX {
     tag: "string",
     content: JSON.stringify(value),
     wrap: empty_wrap,
-    src: false,
+    origin: false,
   };
 }
 
@@ -729,7 +730,7 @@ const empty_slice: STX = {
   tag: "slice",
   content: null,
   wrap: empty_wrap,
-  src: false,
+  origin: false,
 };
 
 const export_keyword: STX = {
@@ -737,7 +738,7 @@ const export_keyword: STX = {
   tag: "other",
   content: "export",
   wrap: empty_wrap,
-  src: false,
+  origin: false,
 };
 
 const comma_keyword: STX = {
@@ -745,7 +746,7 @@ const comma_keyword: STX = {
   tag: "other",
   content: ",",
   wrap: empty_wrap,
-  src: false,
+  origin: false,
 };
 
 const semi_keyword: STX = {
@@ -753,7 +754,7 @@ const semi_keyword: STX = {
   tag: "other",
   content: ";",
   wrap: empty_wrap,
-  src: false,
+  origin: false,
 };
 
 const lt_brace_keyword: STX = {
@@ -761,7 +762,7 @@ const lt_brace_keyword: STX = {
   tag: "other",
   content: "{",
   wrap: empty_wrap,
-  src: false,
+  origin: false,
 };
 
 const rt_brace_keyword: STX = {
@@ -769,7 +770,7 @@ const rt_brace_keyword: STX = {
   tag: "other",
   content: "}",
   wrap: empty_wrap,
-  src: false,
+  origin: false,
 };
 
 const import_keyword: STX = {
@@ -777,7 +778,7 @@ const import_keyword: STX = {
   tag: "other",
   content: "import",
   wrap: empty_wrap,
-  src: false,
+  origin: false,
 };
 
 const type_keyword: STX = {
@@ -785,7 +786,7 @@ const type_keyword: STX = {
   tag: "other",
   content: "type",
   wrap: empty_wrap,
-  src: false,
+  origin: false,
 };
 
 const from_keyword: STX = {
@@ -793,7 +794,7 @@ const from_keyword: STX = {
   tag: "other",
   content: "from",
   wrap: empty_wrap,
-  src: false,
+  origin: false,
 };
 
 const as_keyword: STX = {
@@ -801,7 +802,7 @@ const as_keyword: STX = {
   tag: "other",
   content: "as",
   wrap: empty_wrap,
-  src: false,
+  origin: false,
 };
 
 const insert_export_keyword: swalker = ({ loc, counters, modular, imp, ...data }) => {
@@ -1110,7 +1111,7 @@ function rename(loc: Loc, new_name: string): Loc {
     tag: "identifier",
     wrap: { marks: null, subst: null, aes: null },
     content: new_name,
-    src: loc.t,
+    origin: loc.t,
   };
   return change(loc, mkzipper(new_id));
 }

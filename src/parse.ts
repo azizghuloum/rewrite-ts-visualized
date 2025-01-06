@@ -1,4 +1,4 @@
-import { AST, src } from "./ast";
+import { AST, origin } from "./ast";
 import { atom_tag, list_tag } from "./tags";
 import { array_to_ll, LL, llappend, llforeach } from "./llhelpers";
 import TS, { SyntaxKind } from "typescript";
@@ -66,13 +66,13 @@ function left_associate(op: string, [head, tail]: [AST, LL<AST>]): AST {
       assert(t0.content === op);
       assert(t1 !== null);
       const [t2, t3] = t1;
-      const src0 = head.src;
+      const src0 = head.origin;
       assert(src0 !== false);
-      const src1 = t2.src;
+      const src1 = t2.origin;
       assert(src1 !== false);
-      const src: src = { ...src0, e: src1.e };
+      const origin: origin = { ...src0, e: src1.e };
       return f(
-        { type: "list", tag: "binary_expression", content: [head, [t0, [t2, null]]], src },
+        { type: "list", tag: "binary_expression", content: [head, [t0, [t2, null]]], origin },
         t3,
       );
     }
@@ -89,7 +89,7 @@ function absurdly(node: TS.Node, source: TS.SourceFile, cuid: string): AST {
   const children = node.getChildren(source);
   if (children.length === 0 && node.kind !== SyntaxKind.SyntaxList) {
     const content = node.getText(source);
-    const src: src = {
+    const origin: origin = {
       type: "origin",
       s: node.end - content.length,
       e: node.end,
@@ -98,13 +98,13 @@ function absurdly(node: TS.Node, source: TS.SourceFile, cuid: string): AST {
     };
     switch (node.kind) {
       case SyntaxKind.NumericLiteral:
-        return { type: "atom", tag: "number", content, src };
+        return { type: "atom", tag: "number", content, origin };
       case SyntaxKind.StringLiteral:
-        return { type: "atom", tag: "string", content, src };
+        return { type: "atom", tag: "string", content, origin };
       case SyntaxKind.Identifier:
-        return { type: "atom", tag: "identifier", content, src };
+        return { type: "atom", tag: "identifier", content, origin };
       case SyntaxKind.RegularExpressionLiteral:
-        return { type: "atom", tag: "regex", content, src };
+        return { type: "atom", tag: "regex", content, origin };
       case SyntaxKind.OpenParenToken:
       case SyntaxKind.CloseParenToken:
       case SyntaxKind.EqualsGreaterThanToken:
@@ -158,16 +158,16 @@ function absurdly(node: TS.Node, source: TS.SourceFile, cuid: string): AST {
       case SyntaxKind.ReadonlyKeyword:
       case SyntaxKind.NewKeyword:
       case SyntaxKind.ThrowKeyword:
-        return { type: "atom", tag: "other", content, src };
+        return { type: "atom", tag: "other", content, origin };
       case SyntaxKind.EndOfFileToken:
-        return { type: "atom", tag: "other", content, src };
+        return { type: "atom", tag: "other", content, origin };
       default: {
         throw new Error(`unknown atom '${TS.SyntaxKind[node.kind]}':'${node.getText(source)}'`);
       }
     }
   } else {
     const ls = children.filter((x) => x.kind !== null).map((x) => absurdly(x, source, cuid));
-    const src: src = { type: "origin", s: node.pos, e: node.end, name: undefined, cuid };
+    const origin: origin = { type: "origin", s: node.pos, e: node.end, name: undefined, cuid };
     const content = array_to_ll(ls);
     {
       const tag = remove_singleton_identifier[node.kind];
@@ -175,13 +175,13 @@ function absurdly(node: TS.Node, source: TS.SourceFile, cuid: string): AST {
         if (ls.length === 1 && ls[0].tag === "identifier") {
           return ls[0];
         } else {
-          return { type: "list", tag, content, src };
+          return { type: "list", tag, content, origin };
         }
       }
     }
     {
       const tag = pass_through[node.kind];
-      if (tag) return { type: "list", tag, content, src };
+      if (tag) return { type: "list", tag, content, origin };
     }
     {
       const tag = splice_middle[node.kind];
@@ -192,7 +192,7 @@ function absurdly(node: TS.Node, source: TS.SourceFile, cuid: string): AST {
           type: "list",
           tag,
           content: [ls[0], llappend(ls[1].content, [ls[2], null])],
-          src,
+          origin,
         };
       }
     }
@@ -216,21 +216,21 @@ function absurdly(node: TS.Node, source: TS.SourceFile, cuid: string): AST {
               ls[0].content[0], // export keyword
               llappend(ls[1].content, [ls[2], null]),
             ],
-            src,
+            origin,
           };
         } else {
-          return { type: "list", tag: "ERROR", content, src };
+          return { type: "list", tag: "ERROR", content, origin };
         }
       }
       case SyntaxKind.CallExpression: {
-        if (ls.length !== 4) return { type: "list", tag: "ERROR", content, src };
+        if (ls.length !== 4) return { type: "list", tag: "ERROR", content, origin };
         assert(ls.length === 4, ls);
         assert(ls[2].tag === "syntax_list");
         return {
           type: "list",
           tag: "call_expression",
           content: [ls[0], [ls[1], llappend(ls[2].content, [ls[3], null])]],
-          src,
+          origin,
         };
       }
       case SyntaxKind.ArrowFunction: {
@@ -238,25 +238,25 @@ function absurdly(node: TS.Node, source: TS.SourceFile, cuid: string): AST {
         const [lt, fmls, rt, ar, body] = ls;
         assert(fmls.tag === "syntax_list", fmls);
         assert(
-          lt.src &&
-            rt.src &&
-            lt.src.cuid === rt.src.cuid &&
-            typeof lt.src.s === "number" &&
-            typeof rt.src.e === "number" &&
-            lt.src.s < rt.src.e,
+          lt.origin &&
+            rt.origin &&
+            lt.origin.cuid === rt.origin.cuid &&
+            typeof lt.origin.s === "number" &&
+            typeof rt.origin.e === "number" &&
+            lt.origin.s < rt.origin.e,
         );
-        const args_src = { ...lt.src, p: lt.src.s, e: rt.src.e };
+        const args_src = { ...lt.origin, p: lt.origin.s, e: rt.origin.e };
         const args: AST = {
           type: "list",
           tag: "formal_parameters",
           content: [lt, llappend(fmls.content, [rt, null])],
-          src: args_src,
+          origin: args_src,
         };
         return {
           type: "list",
           tag: "arrow_function",
           content: [args, [ar, [body, null]]],
-          src: src,
+          origin,
         };
       }
       case SyntaxKind.ShorthandPropertyAssignment:
@@ -270,13 +270,18 @@ function absurdly(node: TS.Node, source: TS.SourceFile, cuid: string): AST {
         assert(ls[1].content === "", ls[1]);
         const fst = ls[0];
         assert(fst.tag === "syntax_list", fst);
-        return { type: "list", tag: "program", content: fst.content, src };
+        return { type: "list", tag: "program", content: fst.content, origin };
       }
       case SyntaxKind.VariableDeclarationList: {
         assert(ls.length === 2, ls);
         const [kwd, decls] = ls;
         assert(decls.tag === "syntax_list");
-        return { type: "list", tag: "lexical_declaration", content: [kwd, decls.content], src };
+        return {
+          type: "list",
+          tag: "lexical_declaration",
+          content: [kwd, decls.content],
+          origin,
+        };
       }
       case SyntaxKind.UnionType: {
         assert(ls.length === 1);
@@ -294,7 +299,7 @@ function absurdly(node: TS.Node, source: TS.SourceFile, cuid: string): AST {
       }
       case SyntaxKind.AsExpression: {
         assert(ls.length === 3);
-        return { type: "list", tag: "binary_expression", content, src };
+        return { type: "list", tag: "binary_expression", content, origin };
       }
       case SyntaxKind.TypeAliasDeclaration: {
         assert(content !== null);
@@ -304,10 +309,10 @@ function absurdly(node: TS.Node, source: TS.SourceFile, cuid: string): AST {
             type: "list",
             tag: "type_alias_declaration",
             content: llappend(fst.content, rest),
-            src,
+            origin,
           };
         } else {
-          return { type: "list", tag: "type_alias_declaration", content, src };
+          return { type: "list", tag: "type_alias_declaration", content, origin };
         }
       }
       default:
@@ -346,14 +351,14 @@ function remap_source(ast: AST, code: string) {
   }
 
   function remap(ast: AST) {
-    assert(ast.src !== false);
-    assert(typeof ast.src.s === "number", JSON.stringify(ast));
-    ast.src.s = get_src(ast.src.s, ast.tag, ast.content);
+    assert(ast.origin !== false);
+    assert(typeof ast.origin.s === "number", JSON.stringify(ast));
+    ast.origin.s = get_src(ast.origin.s, ast.tag, ast.content);
     if (ast.type === "list") {
       llforeach(ast.content, remap);
     }
-    assert(typeof ast.src.e === "number");
-    ast.src.e = get_src(ast.src.e, ast.tag, ast.content);
+    assert(typeof ast.origin.e === "number");
+    ast.origin.e = get_src(ast.origin.e, ast.tag, ast.content);
   }
 
   remap(ast);
@@ -371,6 +376,6 @@ export function parse(code: string, cuid: string): AST {
     return ast;
   } catch (err) {
     console.error(err);
-    return { type: "list", tag: "ERROR", content: null, src: false };
+    return { type: "list", tag: "ERROR", content: null, origin: false };
   }
 }

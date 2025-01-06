@@ -13,7 +13,7 @@ export type source = {
   cuid: string;
 };
 
-export type src = no_source | source;
+export type origin = no_source | source;
 
 export type AST =
   | {
@@ -21,12 +21,12 @@ export type AST =
       wrap?: undefined;
       tag: atom_tag;
       content: string;
-      src: src;
+      origin: origin;
     }
   | {
       type: "list";
       wrap?: undefined;
       tag: list_tag;
       content: LL<AST>;
-      src: src;
+      origin: origin;
     };

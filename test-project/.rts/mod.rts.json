@@ -1,6 +1,6 @@
 {
   "cid": "test-project/mod.rts rewrite-ts-visualized 0.0.0",
-  "cookie": "rewrite-ts-026",
+  "cookie": "rewrite-ts-027",
   "imports": [],
   "exported_identifiers": {
     "x": [
@@ -59,11 +59,11 @@
               },
               "tag": "identifier",
               "content": "fref",
-              "src": {
+              "origin": {
                 "type": "atom",
                 "tag": "identifier",
                 "content": "fref",
-                "src": {
+                "origin": {
                   "type": "origin",
                   "s": {"line": 5, "column": 28, "offset": 89},
                   "e": {"line": 5, "column": 32, "offset": 93},
@@ -92,11 +92,11 @@
             },
             "tag": "identifier",
             "content": "f",
-            "src": {
+            "origin": {
               "type": "atom",
               "tag": "identifier",
               "content": "f",
-              "src": {
+              "origin": {
                 "type": "origin",
                 "s": {"line": 5, "column": 40, "offset": 101},
                 "e": {"line": 5, "column": 41, "offset": 102},

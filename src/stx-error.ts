@@ -62,14 +62,15 @@ export async function print_stx_error(error: StxError, library_manager: LibraryM
   }
 }
 
-function loc_src_origins(t: STX | AST | false): source[] {
+function loc_src_origins(t: STX | AST | source | false): source[] {
   if (t === false) return [];
+  if (t.type === "origin") return [t];
   const wrap_srcs = llreduce(
     llmap(t.wrap?.aes ?? null, loc_src_origins),
     (s1, s2) => [...s1, ...s2],
     [] as source[],
   );
-  const src = t.src;
+  const src = t.origin;
   if (src) {
     switch (src.type) {
       case "origin":

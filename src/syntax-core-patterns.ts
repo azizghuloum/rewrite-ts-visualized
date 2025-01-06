@@ -264,7 +264,7 @@ const splice: walker = async ({ loc, context, unit, lexical, helpers, ...data })
     tag: "slice",
     wrap: undefined,
     content: body_code,
-    src: false,
+    origin: false,
   };
   return {
     loc: change(unification.loc, mkzipper(result)),
@@ -454,7 +454,7 @@ function search_and_replace(stx: STX, subst: subst, loc: Loc): LL<STX> {
             llappend,
             null as LL<STX>,
           ),
-          src: stx.src,
+          origin: stx.origin,
         },
         null,
       ];
@@ -552,7 +552,7 @@ const define_rewrite_rules: walker = async ({
       tag: "slice",
       wrap: { marks: null, subst: null, aes: [loc.t, null] },
       content: null,
-      src: false,
+      origin: false,
     }),
   );
   return {

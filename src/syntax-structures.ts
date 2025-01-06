@@ -1,5 +1,5 @@
-import { TaggedReconstructiveZipper } from "zipper";
-import { AST } from "./ast";
+import { TaggedReconstructiveZipperWithOrigin } from "zipper";
+import { AST, source } from "./ast";
 import { atom_tag, list_tag } from "./tags";
 import { LL } from "./llhelpers";
 import { counters } from "./data";
@@ -67,16 +67,16 @@ export type RibRef = { rib_id: string; cu_id: string };
 
 export type Subst = LL<Shift | RibRef>;
 
-export type AE = false | STX | AST;
+export type origin = false | STX | AST | source;
 
-export type Wrap = { marks: Marks; subst: Subst; aes: LL<AE> };
+export type Wrap = { marks: Marks; subst: Subst; aes: LL<origin> };
 
 export type STX =
-  | { type: "list"; tag: list_tag; wrap: Wrap; content: LL<STX | AST>; src: AE }
-  | { type: "list"; tag: list_tag; wrap: undefined; content: LL<STX>; src: AE }
-  | { type: "atom"; tag: atom_tag; wrap: Wrap; content: string; src: AE };
+  | { type: "list"; tag: list_tag; wrap: Wrap; content: LL<STX | AST>; origin: origin }
+  | { type: "list"; tag: list_tag; wrap: undefined; content: LL<STX>; origin: origin }
+  | { type: "atom"; tag: atom_tag; wrap: Wrap; content: string; origin: origin };
 
-export type Loc = TaggedReconstructiveZipper.Loc<list_tag, STX>;
+export type Loc = TaggedReconstructiveZipperWithOrigin.Loc<list_tag, STX, origin>;
 
 export type Binding =
   | { type: "lexical"; name: string }

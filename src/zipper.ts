@@ -1,7 +1,7 @@
-import { TaggedReconstructiveZipper as Zipper } from "zipper";
+import { TaggedReconstructiveZipperWithOrigin as Zipper } from "zipper";
 import { assert } from "./assert";
 import { LL, llappend, llmap } from "./llhelpers";
-import { STX, Loc, Wrap } from "./syntax-structures";
+import { STX, Loc, Wrap, origin } from "./syntax-structures";
 import { push_wrap } from "./stx";
 import { list_tag } from "./tags";
 import { syntax_error } from "./stx-error";
@@ -45,7 +45,7 @@ export function go_down<S>(loc: Loc, k: (loc: Loc) => S, fk?: (loc: Loc) => S): 
   return k(
     Zipper.go_down(loc, (t, cb) => {
       assert(t.type === "list");
-      return cb(t.tag, stx_list_content(t));
+      return cb(t.tag, stx_list_content(t), t.origin);
     }),
   );
 }
@@ -66,6 +66,7 @@ export function unisolate(loc: Loc, new_loc: Loc): Loc {
           l: np.l,
           p: rewrap(op, np.p),
           r: np.r,
+          o: np.o,
         };
     }
   }
@@ -87,8 +88,8 @@ export function change_splicing(loc: Loc, list: [STX, LL<STX>]): Loc {
   };
 }
 
-function mkstx(tag: list_tag, content: LL<STX>): STX {
-  return { type: "list", tag, wrap: undefined, content, src: false };
+function mkstx(tag: list_tag, content: LL<STX>, origin: origin): STX {
+  return { type: "list", tag, wrap: undefined, content, origin };
 }
 
 export function go_next<S>(loc: Loc, sk: (loc: Loc) => S, fk: (loc: Loc) => S): S {

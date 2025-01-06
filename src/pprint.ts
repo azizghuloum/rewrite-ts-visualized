@@ -33,10 +33,10 @@ function loc_to_ns(loc: Loc): ns {
       return ns.val.endsWith(";") ? ns : [ns, { val: semi, src: false }];
     }
   }
-  type src = (AST | STX)["src"];
+  type src = (AST | STX)["origin"];
   function wrap_src(src: src, content: string): ns {
     if (!src) return { val: content, src: false };
-    if (src.type !== "origin") return wrap_src(src.src, content);
+    if (src.type !== "origin") return wrap_src(src.origin, content);
     return { val: content, src };
   }
   function stx_to_ns(stx: AST | STX, semi: boolean): ns {
@@ -60,12 +60,12 @@ function loc_to_ns(loc: Loc): ns {
           case "string":
           case "regex":
           case "other":
-            return wrap_src(stx.src, stx.content);
+            return wrap_src(stx.origin, stx.content);
           case "ERROR":
             return [
-              wrap_src(stx.src, "!!!ERROR!!!"),
-              wrap_src(stx.src, stx.content),
-              wrap_src(stx.src, "!!!ERROR!!!"),
+              wrap_src(stx.origin, "!!!ERROR!!!"),
+              wrap_src(stx.origin, stx.content),
+              wrap_src(stx.origin, "!!!ERROR!!!"),
             ];
           default:
             const invalid: never = stx;
@@ -127,7 +127,6 @@ function loc_to_ns(loc: Loc): ns {
 const lparen: n = { val: "(", src: false };
 const rparen: n = { val: ")", src: false };
 const space: n = { val: " ", src: false };
-const newline: n = { val: "\n", src: false };
 const lpointer: n = { val: "/*>>>*/", src: false };
 const rpointer: n = { val: "/*<<<*/", src: false };
 

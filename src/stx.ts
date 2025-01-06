@@ -2,7 +2,7 @@ import { assert } from "./assert";
 import { AST } from "./ast";
 import { LL, llappend } from "./llhelpers";
 import {
-  AE,
+  origin,
   antimark,
   Binding,
   CompilationUnit,
@@ -20,7 +20,7 @@ import {
   top_marks,
   Wrap,
 } from "./syntax-structures";
-import { get_globals, globals_cuid } from "./global-module";
+import { globals_cuid } from "./global-module";
 import { syntax_error } from "./stx-error";
 import { preexpand_helpers } from "./preexpand-helpers";
 import { counters } from "./data";
@@ -261,7 +261,7 @@ function llcancel<X>(ls1: [X, LL<X>], ls2: [X, LL<X>]): LL<X> {
   return f(ls1[0], ls1[1]);
 }
 
-function merge_aes(ls1: LL<AE>, ls2: LL<AE>): LL<AE> {
+function merge_aes(ls1: LL<origin>, ls2: LL<origin>): LL<origin> {
   if (ls1 !== null && ls2 !== null && ls2[0] === false) {
     return llcancel(ls1, ls2);
   } else {
@@ -301,7 +301,7 @@ export function push_wrap(outerwrap: Wrap): (stx: AST | STX) => STX {
           wrap,
           tag: stx.tag,
           content: stx.content,
-          src: stx,
+          origin: stx,
         };
       }
       case "atom": {
@@ -310,7 +310,7 @@ export function push_wrap(outerwrap: Wrap): (stx: AST | STX) => STX {
           wrap,
           tag: stx.tag,
           content: stx.content,
-          src: stx,
+          origin: stx,
         };
       }
     }
@@ -337,7 +337,7 @@ export function init_top_level(
   const top_wrap: Wrap = { marks, subst: [{ rib_id, cu_id: cuid }, null], aes: null };
   const rib: Rib = { type: "rib", normal_env: {}, types_env: {}, libs: libs };
   function wrap(ast: AST): STX {
-    return { ...ast, wrap: top_wrap, src: ast };
+    return { ...ast, wrap: top_wrap, origin: ast };
   }
   const unit: CompilationUnit = {
     cu_id: cuid,
