@@ -67,7 +67,7 @@ export type RibRef = { rib_id: string; cu_id: string };
 
 export type Subst = LL<Shift | RibRef>;
 
-export type origin = false | STX | AST | source;
+export type origin = false | STX | source;
 
 export type Wrap = { marks: Marks; subst: Subst; aes: LL<origin> };
 

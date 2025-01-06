@@ -301,7 +301,7 @@ export function push_wrap(outerwrap: Wrap): (stx: AST | STX) => STX {
           wrap,
           tag: stx.tag,
           content: stx.content,
-          origin: stx,
+          origin: stx.origin,
         };
       }
       case "atom": {
@@ -310,7 +310,7 @@ export function push_wrap(outerwrap: Wrap): (stx: AST | STX) => STX {
           wrap,
           tag: stx.tag,
           content: stx.content,
-          origin: stx,
+          origin: stx.origin,
         };
       }
     }
@@ -337,7 +337,7 @@ export function init_top_level(
   const top_wrap: Wrap = { marks, subst: [{ rib_id, cu_id: cuid }, null], aes: null };
   const rib: Rib = { type: "rib", normal_env: {}, types_env: {}, libs: libs };
   function wrap(ast: AST): STX {
-    return { ...ast, wrap: top_wrap, origin: ast };
+    return { ...ast, wrap: top_wrap, origin: ast.origin };
   }
   const unit: CompilationUnit = {
     cu_id: cuid,

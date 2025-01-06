@@ -1,6 +1,6 @@
 {
   "cid": "test-project/sourcemap1.test.rts rewrite-ts-visualized 0.0.0",
-  "cookie": "rewrite-ts-027",
+  "cookie": "rewrite-ts-028",
   "imports": [
     {
       "pkg": {"name": "vitest", "version": "2.1.8"},

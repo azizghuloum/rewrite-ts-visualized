@@ -1,6 +1,6 @@
 {
   "cid": "test-project/mod.rts rewrite-ts-visualized 0.0.0",
-  "cookie": "rewrite-ts-027",
+  "cookie": "rewrite-ts-028",
   "imports": [],
   "exported_identifiers": {
     "x": [
@@ -60,16 +60,11 @@
               "tag": "identifier",
               "content": "fref",
               "origin": {
-                "type": "atom",
-                "tag": "identifier",
-                "content": "fref",
-                "origin": {
-                  "type": "origin",
-                  "s": {"line": 5, "column": 28, "offset": 89},
-                  "e": {"line": 5, "column": 32, "offset": 93},
-                  "name": "fref",
-                  "cuid": "test-project/mod.rts rewrite-ts-visualized 0.0.0"
-                }
+                "type": "origin",
+                "s": {"line": 5, "column": 28, "offset": 89},
+                "e": {"line": 5, "column": 32, "offset": 93},
+                "name": "fref",
+                "cuid": "test-project/mod.rts rewrite-ts-visualized 0.0.0"
               }
             },
             "p": {"type": "top"}
@@ -93,16 +88,11 @@
             "tag": "identifier",
             "content": "f",
             "origin": {
-              "type": "atom",
-              "tag": "identifier",
-              "content": "f",
-              "origin": {
-                "type": "origin",
-                "s": {"line": 5, "column": 40, "offset": 101},
-                "e": {"line": 5, "column": 41, "offset": 102},
-                "name": "f",
-                "cuid": "test-project/mod.rts rewrite-ts-visualized 0.0.0"
-              }
+              "type": "origin",
+              "s": {"line": 5, "column": 40, "offset": 101},
+              "e": {"line": 5, "column": 41, "offset": 102},
+              "name": "f",
+              "cuid": "test-project/mod.rts rewrite-ts-visualized 0.0.0"
             }
           }
         }
